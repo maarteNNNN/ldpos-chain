@@ -13,6 +13,8 @@
   "author": "Jonathan Gros-Dubois",
   "license": "GPL-3.0",
   "dependencies": {
+    "lamport": "0.0.0",
+    "lamport-ots": "^1.1.0",
     "mocha": "^8.1.1"
   }
 }

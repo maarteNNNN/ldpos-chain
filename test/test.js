@@ -1,11 +1,15 @@
 const assert = require('assert');
+const DAL = require('./utils/dal');
 const LPoSChainModule = require('../index');
 
 describe('Unit tests', async () => {
   let chainModule;
 
   beforeEach(async () => {
-    chainModule = new LPoSChainModule({});
+    chainModule = new LPoSChainModule({
+      candidateListBroadcastInterval: 5000,
+      dal: new DAL()
+    });
   });
 
   describe('Core methods', async () => {
@@ -30,6 +34,7 @@ describe('Unit tests', async () => {
       assert.equal(events.includes('bootstrap'), true);
       assert.equal(events.includes('chainChanges'), true);
     });
+
   });
 
   describe('getMultisigWalletMembers action', async () => {

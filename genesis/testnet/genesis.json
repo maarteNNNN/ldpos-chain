@@ -1,0 +1,16 @@
+{
+  "accounts": [
+    {
+      "address": "",
+      "candidacyKeyIndex": 0,
+      "candidacyPublicKey": "",
+      "votingKeyIndex": 0,
+      "votingPublicKey": "",
+      "forgingKeyIndex": 0,
+      "forgingPublicKey": "",
+      "transactionKeyIndex": 0,
+      "transactionPublicKey": "",
+      "balance": "10000000000000000"
+    }
+  ]
+}
