@@ -15,6 +15,6 @@
   "dependencies": {
     "bip39": "^3.0.2",
     "mocha": "^8.1.1",
-    "simple-lamport": "^1.2.0"
+    "proper-merkle": "^1.0.2"
   }
 }
