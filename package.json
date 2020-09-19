@@ -15,6 +15,6 @@
   "dependencies": {
     "bip39": "^3.0.2",
     "mocha": "^8.1.1",
-    "proper-merkle": "^1.0.2"
+    "proper-merkle": "^1.1.0"
   }
 }
