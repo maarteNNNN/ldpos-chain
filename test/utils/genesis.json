@@ -1,0 +1,18 @@
+{
+  "accounts": [
+    {
+      "address": "30edd8c048b555f77fe6c0324c6833e1d123dd35de68f92b6a75394b2b136b17lpos",
+      "candidacyKeyIndex": 0,
+      "candidacyPublicKey": "njbUmFggDmjupB94a6+Ha+le3ncNSE9f7CyPiLa8G78=",
+      "votingKeyIndex": 0,
+      "votingPublicKey": "yiNN1FD53NpPRvJPragY85vfPPbjK1YhT2Pm8xnC5Po=",
+      "forgingKeyIndex": 0,
+      "forgingPublicKey": "fxihWHnU6LQ1oSGERrWNYIFqM/OjoE54o/osDX2TTkI=",
+      "multisigKeyIndex": 0,
+      "multisigPublicKey": "SSF1HdPmSTxTGQfVx27X9zcByp+WAJAmimx+7hgcw34=",
+      "sigKeyIndex": 0,
+      "sigPublicKey": "MO3YwEi1Vfd/5sAyTGgz4dEj3TXeaPkranU5SysTaxc=",
+      "balance": "10000000000000000"
+    }
+  ]
+}

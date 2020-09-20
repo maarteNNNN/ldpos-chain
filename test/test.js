@@ -1,15 +1,25 @@
 const assert = require('assert');
 const DAL = require('./utils/dal');
+const Channel = require('./utils/channel');
 const LPoSChainModule = require('../index');
 
 describe('Unit tests', async () => {
   let chainModule;
+  let channel;
+  let options;
 
   beforeEach(async () => {
     chainModule = new LPoSChainModule({
       candidateListBroadcastInterval: 5000,
       dal: new DAL()
     });
+    channel = new Channel();
+    options = {
+      genesisPath: './utils/genesis.json',
+      stakingPassphrase: 'save tree rib blouse weapon broccoli finger tenant accuse taste copper cinnamon'
+    };
+
+    await chainModule.load(channel, options);
   });
 
   describe('Core methods', async () => {

@@ -3,7 +3,9 @@
 const bip39 = require('bip39');
 const ProperMerkle = require('proper-merkle');
 
-let merkle = new ProperMerkle();
+let merkle = new ProperMerkle({
+  leafCount: 32
+});
 
 let mnemonic = bip39.generateMnemonic();
 
