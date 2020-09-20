@@ -1,6 +1,7 @@
 const pkg = require('./package.json');
 const crypto = require('crypto');
 const genesisBlock = require('./genesis/testnet/genesis.json');
+const LPoSClient = require('lpos-client');
 
 const DEFAULT_MODULE_ALIAS = 'lpos_chain';
 const DEFAULT_MAX_CANDIDACY_LIST_LENGTH = 100;
@@ -8,6 +9,7 @@ const DEFAULT_GENESIS_PATH = './genesis/mainnet/genesis.json';
 
 module.exports = class LPoSChainModule {
   constructor(options) {
+    this.lposClient = new LPoSClient();
     this.alias = options.alias || DEFAULT_MODULE_ALIAS;
     this.logger = options.logger;
     if (options.dal) {
@@ -120,7 +122,7 @@ module.exports = class LPoSChainModule {
     this.genesis = require(options.genesisPath || DEFAULT_GENESIS_PATH);
 
     this._stakingPassphrase = options.stakingPassphrase;
-    this._stakingWalletAddress = options.stakingWalletAddress; // TODO 222: Derive from the passphrase
+    this._stakingWalletAddress = this.lposClient.getAccountAddressFromPassphrase(this._stakingPassphrase);
     this._candidacyMap = {};
     this._candidacyListHash = null;
 

@@ -14,6 +14,7 @@
   "license": "GPL-3.0",
   "dependencies": {
     "bip39": "^3.0.2",
+    "lpos-client": "^1.0.0",
     "mocha": "^8.1.1",
     "proper-merkle": "^1.1.0"
   }
