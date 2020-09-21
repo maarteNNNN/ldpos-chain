@@ -1,7 +1,7 @@
 const pkg = require('./package.json');
 const crypto = require('crypto');
 const genesisBlock = require('./genesis/testnet/genesis.json');
-const LPoSClient = require('lpos-client');
+const { createLPoSClient } = require('lpos-client');
 
 const DEFAULT_MODULE_ALIAS = 'lpos_chain';
 const DEFAULT_MAX_CANDIDACY_LIST_LENGTH = 100;
@@ -9,7 +9,6 @@ const DEFAULT_GENESIS_PATH = './genesis/mainnet/genesis.json';
 
 module.exports = class LPoSChainModule {
   constructor(options) {
-    this.lposClient = new LPoSClient();
     this.alias = options.alias || DEFAULT_MODULE_ALIAS;
     this.logger = options.logger;
     if (options.dal) {
@@ -82,18 +81,6 @@ module.exports = class LPoSChainModule {
     };
   }
 
-  async generateCandidacyToken(candidateAddress, stakingPassphrase) {
-    let randomBuffer = crypto.randomBytes();
-    let randomString = randomBuffer.toString('hex');
-    let candidateBalance = await this.dal.getAccountBalance(candidateAddress);
-    return {
-      candidateAddress,
-      candidateBalance,
-      candidacyNumber: randomString,
-      signature: 'TODO 222'
-    };
-  }
-
   getCandidacyListHash(candidacyMap) {
     // TODO make sure that the order is deterministic
     return 'TODO 222';
@@ -120,15 +107,20 @@ module.exports = class LPoSChainModule {
     this.channel = channel;
 
     this.genesis = require(options.genesisPath || DEFAULT_GENESIS_PATH);
-
-    this._stakingPassphrase = options.stakingPassphrase;
-    this._stakingWalletAddress = this.lposClient.getAccountAddressFromPassphrase(this._stakingPassphrase);
-    this._candidacyMap = {};
-    this._candidacyListHash = null;
-
     await this.dal.init({
       genesis: this.genesis
     });
+
+    this.lposClient = await createLPoSClient({
+      network: 'lpos',
+      passphrase: options.stakingPassphrase,
+      adapter: this.dal
+    });
+
+    this._stakingPassphrase = options.stakingPassphrase;
+    this._stakingWalletAddress = this.lposClient.getAccountAddress();
+    this._candidacyMap = {};
+    this._candidacyListHash = null;
 
     let processedCandidacyPeerSet = {};
     let processedCandidacyListHashSet = {};
@@ -193,8 +185,12 @@ module.exports = class LPoSChainModule {
       if (this._stakingPassphrase) {
         if (!this._candidacyMap[this._stakingWalletAddress]) {
           try {
-            let candidacyToken = await this.generateCandidacyToken(this._stakingWalletAddress, this._stakingPassphrase);
-            this._candidacyMap[candidacyToken.candidateAddress] = candidacyToken;
+            let candidacyToken = this.lposClient.generateCandidacyToken();
+            let candidateBalance = await this.dal.getAccountBalance(candidacyToken.candidateAddress);
+            this._candidacyMap[candidacyToken.candidateAddress] = {
+              ...candidacyToken,
+              candidateBalance
+            };
           } catch (error) {
             this.logger.error(`Failed to generate candidacy token because of error: ${error.message}`);
           }

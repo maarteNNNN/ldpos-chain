@@ -15,6 +15,20 @@ class DAL {
     }
   }
 
+  async getAccountKeyIndexes(accountAddress) {
+    let account = this.accounts[account.address];
+    if (!account) {
+      throw new Error(`Account ${accountAddress} does not exist`);
+    }
+    return {
+      candidacyKeyIndex: account.candidacyKeyIndex,
+      votingKeyIndex: account.votingKeyIndex,
+      forgingKeyIndex: account.forgingKeyIndex,
+      multisigKeyIndex: account.multisigKeyIndex,
+      sigKeyIndex: account.sigKeyIndex
+    };
+  }
+
   async getAccountBalance(accountAddress) {
     let account = this.accounts[account.address];
     if (!account) {
