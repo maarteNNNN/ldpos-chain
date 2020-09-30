@@ -1,6 +1,7 @@
 class DAL {
   constructor() {
     this.accounts = {};
+    this.votes = {};
   }
 
   async init(options) {
@@ -12,7 +13,17 @@ class DAL {
         ...account,
         balance: BigInt(account.balance)
       };
+      for (let vote of account.votes) {
+        if (!this.votes[vote]) {
+          this.votes[vote] = [];
+        }
+        this.votes[vote].push(account.address);
+      }
     }
+  }
+
+  async getNetworkSymbol() {
+    return 'ldpos';
   }
 
   async getAccountKeyIndexes(accountAddress) {
@@ -21,8 +32,6 @@ class DAL {
       throw new Error(`Account ${accountAddress} does not exist`);
     }
     return {
-      candidacyKeyIndex: account.candidacyKeyIndex,
-      votingKeyIndex: account.votingKeyIndex,
       forgingKeyIndex: account.forgingKeyIndex,
       multisigKeyIndex: account.multisigKeyIndex,
       sigKeyIndex: account.sigKeyIndex

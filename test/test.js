@@ -1,7 +1,7 @@
 const assert = require('assert');
 const DAL = require('./utils/dal');
 const Channel = require('./utils/channel');
-const LPoSChainModule = require('../index');
+const LDPoSChainModule = require('../index');
 
 describe('Unit tests', async () => {
   let chainModule;
@@ -9,7 +9,7 @@ describe('Unit tests', async () => {
   let options;
 
   beforeEach(async () => {
-    chainModule = new LPoSChainModule({
+    chainModule = new LDPoSChainModule({
       candidateListBroadcastInterval: 5000,
       dal: new DAL()
     });

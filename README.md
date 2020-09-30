@@ -1,2 +1,2 @@
-# lpos-chain
-Simple PoS chain module compatible with LDEX
+# ldpos-chain
+Simple DPoS chain module compatible with LDEX

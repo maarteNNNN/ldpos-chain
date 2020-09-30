@@ -1,20 +1,20 @@
 {
-  "name": "lpos-chain",
+  "name": "ldpos-chain",
   "version": "1.0.0",
-  "description": "LPoS chain module",
+  "description": "LDPoS chain module",
   "main": "index.js",
   "scripts": {
     "test": "mocha --reporter spec --timeout 3000 --slow 3000"
   },
   "keywords": [
     "blockchain",
-    "pos"
+    "dpos"
   ],
   "author": "Jonathan Gros-Dubois",
   "license": "GPL-3.0",
   "dependencies": {
     "bip39": "^3.0.2",
-    "lpos-client": "^1.0.0",
+    "ldpos-client": "^1.0.0",
     "mocha": "^8.1.1",
     "proper-merkle": "^1.1.0"
   }

@@ -1,18 +1,15 @@
 {
   "accounts": [
     {
-      "address": "5aaf013071110f71d3147b66f069d6dd7957b92d250394b972b2a48fd73af266lpos",
-      "candidacyKeyIndex": 0,
-      "candidacyPublicKey": "pmfR9Q0nFCKeHV4DezLplWSJAZiwV471fH0cDqHV2Vo=",
-      "votingKeyIndex": 0,
-      "votingPublicKey": "Z3/0uCToqogXNOY2jyLhfTA+xKAyuVs+loq27ieoWNU=",
+      "address": "120e44ab595b9fdd8bbca48250a31f3b87f80dbc61605d75e7e00f8a534267bdldpos",
       "forgingKeyIndex": 0,
-      "forgingPublicKey": "e2hvmkVKFSYLdC8FaMHMLVTAkxn+7vxBTrzylzyXo1Q=",
+      "forgingPublicKey": "WTcFfqZWdSALmEfGFC1chWwCB3p6xH6gSqIayN6TDwc=",
       "multisigKeyIndex": 0,
-      "multisigPublicKey": "u7By8juQmXh7fuGjs/7MrnD33X/HHCFI0TnTgvDOGi4=",
+      "multisigPublicKey": "/1D8xpQo+hkN8h4b/39IlRk/PR1/qAN38jMmcd2Mqh4=",
       "sigKeyIndex": 0,
-      "sigPublicKey": "Wq8BMHERD3HTFHtm8GnW3XlXuS0lA5S5crKkj9c68mY=",
-      "balance": "10000000000000000"
+      "sigPublicKey": "Eg5Eq1lbn92LvKSCUKMfO4f4DbxhYF115+APilNCZ70=",
+      "balance": "10000000000000000",
+      "votes": ["120e44ab595b9fdd8bbca48250a31f3b87f80dbc61605d75e7e00f8a534267bdldpos"]
     }
   ]
 }
