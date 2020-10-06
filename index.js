@@ -6,6 +6,7 @@ const { createLDPoSClient } = require('ldpos-client');
 const DEFAULT_MODULE_ALIAS = 'ldpos_chain';
 const DEFAULT_GENESIS_PATH = './genesis/mainnet/genesis.json';
 const DEFAULT_RECEIVE_BLOCK_TIMEOUT_FACTOR = 1.5;
+const DEFAULT_BLOCK_FORGING_RETRY_DELAY = 1000;
 
 module.exports = class LDPoSChainModule {
   constructor(options) {
@@ -16,6 +17,7 @@ module.exports = class LDPoSChainModule {
     } else {
       // TODO 222: Default to postgres adapter as Data Access Layer
     }
+    this.pendingTransactionMap = new Map();
   }
 
   get dependencies() {
@@ -91,21 +93,57 @@ module.exports = class LDPoSChainModule {
 
   async catchUpWithNetwork() {
     // TODO 222
+    // this.nodeHeight = latestHeight;
+    // this.networkHeight = latestHeight;
   }
 
   async receiveNextBlock(timeout) {
     // TODO 222
   }
 
+  async getCurrentBlockTimeSlot() {
+    let { blockForgingInterval } = this.options;
+    return Math.round(Date.now() / blockForgingInterval) * blockForgingInterval;
+  }
+
+  async getCurrentForgingDelegateAddress() {
+
+  }
+
+  forgeBlock(transactionList) {
+
+  }
+
+  async processBlock(block) {
+
+  }
+
+  verifyTransaction(transaction) {
+
+  }
+
+  async broadcastBlock(block) {
+    await channel.invoke('network:emit', {
+      event: `${this.alias}:block`,
+      data: block
+    });
+  }
+
   async startBlockProcessingLoop() {
     let options = this.options;
+    let channel = this.channel;
+
     let {
       blockForgingInterval,
+      blockForgingRetryDelay,
       receiveBlockTimeoutFactor
     } = options;
 
-    if (!receiveBlockTimeoutFactor) {
+    if (receiveBlockTimeoutFactor == null) {
       receiveBlockTimeoutFactor = DEFAULT_RECEIVE_BLOCK_TIMEOUT_FACTOR;
+    }
+    if (blockForgingRetryDelay == null) {
+      blockForgingRetryDelay = DEFAULT_BLOCK_FORGING_RETRY_DELAY;
     }
     let blockReceiveTimeout = blockForgingInterval * receiveBlockTimeoutFactor;
 
@@ -123,17 +161,64 @@ module.exports = class LDPoSChainModule {
 
     while (true) {
       // If the node is already on the latest network height, it will just return it.
-      let latestHeight = await this.catchUpWithNetwork();
+      await this.catchUpWithNetwork();
 
-      this.nodeHeight = latestHeight;
-      this.networkHeight = latestHeight;
+      if (forgingWalletAddress && forgingWalletAddress === this.getCurrentForgingDelegateAddress()) {
+        let forgedBlock = this.forgeBlock(); // TODO 222 pass transactionList as argument.
 
-      let latestBlock = await this.receiveNextBlock(blockReceiveTimeout);
+        try {
+          await this.broadcastBlock(forgedBlock);
+        } catch (error) {
+          this.logger.error(error);
+          await this.wait(blockForgingRetryDelay);
+          continue;
+        }
+      }
 
-      if (forgingWalletAddress) {
-        // TODO 222
+      let latestBlock;
+      try {
+        latestBlock = await this.receiveNextBlock(blockReceiveTimeout);
+        // Will throw if block has already been processed before.
+        await this.processBlock(latestBlock);
+        // Propagate if block was valid and processed successfully.
+        await this.broadcastBlock(latestBlock);
+      } catch (error) {
+        this.logger.error(error);
+        continue;
       }
     }
+  }
+
+  async startTransactionPropagationLoop() {
+    let channel = this.channel;
+    channel.subscribe(`network:event:${this.alias}:transaction`, async (event) => {
+      let transaction = event.data;
+
+      if (transaction && this.pendingTransactionMap.has(transaction.id)) {
+        this.logger.error(
+          new Error(`Transaction ${transaction.id} has already been received before`)
+        );
+        return;
+      }
+
+      try {
+        this.verifyTransaction(transaction);
+      } catch (error) {
+        this.logger.error(
+          new Error(`Transaction is invalid - ${error.message}`)
+        );
+        return;
+      }
+
+      try {
+        await channel.invoke('network:emit', {
+          event: `${this.alias}:transaction`,
+          data: transaction
+        });
+      } catch (error) {
+        this.logger.error(error);
+      }
+    });
   }
 
   async load(channel, options) {
@@ -145,6 +230,7 @@ module.exports = class LDPoSChainModule {
       genesis: this.genesis
     });
 
+    this.startTransactionPropagationLoop();
     this.startBlockProcessingLoop();
 
     channel.publish(`${this.alias}:bootstrap`);
@@ -152,5 +238,11 @@ module.exports = class LDPoSChainModule {
 
   async unload() {
 
+  }
+
+  async wait(duration) {
+    return new Promise((resolve) => {
+      setTimeout(resolve, duration);
+    });
   }
 };
