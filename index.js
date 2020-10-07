@@ -99,6 +99,8 @@ module.exports = class LDPoSChainModule {
 
   async receiveNextBlock(timeout) {
     // TODO 222
+    // As part of validation, check that all the transactions in the newly
+    // received block are inside our pendingTransactionMap.
   }
 
   async getCurrentBlockTimeSlot() {
@@ -177,8 +179,8 @@ module.exports = class LDPoSChainModule {
 
       let latestBlock;
       try {
+        // Will throw if block is not valid or has already been processed before.
         latestBlock = await this.receiveNextBlock(blockReceiveTimeout);
-        // Will throw if block has already been processed before.
         await this.processBlock(latestBlock);
         // Propagate if block was valid and processed successfully.
         await this.broadcastBlock(latestBlock);
