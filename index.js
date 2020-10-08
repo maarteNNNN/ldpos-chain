@@ -7,6 +7,7 @@ const DEFAULT_MODULE_ALIAS = 'ldpos_chain';
 const DEFAULT_GENESIS_PATH = './genesis/mainnet/genesis.json';
 const DEFAULT_RECEIVE_BLOCK_TIMEOUT_FACTOR = 1.5;
 const DEFAULT_BLOCK_FORGING_RETRY_DELAY = 1000;
+const DEFAULT_DELEGATE_COUNT = 21;
 
 module.exports = class LDPoSChainModule {
   constructor(options) {
@@ -18,6 +19,8 @@ module.exports = class LDPoSChainModule {
       // TODO 222: Default to postgres adapter as Data Access Layer
     }
     this.pendingTransactionMap = new Map();
+    this.latestBlock = null;
+    this.latestBlockSignatureMap = new Map();
   }
 
   get dependencies() {
@@ -97,10 +100,16 @@ module.exports = class LDPoSChainModule {
     // this.networkHeight = latestHeight;
   }
 
-  async receiveNextBlock(timeout) {
+  async receiveLatestBlock(height, timeout) {
+    // TODO 2222 If timeout is undefined, wait forever until block is received.
+
     // TODO 222
     // As part of validation, check that all the transactions in the newly
     // received block are inside our pendingTransactionMap.
+  }
+
+  async receiveLatestBlockSignatures(latestBlock, requiredSignatureCount, timeout) {
+
   }
 
   async getCurrentBlockTimeSlot() {
@@ -112,7 +121,7 @@ module.exports = class LDPoSChainModule {
 
   }
 
-  forgeBlock(transactionList) {
+  forgeBlock(height, transactionList) {
 
   }
 
@@ -124,11 +133,30 @@ module.exports = class LDPoSChainModule {
 
   }
 
+  verifyBlock(block) {
+
+  }
+
+  verifySignature(signature) {
+
+  }
+
   async broadcastBlock(block) {
     await channel.invoke('network:emit', {
       event: `${this.alias}:block`,
       data: block
     });
+  }
+
+  async broadcastBlockSignature(signature) {
+    await channel.invoke('network:emit', {
+      event: `${this.alias}:blockSignature`,
+      data: signature
+    });
+  }
+
+  async signBlock(block) {
+
   }
 
   async startBlockProcessingLoop() {
@@ -137,16 +165,17 @@ module.exports = class LDPoSChainModule {
 
     let {
       blockForgingInterval,
-      blockForgingRetryDelay,
-      receiveBlockTimeoutFactor
+      receiveBlockTimeoutFactor,
+      delegateCount
     } = options;
 
     if (receiveBlockTimeoutFactor == null) {
       receiveBlockTimeoutFactor = DEFAULT_RECEIVE_BLOCK_TIMEOUT_FACTOR;
     }
-    if (blockForgingRetryDelay == null) {
-      blockForgingRetryDelay = DEFAULT_BLOCK_FORGING_RETRY_DELAY;
+    if (delegateCount == null) {
+      delegateCount = DEFAULT_DELEGATE_COUNT;
     }
+    let delegateMajorityCount = Math.ceil(delegateCount / 2);
     let blockReceiveTimeout = blockForgingInterval * receiveBlockTimeoutFactor;
 
     let ldposClient;
@@ -160,30 +189,54 @@ module.exports = class LDPoSChainModule {
 
       forgingWalletAddress = ldposClient.getAccountAddress();
     }
+    this.ldposClient = ldposClient;
+    this.nodeHeight = await this.dal.getLatestHeight();
 
     while (true) {
+      this.latestBlockSignatureMap.clear();
       // If the node is already on the latest network height, it will just return it.
-      await this.catchUpWithNetwork();
+      this.networkHeight = await this.catchUpWithNetwork();
+      this.nodeHeight = this.networkHeight;
+      let nextHeight = this.networkHeight + 1;
 
-      if (forgingWalletAddress && forgingWalletAddress === this.getCurrentForgingDelegateAddress()) {
-        let forgedBlock = this.forgeBlock(); // TODO 222 pass transactionList as argument.
+      let isCurrentForgingDelegate = forgingWalletAddress && forgingWalletAddress === this.getCurrentForgingDelegateAddress();
 
-        try {
-          await this.broadcastBlock(forgedBlock);
-        } catch (error) {
-          this.logger.error(error);
-          await this.wait(blockForgingRetryDelay);
-          continue;
+      (async () => {
+        if (isCurrentForgingDelegate) {
+          let forgedBlock = this.forgeBlock(nextHeight); // TODO 222 pass transactionList as argument.
+          try {
+            await this.broadcastBlock(forgedBlock);
+          } catch (error) {
+            this.logger.error(error);
+          }
         }
-      }
+      })();
 
-      let latestBlock;
       try {
         // Will throw if block is not valid or has already been processed before.
-        latestBlock = await this.receiveNextBlock(blockReceiveTimeout);
+        latestBlock = await this.receiveLatestBlock(nextHeight, blockReceiveTimeout);
+
+        if (forgingWalletAddress && !isCurrentForgingDelegate) {
+          (async () => {
+            try {
+              let selfSignature = await this.signBlock(latestBlock);
+              this.latestBlockSignatureMap.set(selfSignature.id, selfSignature);
+              await this.broadcastBlockSignature(selfSignature);
+            } catch (error) {
+              this.logger.error(error);
+            }
+          })();
+        }
+
+        // Will throw if the required number of valid signatures cannot be gathered in time.
+        latestBlockSignatures = await this.receiveLatestBlockSignatures(latestBlock, delegateMajorityCount, blockReceiveTimeout);
+        this.latestBlock = {
+          ...latestBlock,
+          signatures: latestBlockSignatures
+        };
+        this.nodeHeight = nextHeight;
+        this.networkHeight = nextHeight;
         await this.processBlock(latestBlock);
-        // Propagate if block was valid and processed successfully.
-        await this.broadcastBlock(latestBlock);
       } catch (error) {
         this.logger.error(error);
         continue;
@@ -196,13 +249,6 @@ module.exports = class LDPoSChainModule {
     channel.subscribe(`network:event:${this.alias}:transaction`, async (event) => {
       let transaction = event.data;
 
-      if (transaction && this.pendingTransactionMap.has(transaction.id)) {
-        this.logger.error(
-          new Error(`Transaction ${transaction.id} has already been received before`)
-        );
-        return;
-      }
-
       try {
         this.verifyTransaction(transaction);
       } catch (error) {
@@ -212,11 +258,76 @@ module.exports = class LDPoSChainModule {
         return;
       }
 
+      if (this.pendingTransactionMap.has(transaction.id)) {
+        this.logger.error(
+          new Error(`Transaction ${transaction.id} has already been received before`)
+        );
+        return;
+      }
+
       try {
         await channel.invoke('network:emit', {
           event: `${this.alias}:transaction`,
           data: transaction
         });
+      } catch (error) {
+        this.logger.error(error);
+      }
+    });
+  }
+
+  async startBlockPropagationLoop() {
+    let channel = this.channel;
+    channel.subscribe(`network:event:${this.alias}:block`, async (event) => {
+      let block = event.data;
+
+      try {
+        this.verifyBlock(block); // TODO 222: Make sure that block is valid and references appropriate height
+      } catch (error) {
+        this.logger.error(
+          new Error(`Block is invalid - ${error.message}`)
+        );
+        return;
+      }
+
+      if (this.latestBlock && this.latestBlock.id === block.id) {
+        this.logger.error(
+          new Error(`Block ${block.id} has already been received before`)
+        );
+        return;
+      }
+
+      try {
+        await this.broadcastBlock(block);
+      } catch (error) {
+        this.logger.error(error);
+      }
+    });
+  }
+
+  async startBlockSignaturePropagationLoop() {
+    let channel = this.channel;
+    channel.subscribe(`network:event:${this.alias}:blockSignature`, async (event) => {
+      let signature = event.data;
+
+      try {
+        this.verifySignature(signature); // TODO 222: Make sure that signature is valid and references appropriate block ID and height
+      } catch (error) {
+        this.logger.error(
+          new Error(`Block signature is invalid - ${error.message}`)
+        );
+        return;
+      }
+
+      if (this.latestBlockSignatureMap.has(signature.id)) {
+        this.logger.error(
+          new Error(`Block signature ${signature.id} has already been received before`)
+        );
+        return;
+      }
+
+      try {
+        await this.broadcastBlockSignature(signature);
       } catch (error) {
         this.logger.error(error);
       }
@@ -233,6 +344,8 @@ module.exports = class LDPoSChainModule {
     });
 
     this.startTransactionPropagationLoop();
+    this.startBlockPropagationLoop();
+    this.startBlockSignaturePropagationLoop();
     this.startBlockProcessingLoop();
 
     channel.publish(`${this.alias}:bootstrap`);

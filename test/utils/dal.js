@@ -2,6 +2,7 @@ class DAL {
   constructor() {
     this.accounts = {};
     this.votes = {};
+    this.blocks = [null];
   }
 
   async init(options) {
@@ -44,6 +45,18 @@ class DAL {
       throw new Error(`Account ${accountAddress} does not exist`);
     }
     return account.balance;
+  }
+
+  async getBlockAtHeight(height) {
+    return this.blocks[height];
+  }
+
+  async getLatestBlock() {
+    return this.blocks[this.blocks.length - 1];
+  }
+
+  async getLatestHeight() {
+    return this.blocks.length;
   }
 }
 
