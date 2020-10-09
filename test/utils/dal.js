@@ -58,6 +58,12 @@ class DAL {
   async getLatestHeight() {
     return this.blocks.length;
   }
+
+  async insertBlocks(blocks) {
+    for (let block of blocks) {
+      this.blocks[block.height] = block;
+    }
+  }
 }
 
 module.exports = DAL;
