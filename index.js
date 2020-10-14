@@ -2,11 +2,12 @@ const pkg = require('./package.json');
 const crypto = require('crypto');
 const genesisBlock = require('./genesis/testnet/genesis.json');
 const { createLDPoSClient } = require('ldpos-client');
+const WritableConsumableStream = require('writable-consumable-stream');
 
 const DEFAULT_MODULE_ALIAS = 'ldpos_chain';
 const DEFAULT_GENESIS_PATH = './genesis/mainnet/genesis.json';
 const DEFAULT_DELEGATE_COUNT = 21;
-const DEFAULT_FORGING_INTERVAL = 20000;
+const DEFAULT_FORGING_INTERVAL = 30000;
 const DEFAULT_FETCH_BLOCK_LIMIT = 20;
 const DEFAULT_FETCH_BLOCK_PAUSE = 100;
 const DEFAULT_FETCH_BLOCK_END_CONFIRMATIONS = 10;
@@ -14,6 +15,7 @@ const DEFAULT_FORGING_BLOCK_BROADCAST_DELAY = 2000;
 const DEFAULT_FORGING_SIGNATURE_BROADCAST_DELAY = 5000;
 const DEFAULT_PROPAGATION_TIMEOUT = 5000;
 const DEFAULT_TIME_POLL_INTERVAL = 200;
+const DEFAULT_MAX_TRANSACTIONS_PER_BLOCK = 300;
 
 module.exports = class LDPoSChainModule {
   constructor(options) {
@@ -27,6 +29,8 @@ module.exports = class LDPoSChainModule {
     this.pendingTransactionMap = new Map();
     this.latestBlock = null;
     this.latestBlockSignatureMap = new Map();
+
+    this.verifiedBlockStream = new WritableConsumableStream();
   }
 
   get dependencies() {
@@ -92,14 +96,6 @@ module.exports = class LDPoSChainModule {
     };
   }
 
-  async getHighestNodeHeight() {
-    // TODO 222
-  }
-
-  async getHighestNetworkHeight() {
-    // TODO 222
-  }
-
   async catchUpWithNetwork(options) {
     let { forgingInterval, fetchBlockEndConfirmations } = options;
 
@@ -153,12 +149,8 @@ module.exports = class LDPoSChainModule {
     return nodeHeight;
   }
 
-  async receiveLatestBlock(height, timeout) {
-    // TODO 2222 If timeout is undefined, wait forever until block is received.
-
-    // TODO 222
-    // As part of validation, check that all the transactions in the newly
-    // received block are inside our pendingTransactionMap.
+  async receiveLatestBlock(timeout) {
+    return this.verifiedBlockStream.once(timeout);
   }
 
   async receiveLatestBlockSignatures(latestBlock, requiredSignatureCount, timeout) {
@@ -189,7 +181,7 @@ module.exports = class LDPoSChainModule {
 
   }
 
-  verifySignature(signature) {
+  verifyBlockSignature(blockSignature) {
 
   }
 
@@ -235,7 +227,8 @@ module.exports = class LDPoSChainModule {
       fetchBlockLimit,
       fetchBlockPause,
       fetchBlockEndConfirmations,
-      propagationTimeout
+      propagationTimeout,
+      maxTransactionsPerBlock
     } = options;
 
     if (forgingInterval == null) {
@@ -264,6 +257,9 @@ module.exports = class LDPoSChainModule {
     }
     if (timePollInterval == null) {
       timePollInterval = DEFAULT_TIME_POLL_INTERVAL;
+    }
+    if (maxTransactionsPerBlock == null) {
+      maxTransactionsPerBlock = DEFAULT_MAX_TRANSACTIONS_PER_BLOCK;
     }
 
     let delegateMajorityCount = Math.ceil(delegateCount / 2);
@@ -303,7 +299,19 @@ module.exports = class LDPoSChainModule {
 
       if (isCurrentForgingDelegate) {
         (async () => {
-          let forgedBlock = this.forgeBlock(nextHeight); // TODO 222 Also pass transactionList as argument.
+          let pendingTransactions = [...this.pendingTransactionMap.values()];
+          // Sort by fee from highest to lowest.
+          pendingTransactions.sort((a, b) => {
+            if (a.fee > b.fee) {
+              return -1;
+            }
+            if (a.fee < b.fee) {
+              return 1;
+            }
+            return 0;
+          });
+          let blockTransactions = pendingTransactions.slice(0, maxTransactionsPerBlock);
+          let forgedBlock = this.forgeBlock(nextHeight, blockTransactions);
           await this.wait(forgingBlockBroadcastDelay);
           try {
             await this.broadcastBlock(forgedBlock);
@@ -315,7 +323,7 @@ module.exports = class LDPoSChainModule {
 
       try {
         // Will throw if block is not valid or has already been processed before.
-        latestBlock = await this.receiveLatestBlock(nextHeight, forgingBlockBroadcastDelay + propagationTimeout);
+        latestBlock = await this.receiveLatestBlock(forgingBlockBroadcastDelay + propagationTimeout);
 
         if (forgingWalletAddress && !isCurrentForgingDelegate) {
           (async () => {
@@ -398,6 +406,8 @@ module.exports = class LDPoSChainModule {
         return;
       }
 
+      this.verifiedBlockStream.write(block);
+
       try {
         await this.broadcastBlock(block);
       } catch (error) {
@@ -412,7 +422,7 @@ module.exports = class LDPoSChainModule {
       let signature = event.data;
 
       try {
-        this.verifySignature(signature); // TODO 222: Make sure that signature is valid and references appropriate block ID and height
+        this.verifyBlockSignature(signature); // TODO 222: Make sure that signature is valid and references appropriate block ID and height
       } catch (error) {
         this.logger.error(
           new Error(`Received invalid block signature - ${error.message}`)

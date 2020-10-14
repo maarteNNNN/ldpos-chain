@@ -16,6 +16,7 @@
     "bip39": "^3.0.2",
     "ldpos-client": "^1.0.0",
     "mocha": "^8.1.1",
-    "proper-merkle": "^1.1.0"
+    "proper-merkle": "^1.1.0",
+    "writable-consumable-stream": "^2.0.0"
   }
 }
