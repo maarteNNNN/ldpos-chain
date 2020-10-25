@@ -31,6 +31,7 @@ module.exports = class LDPoSChainModule {
     this.latestBlockSignatureMap = new Map();
 
     this.verifiedBlockStream = new WritableConsumableStream();
+    this.verifiedBlockSignatureStream = new WritableConsumableStream();
   }
 
   get dependencies() {
@@ -97,7 +98,12 @@ module.exports = class LDPoSChainModule {
   }
 
   async catchUpWithNetwork(options) {
-    let { forgingInterval, fetchBlockEndConfirmations } = options;
+    let {
+      forgingInterval,
+      fetchBlockEndConfirmations,
+      fetchBlockLimit,
+      fetchBlockPause
+    } = options;
 
     let now = Date.now();
     if (
@@ -117,7 +123,7 @@ module.exports = class LDPoSChainModule {
             procedure: `${this.alias}:getBlocksFromHeight`,
             data: {
               height: nodeHeight + 1,
-              limit: options.fetchBlockLimit
+              limit: fetchBlockLimit
             }
           });
         } catch (error) {
@@ -143,7 +149,7 @@ module.exports = class LDPoSChainModule {
       } catch (error) {
         this.logger.error(`Failed to insert blocks while catching up with network - ${error.message}`);
       }
-      await this.wait(options.fetchBlockPause);
+      await this.wait(fetchBlockPause);
     }
 
     return nodeHeight;
@@ -154,7 +160,20 @@ module.exports = class LDPoSChainModule {
   }
 
   async receiveLatestBlockSignatures(latestBlock, requiredSignatureCount, timeout) {
-
+    let signatureList = [];
+    while (true) {
+      let startTime = Date.now();
+      let signature = await this.verifiedBlockSignatureStream.once(timeout);
+      if (signature.blockId === latestBlock.id) {
+        signatureList.push(signature);
+      }
+      let timeDiff = Date.now() - startTime;
+      timeout -= timeDiff;
+      if (timeout <= 0 || signatureList.length >= requiredSignatureCount) {
+        break;
+      }
+    }
+    return signatureList;
   }
 
   async getCurrentBlockTimeSlot(forgingInterval) {
@@ -436,6 +455,8 @@ module.exports = class LDPoSChainModule {
         );
         return;
       }
+
+      this.verifiedBlockSignatureStream.write(signature);
 
       try {
         await this.broadcastBlockSignature(signature);
