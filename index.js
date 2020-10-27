@@ -180,8 +180,11 @@ module.exports = class LDPoSChainModule {
     return Math.round(Date.now() / forgingInterval) * forgingInterval;
   }
 
-  async getCurrentForgingDelegateAddress() {
-
+  async getCurrentForgingDelegateAddress(delegateCount, forgingInterval) {
+    let activeDelegates = await this.getTopActiveDelegates(delegateCount);
+    let slotIndex = Math.floor(Date.now() / forgingInterval);
+    let activeDelegateIndex = slotIndex % activeDelegates.length;
+    return activeDelegates[activeDelegateIndex].address;
   }
 
   forgeBlock(height, transactionList) {
@@ -314,7 +317,7 @@ module.exports = class LDPoSChainModule {
         timePollInterval
       });
 
-      let isCurrentForgingDelegate = forgingWalletAddress && forgingWalletAddress === this.getCurrentForgingDelegateAddress();
+      let isCurrentForgingDelegate = forgingWalletAddress && forgingWalletAddress === this.getCurrentForgingDelegateAddress(delegateCount, forgingInterval);
 
       if (isCurrentForgingDelegate) {
         (async () => {

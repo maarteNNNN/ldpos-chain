@@ -18,7 +18,9 @@ class DAL {
         if (!this.votes[vote]) {
           this.votes[vote] = [];
         }
-        this.votes[vote].push(account.address);
+        this.votes[vote].push({
+          ...account
+        });
       }
     }
   }
@@ -63,6 +65,34 @@ class DAL {
     for (let block of blocks) {
       this.blocks[block.height] = block;
     }
+  }
+
+  async getTopActiveDelegates(delegateCount) {
+    let delegateList = [];
+    let delegateAddressList = Object.keys(this.votes);
+    for (let delegateAddress of delegateAddressList) {
+      let voterList = this.votes[delegateAddress];
+      let voteWeight = 0;
+      for (let voter of voterList) {
+        voteWeight += voter.balance;
+      }
+      delegateList.push({
+        address: delegateAddress,
+        voteWeight
+      });
+    }
+
+    delegateList.sort((a, b) => {
+      if (a.voteWeight > b.voteWeight) {
+        return -1;
+      }
+      if (a.voteWeight < b.voteWeight) {
+        return 1;
+      }
+      return 0;
+    });
+
+    return delegateList.slice(0, delegateCount);
   }
 }
 
