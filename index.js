@@ -222,7 +222,7 @@ module.exports = class LDPoSChainModule {
   }
 
   async signBlock(block) {
-
+    return this.ldposClient.signBlock(block);
   }
 
   async waitUntilNextBlockTimeSlot(options) {
