@@ -177,7 +177,7 @@ module.exports = class LDPoSChainModule {
   }
 
   async getCurrentBlockTimeSlot(forgingInterval) {
-    return Math.round(Date.now() / forgingInterval) * forgingInterval;
+    return Math.floor(Date.now() / forgingInterval) * forgingInterval;
   }
 
   async getCurrentForgingDelegateAddress(delegateCount, forgingInterval) {
@@ -187,8 +187,20 @@ module.exports = class LDPoSChainModule {
     return activeDelegates[activeDelegateIndex].address;
   }
 
-  forgeBlock(height, transactionList) {
+  sha256(message) {
+    return crypto.createHash('sha256').update(message, 'utf8').digest('hex');
+  }
 
+  forgeBlock(height, timestamp, transactions) {
+    let block = {
+      height,
+      timestamp,
+      transactions
+    };
+    let blockJSON = JSON.stringify(block);
+    block.id = this.sha256(blockJSON);
+
+    return this.signBlock(block);
   }
 
   async processBlock(block) {
@@ -333,7 +345,8 @@ module.exports = class LDPoSChainModule {
             return 0;
           });
           let blockTransactions = pendingTransactions.slice(0, maxTransactionsPerBlock);
-          let forgedBlock = this.forgeBlock(nextHeight, blockTransactions);
+          let blockTimestamp = this.getCurrentBlockTimeSlot(forgingInterval);
+          let forgedBlock = this.forgeBlock(nextHeight, blockTimestamp, blockTransactions);
           await this.wait(forgingBlockBroadcastDelay);
           try {
             await this.broadcastBlock(forgedBlock);
