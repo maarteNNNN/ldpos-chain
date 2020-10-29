@@ -29,24 +29,12 @@ class DAL {
     return 'ldpos';
   }
 
-  async getAccountKeyIndexes(accountAddress) {
+  async getAccount(accountAddress) {
     let account = this.accounts[account.address];
     if (!account) {
       throw new Error(`Account ${accountAddress} does not exist`);
     }
-    return {
-      forgingKeyIndex: account.forgingKeyIndex,
-      multisigKeyIndex: account.multisigKeyIndex,
-      sigKeyIndex: account.sigKeyIndex
-    };
-  }
-
-  async getAccountBalance(accountAddress) {
-    let account = this.accounts[account.address];
-    if (!account) {
-      throw new Error(`Account ${accountAddress} does not exist`);
-    }
-    return account.balance;
+    return account;
   }
 
   async getBlockAtHeight(height) {

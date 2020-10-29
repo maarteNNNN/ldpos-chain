@@ -180,11 +180,15 @@ module.exports = class LDPoSChainModule {
     return Math.floor(Date.now() / forgingInterval) * forgingInterval;
   }
 
-  async getCurrentForgingDelegateAddress(delegateCount, forgingInterval) {
-    let activeDelegates = await this.getTopActiveDelegates(delegateCount);
-    let slotIndex = Math.floor(Date.now() / forgingInterval);
+  async getForgingDelegateAddressAtTimestamp(timestamp) {
+    let activeDelegates = await this.getTopActiveDelegates(this.delegateCount);
+    let slotIndex = Math.floor(timestamp / this.forgingInterval);
     let activeDelegateIndex = slotIndex % activeDelegates.length;
     return activeDelegates[activeDelegateIndex].address;
+  }
+
+  async getCurrentForgingDelegateAddress() {
+    return this.getForgingDelegateAddressAtTimestamp(Date.now());
   }
 
   sha256(message) {
@@ -207,12 +211,30 @@ module.exports = class LDPoSChainModule {
 
   }
 
-  verifyTransaction(transaction) {
+  verifyTransactions(transactions) {
+    if (!transactions) {
+      throw new Error(
+        'Transactions array was not specified'
+      );
+    }
+    let areTransactionSignaturesValid = this.ldposClient.verifyTransactions(transactions);
+    if (!areTransactionSignaturesValid) {
+      throw new Error('Transactions signature was invalid');
+    }
 
+    // TODO 222: Check if there is enough money
   }
 
   verifyBlock(block) {
-
+    if (!block) {
+      throw new Error('Block was not specified');
+    }
+    let targetDelegateAddress = this.getForgingDelegateAddressAtTimestamp(block.timestamp);
+    let targetDelegateAccount = await this.dal.getAccount(targetDelegateAddress);
+    let isBlockValid = this.ldposClient.verifyBlock(block, targetDelegateAccount.forgingPublicKey);
+    if (!isBlockValid) {
+      throw new Error(`Block ${block ? block.id : 'without ID'} was invalid`);
+    }
   }
 
   verifyBlockSignature(blockSignature) {
@@ -296,6 +318,9 @@ module.exports = class LDPoSChainModule {
       maxTransactionsPerBlock = DEFAULT_MAX_TRANSACTIONS_PER_BLOCK;
     }
 
+    this.delegateCount = delegateCount;
+    this.forgingInterval = forgingInterval;
+
     let delegateMajorityCount = Math.ceil(delegateCount / 2);
 
     let ldposClient;
@@ -329,7 +354,7 @@ module.exports = class LDPoSChainModule {
         timePollInterval
       });
 
-      let isCurrentForgingDelegate = forgingWalletAddress && forgingWalletAddress === this.getCurrentForgingDelegateAddress(delegateCount, forgingInterval);
+      let isCurrentForgingDelegate = forgingWalletAddress && forgingWalletAddress === this.getCurrentForgingDelegateAddress();
 
       if (isCurrentForgingDelegate) {
         (async () => {
@@ -390,29 +415,31 @@ module.exports = class LDPoSChainModule {
 
   async startTransactionPropagationLoop() {
     let channel = this.channel;
-    channel.subscribe(`network:event:${this.alias}:transaction`, async (event) => {
-      let transaction = event.data;
+    channel.subscribe(`network:event:${this.alias}:transactions`, async (event) => {
+      let transactions = event.data;
 
       try {
-        this.verifyTransaction(transaction);
+        this.verifyTransactions(transactions);
       } catch (error) {
         this.logger.error(
-          new Error(`Received invalid Transaction - ${error.message}`)
+          new Error(`Received invalid Transactions - ${error.message}`)
         );
         return;
       }
 
-      if (this.pendingTransactionMap.has(transaction.id)) {
-        this.logger.error(
-          new Error(`Transaction ${transaction.id} has already been received before`)
-        );
-        return;
+      for (let txn of transactions) {
+        if (this.pendingTransactionMap.has(txn.id)) {
+          this.logger.error(
+            new Error(`Transaction ${txn.id} has already been received before`)
+          );
+          return;
+        }
       }
 
       try {
         await channel.invoke('network:emit', {
-          event: `${this.alias}:transaction`,
-          data: transaction
+          event: `${this.alias}:transactions`,
+          data: transactions
         });
       } catch (error) {
         this.logger.error(error);
