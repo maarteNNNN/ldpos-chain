@@ -145,7 +145,9 @@ module.exports = class LDPoSChainModule {
       }
       try {
         await this.dal.insertBlocks(newBlocks);
-        nodeHeight = newBlocks[newBlocks.length - 1].height;
+        let latestBlock = newBlocks[newBlocks.length - 1];
+        this.latestBlock = latestBlock;
+        nodeHeight = latestBlock.height;
       } catch (error) {
         this.logger.error(`Failed to insert blocks while catching up with network - ${error.message}`);
       }
@@ -199,7 +201,8 @@ module.exports = class LDPoSChainModule {
     let block = {
       height,
       timestamp,
-      transactions
+      transactions,
+      previousBlockId: this.latestBlock ? this.latestBlock.id : null
     };
     let blockJSON = JSON.stringify(block);
     block.id = this.sha256(blockJSON);
@@ -211,18 +214,30 @@ module.exports = class LDPoSChainModule {
 
   }
 
-  verifyTransactions(transactions) {
-    if (!transactions) {
-      throw new Error(
-        'Transactions array was not specified'
-      );
+  async verifyTransactionsPacket(transactionsPacket) {
+    if (!transactionsPacket) {
+      throw new Error('Transactions packet was not specified');
     }
-    let areTransactionSignaturesValid = this.ldposClient.verifyTransactions(transactions);
+
+    let areTransactionSignaturesValid = this.ldposClient.verifyTransactionsPacket(transactionsPacket);
     if (!areTransactionSignaturesValid) {
       throw new Error('Transactions signature was invalid');
     }
 
-    // TODO 222: Check if there is enough money
+    let { transactions } = transactionsPacket;
+    let { senderAddress } = transactions[0];
+    let totalTransactionsAmount = 0;
+    for (let txn of transactions) {
+      totalTransactionsAmount += txn.amount;
+    }
+
+    let senderAccount = await this.dal.getAccount(senderAddress);
+    if (!senderAccount) {
+      throw new Error(`Transactions sender account ${senderAddress} could not be found`);
+    }
+    if (totalTransactionsAmount > senderAccount.balance) {
+      throw new Error('Total transactions amount was greater than the sender account balance');
+    }
   }
 
   verifyBlock(block) {
@@ -231,7 +246,8 @@ module.exports = class LDPoSChainModule {
     }
     let targetDelegateAddress = this.getForgingDelegateAddressAtTimestamp(block.timestamp);
     let targetDelegateAccount = await this.dal.getAccount(targetDelegateAddress);
-    let isBlockValid = this.ldposClient.verifyBlock(block, targetDelegateAccount.forgingPublicKey);
+    let lastBlockId = this.latestBlock ? this.latestBlock.id : null;
+    let isBlockValid = this.ldposClient.verifyBlock(block, targetDelegateAccount.forgingPublicKey, lastBlockId);
     if (!isBlockValid) {
       throw new Error(`Block ${block ? block.id : 'without ID'} was invalid`);
     }
@@ -416,16 +432,18 @@ module.exports = class LDPoSChainModule {
   async startTransactionPropagationLoop() {
     let channel = this.channel;
     channel.subscribe(`network:event:${this.alias}:transactions`, async (event) => {
-      let transactions = event.data;
+      let transactionsPacket = event.data;
 
       try {
-        this.verifyTransactions(transactions);
+        await this.verifyTransactionsPacket(transactionsPacket);
       } catch (error) {
         this.logger.error(
           new Error(`Received invalid Transactions - ${error.message}`)
         );
         return;
       }
+
+      let { transactions } = transactionsPacket;
 
       for (let txn of transactions) {
         if (this.pendingTransactionMap.has(txn.id)) {
