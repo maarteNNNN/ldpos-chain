@@ -211,7 +211,7 @@ module.exports = class LDPoSChainModule {
   }
 
   async processBlock(block) {
-
+    // TODO 222: Update forgingPublicKey of forging delegate account with the forgingPublicKey property from the block.
   }
 
   async verifyTransactionsPacket(transactionsPacket) {
@@ -247,7 +247,33 @@ module.exports = class LDPoSChainModule {
     let targetDelegateAddress = this.getForgingDelegateAddressAtTimestamp(block.timestamp);
     let targetDelegateAccount = await this.dal.getAccount(targetDelegateAddress);
     let lastBlockId = this.latestBlock ? this.latestBlock.id : null;
-    let isBlockValid = this.ldposClient.verifyBlock(block, targetDelegateAccount.forgingPublicKey, lastBlockId);
+    let forgingPublicKey;
+    if (block.forgingPublicKey === targetDelegateAccount.forgingPublicKey) {
+      forgingPublicKey = targetDelegateAccount.forgingPublicKey;
+      if (!forgingPublicKey) {
+        throw new Error(
+          `Delegate ${
+            targetDelegateAccount.address
+          } does not have a forgingPublicKey`
+        );
+      }
+    } else if (block.forgingPublicKey === targetDelegateAccount.nextForgingPublicKey) {
+      if (!targetDelegateAccount.nextForgingPublicKey) {
+        throw new Error(
+          `Failed to increment the forging key for delegate ${
+            targetDelegateAccount.address
+          } because it does not have a nextForgingPublicKey`
+        );
+      }
+      forgingPublicKey = targetDelegateAccount.nextForgingPublicKey;
+    } else {
+      throw new Error(
+        `Block forgingPublicKey did not match the forgingPublicKey of delegate ${
+          targetDelegateAccount.address
+        }`
+      );
+    }
+    let isBlockValid = this.ldposClient.verifyBlock(block, forgingPublicKey, lastBlockId);
     if (!isBlockValid) {
       throw new Error(`Block ${block ? block.id : 'without ID'} was invalid`);
     }
