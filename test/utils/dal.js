@@ -12,7 +12,8 @@ class DAL {
     for (let account of accounts) {
       this.accounts[account.address] = {
         ...account,
-        balance: BigInt(account.balance)
+        balance: BigInt(account.balance),
+        updateHeight: 1
       };
       for (let vote of account.votes) {
         if (!this.votes[vote]) {
@@ -35,6 +36,15 @@ class DAL {
       throw new Error(`Account ${accountAddress} does not exist`);
     }
     return account;
+  }
+
+  async setAccountBalance(accountAddress, balance, updateHeight) {
+    let account = this.accounts[account.address];
+    if (!account) {
+      throw new Error(`Account ${accountAddress} does not exist`);
+    }
+    account.balance = balance;
+    account.updateHeight = updateHeight;
   }
 
   async getBlockAtHeight(height) {

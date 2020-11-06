@@ -216,6 +216,27 @@ module.exports = class LDPoSChainModule {
 
   async processBlock(block) {
     // TODO 222: Update forgingPublicKey of forging delegate account with the forgingPublicKey property from the block.
+    // TODO 222: Calculate the sha256 of the block signature and save that instead of signature and signatures properties.
+    // TODO 222: Error handling in case of database write failure.
+    let { transactions, height } = block;
+    for (let txn of transactions) {
+      let { senderAddress, recipientAddress, amount, fee } = txn;
+      let txnAmount = BigInt(amount);
+      let txnFee = BigInt(fee);
+      let [ senderAccount, recipientAccount ] = await Promise.all([
+        this.dal.getAccount(senderAddress),
+        this.dal.getAccount(recipientAddress)
+      ]);
+      let newSenderBalance = senderAccount.balance - txnAmount - txnFee;
+      let newRecipientBalance = senderAccount.balance + txnAmount;
+      await Promise.all([
+        this.dal.setAccountBalance(senderAddress, newSenderBalance, height),
+        this.dal.setAccountBalance(recipientAddress, newRecipientBalance, height)
+      ]);
+    }
+    let { signature, signatures, ...sanitizedBlock } = block;
+    sanitizedBlock.signatureHash = this.sha256(signature);
+    await this.dal.insertBlocks([sanitizedBlock]);
   }
 
   async verifyTransactionsPacket(transactionsPacket) {
