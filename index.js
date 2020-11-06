@@ -162,20 +162,24 @@ module.exports = class LDPoSChainModule {
   }
 
   async receiveLatestBlockSignatures(latestBlock, requiredSignatureCount, timeout) {
-    let signatureList = [];
+    let signatureMap = new Map();
     while (true) {
       let startTime = Date.now();
-      let signature = await this.verifiedBlockSignatureStream.once(timeout);
-      if (signature.blockId === latestBlock.id) {
-        signatureList.push(signature);
+      let blockSignature = await this.verifiedBlockSignatureStream.once(timeout);
+      if (blockSignature.blockId === latestBlock.id) {
+        signatureMap.set(blockSignature.signature, blockSignature);
       }
       let timeDiff = Date.now() - startTime;
       timeout -= timeDiff;
-      if (timeout <= 0 || signatureList.length >= requiredSignatureCount) {
+      if (timeout <= 0 || signatureMap.size >= requiredSignatureCount) {
         break;
       }
     }
-    return signatureList;
+    let signatures = {};
+    for (let [key, value] of signatureMap) {
+      signatures[key] = value;
+    }
+    return signatures;
   }
 
   async getCurrentBlockTimeSlot(forgingInterval) {
@@ -207,7 +211,7 @@ module.exports = class LDPoSChainModule {
     let blockJSON = JSON.stringify(block);
     block.id = this.sha256(blockJSON);
 
-    return this.signBlock(block);
+    return this.ldposClient.prepareBlock(block);
   }
 
   async processBlock(block) {
@@ -279,8 +283,28 @@ module.exports = class LDPoSChainModule {
     }
   }
 
-  verifyBlockSignature(blockSignature) {
+  async verifyBlockSignature(blockSignature) {
+    if (!blockSignature) {
+      throw new Error('Block signature was not specified');
+    }
+    let latestBlock = this.latestBlock;
+    if (!latestBlock) {
+      throw new Error('Cannot verify signature because there is no block pending');
+    }
+    let { signatures } = latestBlock;
+    let { signature, signer, blockId } = blockSignature;
 
+    if (signatures && signatures[signature]) {
+      throw new Error(
+        `Signature of block signer ${signer} for blockId ${blockId} has already been received`
+      );
+    }
+
+    if (latestBlock.id !== blockId) {
+      throw new Error(`Signature blockId ${blockId} did not match the latest block id ${latestBlock.id}`);
+    }
+    let signerAccount = await this.dal.getAccount(signer);
+    return this.ldposClient.verifyBlockSignature(latestBlock, signature, signerAccount.forgingPublicKey);
   }
 
   async broadcastBlock(block) {
@@ -525,10 +549,10 @@ module.exports = class LDPoSChainModule {
   async startBlockSignaturePropagationLoop() {
     let channel = this.channel;
     channel.subscribe(`network:event:${this.alias}:blockSignature`, async (event) => {
-      let signature = event.data;
+      let blockSignature = event.data;
 
       try {
-        this.verifyBlockSignature(signature); // TODO 222: Make sure that signature is valid and references appropriate block ID and height
+        await this.verifyBlockSignature(blockSignature);
       } catch (error) {
         this.logger.error(
           new Error(`Received invalid block signature - ${error.message}`)
@@ -536,17 +560,17 @@ module.exports = class LDPoSChainModule {
         return;
       }
 
-      if (this.latestBlockSignatureMap.has(signature.id)) {
+      if (this.latestBlockSignatureMap.has(blockSignature.id)) {
         this.logger.error(
-          new Error(`Block signature ${signature.id} has already been received before`)
+          new Error(`Block signature ${blockSignature.id} has already been received before`)
         );
         return;
       }
 
-      this.verifiedBlockSignatureStream.write(signature);
+      this.verifiedBlockSignatureStream.write(blockSignature);
 
       try {
-        await this.broadcastBlockSignature(signature);
+        await this.broadcastBlockSignature(blockSignature);
       } catch (error) {
         this.logger.error(error);
       }
