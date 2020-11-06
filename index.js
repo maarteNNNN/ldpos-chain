@@ -167,7 +167,7 @@ module.exports = class LDPoSChainModule {
       let startTime = Date.now();
       let blockSignature = await this.verifiedBlockSignatureStream.once(timeout);
       if (blockSignature.blockId === latestBlock.id) {
-        signatureMap.set(blockSignature.signature, blockSignature);
+        signatureMap.set(blockSignature.signer, blockSignature);
       }
       let timeDiff = Date.now() - startTime;
       timeout -= timeDiff;
@@ -294,7 +294,7 @@ module.exports = class LDPoSChainModule {
     let { signatures } = latestBlock;
     let { signature, signer, blockId } = blockSignature;
 
-    if (signatures && signatures[signature]) {
+    if (signatures && signatures[signer]) {
       throw new Error(
         `Signature of block signer ${signer} for blockId ${blockId} has already been received`
       );
