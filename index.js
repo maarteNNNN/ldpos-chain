@@ -144,6 +144,7 @@ module.exports = class LDPoSChainModule {
         break;
       }
       try {
+        // TODO 222: Process blocks here, not just insert.
         await this.dal.insertBlocks(newBlocks);
         let latestBlock = newBlocks[newBlocks.length - 1];
         this.latestBlock = latestBlock;
@@ -167,7 +168,7 @@ module.exports = class LDPoSChainModule {
       let startTime = Date.now();
       let blockSignature = await this.verifiedBlockSignatureStream.once(timeout);
       if (blockSignature.blockId === latestBlock.id) {
-        signatureMap.set(blockSignature.signer, blockSignature);
+        signatureMap.set(blockSignature.signerAddress, blockSignature);
       }
       let timeDiff = Date.now() - startTime;
       timeout -= timeDiff;
@@ -216,24 +217,33 @@ module.exports = class LDPoSChainModule {
 
   async processBlock(block) {
     // TODO 222: Update forgingPublicKey of forging delegate account with the forgingPublicKey property from the block.
-    // TODO 222: Calculate the sha256 of the block signature and save that instead of signature and signatures properties.
     // TODO 222: Error handling in case of database write failure.
     let { transactions, height } = block;
+    let affectedAddresses = new Set();
+    for (let txn of transactions) {
+      affectedAddresses.add(txn.senderAddress);
+      affectedAddresses.add(txn.recipientAddress);
+    }
+    let accountList = await Promise.all(
+      [...affectedAddresses].map((address) => this.dal.getAccount(address))
+    );
+    let accounts = {};
+    for (account of accountList) {
+      accounts[account.address] = account;
+    }
+    // TODO 2222: Only update accounts whose updateHeight is behind.
     for (let txn of transactions) {
       let { senderAddress, recipientAddress, amount, fee } = txn;
       let txnAmount = BigInt(amount);
       let txnFee = BigInt(fee);
-      let [ senderAccount, recipientAccount ] = await Promise.all([
-        this.dal.getAccount(senderAddress),
-        this.dal.getAccount(recipientAddress)
-      ]);
-      let newSenderBalance = senderAccount.balance - txnAmount - txnFee;
-      let newRecipientBalance = senderAccount.balance + txnAmount;
-      await Promise.all([
-        this.dal.setAccountBalance(senderAddress, newSenderBalance, height),
-        this.dal.setAccountBalance(recipientAddress, newRecipientBalance, height)
-      ]);
+      let senderAccount = accounts[senderAddress];
+      let recipientAccount = accounts[recipientAddress];
+      senderAccount.balance = senderAccount.balance - txnAmount - txnFee;
+      recipientAccount.balance = recipientAccount.balance + txnAmount;
     }
+    await Promise.all(
+      accountList.map((account) => this.dal.setAccountBalance(account.address, accounts[account.address].balance, height))
+    );
     let { signature, signatures, ...sanitizedBlock } = block;
     sanitizedBlock.signatureHash = this.sha256(signature);
     await this.dal.insertBlocks([sanitizedBlock]);
@@ -313,18 +323,18 @@ module.exports = class LDPoSChainModule {
       throw new Error('Cannot verify signature because there is no block pending');
     }
     let { signatures } = latestBlock;
-    let { signature, signer, blockId } = blockSignature;
+    let { signature, signerAddress, blockId } = blockSignature;
 
-    if (signatures && signatures[signer]) {
+    if (signatures && signatures[signerAddress]) {
       throw new Error(
-        `Signature of block signer ${signer} for blockId ${blockId} has already been received`
+        `Signature of block signer ${signerAddress} for blockId ${blockId} has already been received`
       );
     }
 
     if (latestBlock.id !== blockId) {
       throw new Error(`Signature blockId ${blockId} did not match the latest block id ${latestBlock.id}`);
     }
-    let signerAccount = await this.dal.getAccount(signer);
+    let signerAccount = await this.dal.getAccount(signerAddress);
     return this.ldposClient.verifyBlockSignature(latestBlock, signature, signerAccount.forgingPublicKey);
   }
 
