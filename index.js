@@ -216,7 +216,7 @@ module.exports = class LDPoSChainModule {
   }
 
   async processBlock(block) {
-    // TODO 222: Update forgingPublicKey of forging delegate account with the forgingPublicKey property from the block.
+    // TODO 222: Update forgingPublicKey of forging delegate account with the nextForgingPublicKey property from the block when relevant.
     // TODO 222: Error handling in case of database write failure.
     let { transactions, height } = block;
     let affectedAddresses = new Set();
