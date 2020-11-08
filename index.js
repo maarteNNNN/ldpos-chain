@@ -231,18 +231,25 @@ module.exports = class LDPoSChainModule {
     for (account of accountList) {
       accounts[account.address] = account;
     }
-    // TODO 2222: Only update accounts whose updateHeight is behind.
     for (let txn of transactions) {
       let { senderAddress, recipientAddress, amount, fee } = txn;
       let txnAmount = BigInt(amount);
       let txnFee = BigInt(fee);
       let senderAccount = accounts[senderAddress];
       let recipientAccount = accounts[recipientAddress];
-      senderAccount.balance = senderAccount.balance - txnAmount - txnFee;
-      recipientAccount.balance = recipientAccount.balance + txnAmount;
+      if (senderAccount.updateHeight < height) {
+        senderAccount.balance = senderAccount.balance - txnAmount - txnFee;
+      }
+      if (recipientAccount.updateHeight < height) {
+        recipientAccount.balance = recipientAccount.balance + txnAmount;
+      }
     }
     await Promise.all(
-      accountList.map((account) => this.dal.setAccountBalance(account.address, accounts[account.address].balance, height))
+      accountList.map(async (account) => {
+        if (account.updateHeight < height) {
+          await this.dal.setAccountBalance(account.address, account.balance, height)
+        }
+      })
     );
     let { signature, signatures, ...sanitizedBlock } = block;
     sanitizedBlock.signatureHash = this.sha256(signature);
