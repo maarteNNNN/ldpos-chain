@@ -47,6 +47,18 @@ class DAL {
     account.updateHeight = updateHeight;
   }
 
+  async updateAccount(accountAddress, changePacket, updateHeight) {
+    let account = this.accounts[account.address];
+    if (!account) {
+      throw new Error(`Account ${accountAddress} does not exist`);
+    }
+    let changedKeys = Object.keys(changePacket);
+    for (let key of changedKeys) {
+      account[key] = changePacket[key];
+    }
+    account.updateHeight = updateHeight;
+  }
+
   async getBlockAtHeight(height) {
     return this.blocks[height];
   }

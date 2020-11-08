@@ -216,7 +216,6 @@ module.exports = class LDPoSChainModule {
   }
 
   async processBlock(block) {
-    // TODO 222: Update forgingPublicKey of forging delegate account with the nextForgingPublicKey property from the block when relevant.
     // TODO 222: Error handling in case of database write failure.
     let { transactions, height } = block;
     let affectedAddresses = new Set();
@@ -224,6 +223,8 @@ module.exports = class LDPoSChainModule {
       affectedAddresses.add(txn.senderAddress);
       affectedAddresses.add(txn.recipientAddress);
     }
+    affectedAddresses.add(block.forgerAddress);
+
     let accountList = await Promise.all(
       [...affectedAddresses].map((address) => this.dal.getAccount(address))
     );
@@ -231,6 +232,7 @@ module.exports = class LDPoSChainModule {
     for (account of accountList) {
       accounts[account.address] = account;
     }
+    let forgerAccount = accounts[block.forgerAddress];
     for (let txn of transactions) {
       let { senderAddress, recipientAddress, amount, fee } = txn;
       let txnAmount = BigInt(amount);
@@ -247,12 +249,23 @@ module.exports = class LDPoSChainModule {
     await Promise.all(
       accountList.map(async (account) => {
         if (account.updateHeight < height) {
-          await this.dal.setAccountBalance(account.address, account.balance, height)
+          await this.dal.updateAccount(account.address, { balance: account.balance }, height);
         }
       })
     );
     let { signature, signatures, ...sanitizedBlock } = block;
     sanitizedBlock.signatureHash = this.sha256(signature);
+
+    if (block.forgingPublicKey === forgerAccount.nextForgingPublicKey) {
+      await this.dal.updateAccount(
+        forgerAccount.address,
+        {
+          forgingPublicKey: block.forgingPublicKey,
+          nextForgingPublicKey: block.nextForgingPublicKey
+        },
+        height
+      );
+    }
     await this.dal.insertBlocks([sanitizedBlock]);
   }
 
@@ -288,6 +301,15 @@ module.exports = class LDPoSChainModule {
     }
     let targetDelegateAddress = this.getForgingDelegateAddressAtTimestamp(block.timestamp);
     let targetDelegateAccount = await this.dal.getAccount(targetDelegateAddress);
+    if (block.forgerAddress !== targetDelegateAccount.address) {
+      throw new Error(
+        `The block forgerAddress ${
+          block.forgerAddress
+        } did not match the expected forger delegate address ${
+          targetDelegateAccount.address
+        }`
+      );
+    }
     let lastBlockId = this.latestBlock ? this.latestBlock.id : null;
     let forgingPublicKey;
     if (block.forgingPublicKey === targetDelegateAccount.forgingPublicKey) {
