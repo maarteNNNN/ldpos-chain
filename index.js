@@ -158,7 +158,7 @@ module.exports = class LDPoSChainModule {
         let blockCount = this.pendingBlocks.length - finality;
         for (let i = 0; i < blockCount; i++) {
           let block = this.pendingBlocks[i];
-          await this.dal.processBlock(block);
+          await this.processBlock(block);
           this.pendingBlocks[i] = null;
           this.latestBlock = block;
           this.latestProcessedBlock = block;
@@ -229,7 +229,6 @@ module.exports = class LDPoSChainModule {
   }
 
   async processBlock(block) {
-    // TODO 222: Error handling in case of database write failure.
     let { transactions, height } = block;
     let affectedAddresses = new Set();
     for (let txn of transactions) {
@@ -344,7 +343,7 @@ module.exports = class LDPoSChainModule {
       forgingPublicKey = targetDelegateAccount.nextForgingPublicKey;
     } else {
       throw new Error(
-        `Block forgingPublicKey did not match the forgingPublicKey of delegate ${
+        `Block forgingPublicKey did not match the forgingPublicKey or nextForgingPublicKey of delegate ${
           targetDelegateAccount.address
         }`
       );
@@ -610,7 +609,7 @@ module.exports = class LDPoSChainModule {
 
       let lastBlockId = this.latestBlock ? this.latestBlock.id : null;
       try {
-        this.verifyBlock(block, lastBlockId); // TODO 222: Make sure that block is valid and references appropriate height
+        this.verifyBlock(block, lastBlockId);
       } catch (error) {
         this.logger.error(
           new Error(`Received invalid block - ${error.message}`)
