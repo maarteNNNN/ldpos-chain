@@ -27,6 +27,7 @@ module.exports = class LDPoSChainModule {
       // TODO 222: Default to postgres adapter as Data Access Layer
     }
     this.pendingTransactionMap = new Map();
+    this.pendingBlocks = [];
     this.latestBlock = null;
     this.latestBlockSignatureMap = new Map();
 
@@ -102,18 +103,21 @@ module.exports = class LDPoSChainModule {
       forgingInterval,
       fetchBlockEndConfirmations,
       fetchBlockLimit,
-      fetchBlockPause
+      fetchBlockPause,
+      delegateCount
     } = options;
+
+    let finality = Math.ceil(delegateCount / 2);
 
     let now = Date.now();
     if (
-      this.latestBlock &&
       Math.floor(this.latestBlock.timestamp / forgingInterval) >= Math.floor(now / forgingInterval)
     ) {
       return this.latestBlock.height;
     }
 
-    let nodeHeight = this.nodeHeight;
+    let latestProcessedBlock = this.latestBlock;
+    let latestGoodBlock = latestProcessedBlock;
 
     while (true) {
       let newBlocks = [];
@@ -122,7 +126,7 @@ module.exports = class LDPoSChainModule {
           newBlocks = await channel.invoke('network:request', {
             procedure: `${this.alias}:getBlocksFromHeight`,
             data: {
-              height: nodeHeight + 1,
+              height: latestGoodBlock.height + 1,
               limit: fetchBlockLimit
             }
           });
@@ -132,10 +136,14 @@ module.exports = class LDPoSChainModule {
         }
         for (let block of newBlocks) {
           try {
-            this.verifyBlock(block);
+            this.verifyBlock(block, latestGoodBlock.id);
+            latestGoodBlock = block;
           } catch (error) {
             this.logger.warn(`Received invalid block while catching up with network - ${error.message}`);
             newBlocks = [];
+            latestGoodBlock = latestProcessedBlock;
+            this.latestBlock = latestGoodBlock;
+            this.pendingBlocks = [];
             break;
           }
         }
@@ -143,19 +151,27 @@ module.exports = class LDPoSChainModule {
       if (!newBlocks.length) {
         break;
       }
-      try {
-        // TODO 222: Process blocks here, not just insert.
-        await this.dal.insertBlocks(newBlocks);
-        let latestBlock = newBlocks[newBlocks.length - 1];
-        this.latestBlock = latestBlock;
-        nodeHeight = latestBlock.height;
-      } catch (error) {
-        this.logger.error(`Failed to insert blocks while catching up with network - ${error.message}`);
+      for (let block of newBlocks) {
+        this.pendingBlocks.push(block);
       }
+      try {
+        let blockCount = this.pendingBlocks.length - finality;
+        for (let i = 0; i < blockCount; i++) {
+          let block = this.pendingBlocks[i];
+          await this.dal.processBlock(block);
+          this.pendingBlocks[i] = null;
+          this.latestBlock = block;
+          latestProcessedBlock = block;
+        }
+      } catch (error) {
+        this.logger.error(`Failed to process block while catching up with network - ${error.message}`);
+      }
+      this.pendingBlocks = this.pendingBlocks.filter(block => block);
       await this.wait(fetchBlockPause);
     }
 
-    return nodeHeight;
+    this.latestBlock = latestGoodBlock;
+    return latestGoodBlock.height;
   }
 
   async receiveLatestBlock(timeout) {
@@ -210,7 +226,6 @@ module.exports = class LDPoSChainModule {
       previousBlockId: this.latestBlock ? this.latestBlock.id : null
     };
     let blockJSON = JSON.stringify(block);
-    block.id = this.sha256(blockJSON);
 
     return this.ldposClient.prepareBlock(block);
   }
@@ -266,7 +281,7 @@ module.exports = class LDPoSChainModule {
         height
       );
     }
-    await this.dal.insertBlocks([sanitizedBlock]);
+    await this.dal.insertBlock(sanitizedBlock);
   }
 
   async verifyTransactionsPacket(transactionsPacket) {
@@ -295,7 +310,7 @@ module.exports = class LDPoSChainModule {
     }
   }
 
-  verifyBlock(block) {
+  async verifyBlock(block, lastBlockId) {
     if (!block) {
       throw new Error('Block was not specified');
     }
@@ -310,7 +325,6 @@ module.exports = class LDPoSChainModule {
         }`
       );
     }
-    let lastBlockId = this.latestBlock ? this.latestBlock.id : null;
     let forgingPublicKey;
     if (block.forgingPublicKey === targetDelegateAccount.forgingPublicKey) {
       forgingPublicKey = targetDelegateAccount.forgingPublicKey;
@@ -337,17 +351,15 @@ module.exports = class LDPoSChainModule {
         }`
       );
     }
-    let isBlockValid = this.ldposClient.verifyBlock(block, forgingPublicKey, lastBlockId);
-    if (!isBlockValid) {
+    if (!this.ldposClient.verifyBlock(block, forgingPublicKey, lastBlockId)) {
       throw new Error(`Block ${block ? block.id : 'without ID'} was invalid`);
     }
   }
 
-  async verifyBlockSignature(blockSignature) {
+  async verifyBlockSignature(latestBlock, blockSignature) {
     if (!blockSignature) {
       throw new Error('Block signature was not specified');
     }
-    let latestBlock = this.latestBlock;
     if (!latestBlock) {
       throw new Error('Cannot verify signature because there is no block pending');
     }
@@ -462,6 +474,7 @@ module.exports = class LDPoSChainModule {
     }
     this.ldposClient = ldposClient;
     this.nodeHeight = await this.dal.getLatestHeight();
+    this.latestBlock = await this.dal.getBlockAtHeight(this.nodeHeight);
 
     while (true) {
       this.latestBlockSignatureMap.clear();
@@ -470,7 +483,8 @@ module.exports = class LDPoSChainModule {
         forgingInterval,
         fetchBlockLimit,
         fetchBlockPause,
-        fetchBlockEndConfirmations
+        fetchBlockEndConfirmations,
+        delegateCount
       });
       this.nodeHeight = this.networkHeight;
       let nextHeight = this.networkHeight + 1;
@@ -508,7 +522,7 @@ module.exports = class LDPoSChainModule {
       }
 
       try {
-        // Will throw if block is not valid or has already been processed before.
+        // Will throw if block is not received in time.
         latestBlock = await this.receiveLatestBlock(forgingBlockBroadcastDelay + propagationTimeout);
 
         if (forgingWalletAddress && !isCurrentForgingDelegate) {
@@ -532,6 +546,7 @@ module.exports = class LDPoSChainModule {
         };
         this.nodeHeight = nextHeight;
         this.networkHeight = nextHeight;
+        // TODO 222: Process all blocks in this.pendingBlocks before processing the newly received block (make sure that they are valid with respect to latestBlock first)
         await this.processBlock(latestBlock);
       } catch (error) {
         this.logger.error(error);
@@ -580,8 +595,9 @@ module.exports = class LDPoSChainModule {
     channel.subscribe(`network:event:${this.alias}:block`, async (event) => {
       let block = event.data;
 
+      let lastBlockId = this.latestBlock ? this.latestBlock.id : null;
       try {
-        this.verifyBlock(block); // TODO 222: Make sure that block is valid and references appropriate height
+        this.verifyBlock(block, lastBlockId); // TODO 222: Make sure that block is valid and references appropriate height
       } catch (error) {
         this.logger.error(
           new Error(`Received invalid block - ${error.message}`)
@@ -612,7 +628,7 @@ module.exports = class LDPoSChainModule {
       let blockSignature = event.data;
 
       try {
-        await this.verifyBlockSignature(blockSignature);
+        await this.verifyBlockSignature(this.latestBlock, blockSignature);
       } catch (error) {
         this.logger.error(
           new Error(`Received invalid block signature - ${error.message}`)

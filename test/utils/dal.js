@@ -71,10 +71,8 @@ class DAL {
     return this.blocks.length;
   }
 
-  async insertBlocks(blocks) {
-    for (let block of blocks) {
-      this.blocks[block.height] = block;
-    }
+  async insertBlock(block) {
+    this.blocks[block.height] = block;
   }
 
   async getTopActiveDelegates(delegateCount) {
