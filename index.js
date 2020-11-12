@@ -225,8 +225,6 @@ module.exports = class LDPoSChainModule {
       transactions,
       previousBlockId: this.latestBlock ? this.latestBlock.id : null
     };
-    let blockJSON = JSON.stringify(block);
-
     return this.ldposClient.prepareBlock(block);
   }
 
@@ -541,7 +539,20 @@ module.exports = class LDPoSChainModule {
 
         // Will throw if the required number of valid signatures cannot be gathered in time.
         latestBlockSignatures = await this.receiveLatestBlockSignatures(latestBlock, delegateMajorityCount, forgingSignatureBroadcastDelay + propagationTimeout);
-        // TODO 222: Process all blocks in this.pendingBlocks before processing the newly received block (make sure that they are valid with respect to latestBlock first)
+
+        if (this.pendingBlocks.length) {
+          let latestPendingBlock = this.pendingBlocks[this.pendingBlocks.length - 1];
+          if (latestBlock.previousBlockId !== latestPendingBlock.id) {
+            throw new Error(
+              `The previousBlockId of the latest received block did not match the previous pending block ID ${
+                latestPendingBlock.id
+              }`
+            );
+          }
+          for (let block of this.pendingBlocks) {
+            await this.processBlock(block);
+          }
+        }
         await this.processBlock(latestBlock);
         this.latestBlock = {
           ...latestBlock,
