@@ -30,6 +30,7 @@ module.exports = class LDPoSChainModule {
     this.pendingBlocks = [];
     this.latestBlock = null;
     this.latestBlockSignatureMap = new Map();
+    this.latestProcessedBlock = this.latestBlock;
 
     this.verifiedBlockStream = new WritableConsumableStream();
     this.verifiedBlockSignatureStream = new WritableConsumableStream();
@@ -111,13 +112,12 @@ module.exports = class LDPoSChainModule {
 
     let now = Date.now();
     if (
-      Math.floor(this.latestBlock.timestamp / forgingInterval) >= Math.floor(now / forgingInterval)
+      Math.floor(this.latestProcessedBlock.timestamp / forgingInterval) >= Math.floor(now / forgingInterval)
     ) {
-      return this.latestBlock.height;
+      return this.latestProcessedBlock.height;
     }
 
-    let latestProcessedBlock = this.latestBlock;
-    let latestGoodBlock = latestProcessedBlock;
+    let latestGoodBlock = this.latestProcessedBlock;
 
     while (true) {
       let newBlocks = [];
@@ -141,7 +141,7 @@ module.exports = class LDPoSChainModule {
           } catch (error) {
             this.logger.warn(`Received invalid block while catching up with network - ${error.message}`);
             newBlocks = [];
-            latestGoodBlock = latestProcessedBlock;
+            latestGoodBlock = this.latestProcessedBlock;
             this.latestBlock = latestGoodBlock;
             this.pendingBlocks = [];
             break;
@@ -161,7 +161,7 @@ module.exports = class LDPoSChainModule {
           await this.dal.processBlock(block);
           this.pendingBlocks[i] = null;
           this.latestBlock = block;
-          latestProcessedBlock = block;
+          this.latestProcessedBlock = block;
         }
       } catch (error) {
         this.logger.error(`Failed to process block while catching up with network - ${error.message}`);
@@ -475,6 +475,7 @@ module.exports = class LDPoSChainModule {
     this.ldposClient = ldposClient;
     this.nodeHeight = await this.dal.getLatestHeight();
     this.latestBlock = await this.dal.getBlockAtHeight(this.nodeHeight);
+    this.latestProcessedBlock = this.latestBlock;
 
     while (true) {
       this.latestBlockSignatureMap.clear();
@@ -540,14 +541,15 @@ module.exports = class LDPoSChainModule {
 
         // Will throw if the required number of valid signatures cannot be gathered in time.
         latestBlockSignatures = await this.receiveLatestBlockSignatures(latestBlock, delegateMajorityCount, forgingSignatureBroadcastDelay + propagationTimeout);
+        // TODO 222: Process all blocks in this.pendingBlocks before processing the newly received block (make sure that they are valid with respect to latestBlock first)
+        await this.processBlock(latestBlock);
         this.latestBlock = {
           ...latestBlock,
           signatures: latestBlockSignatures
         };
+        this.latestProcessedBlock = this.latestBlock;
         this.nodeHeight = nextHeight;
         this.networkHeight = nextHeight;
-        // TODO 222: Process all blocks in this.pendingBlocks before processing the newly received block (make sure that they are valid with respect to latestBlock first)
-        await this.processBlock(latestBlock);
       } catch (error) {
         this.logger.error(error);
       }
