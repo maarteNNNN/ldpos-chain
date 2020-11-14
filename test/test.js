@@ -1,6 +1,8 @@
 const assert = require('assert');
 const DAL = require('./utils/dal');
 const Channel = require('./utils/channel');
+const NetworkModule = require('./utils/network');
+const wait = require('./utils/wait');
 const LDPoSChainModule = require('../index');
 
 describe('Unit tests', async () => {
@@ -10,12 +12,15 @@ describe('Unit tests', async () => {
 
   beforeEach(async () => {
     chainModule = new LDPoSChainModule({
-      candidateListBroadcastInterval: 5000,
       dal: new DAL()
     });
-    channel = new Channel();
+    channel = new Channel({
+      modules: {
+        network: new NetworkModule()
+      }
+    });
     options = {
-      genesisPath: './utils/genesis.json',
+      genesisPath: './test/utils/genesis.json',
       stakingPassphrase: 'save tree rib blouse weapon broccoli finger tenant accuse taste copper cinnamon'
     };
 
@@ -24,8 +29,14 @@ describe('Unit tests', async () => {
 
   describe('Core methods', async () => {
 
-    it('should trigger bootstrap event after launch', async () => {
-
+    it.only('should trigger bootstrap event after launch', async () => {
+      let bootstrapEventTriggered = false;
+      channel.subscribe(`${chainModule.alias}:bootstrap`, async () => {
+        bootstrapEventTriggered = true;
+      });
+      chainModule.load(channel, options);
+      await wait(1000);
+      assert.equal(bootstrapEventTriggered, true);
     });
 
     it('should expose an info property', async () => {

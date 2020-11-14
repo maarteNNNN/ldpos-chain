@@ -57,11 +57,10 @@ module.exports = class LDPoSChainModule {
 
   get actions() {
     return {
-      getCandidacyList: {
-        handler: async action => {}
-      },
       postTransactions: {
-        handler: async action => {}
+        handler: async action => {
+          return this.postTransactions(action.transactions);
+        }
       },
       getNodeStatus: {
         handler: async () => {}
@@ -566,9 +565,15 @@ module.exports = class LDPoSChainModule {
     }
   }
 
+  async postTransactions(transactions) {
+    return this.channel.invoke('network:emit', {
+      event: `${this.alias}:transactions`,
+      data: transactions
+    });
+  }
+
   async startTransactionPropagationLoop() {
-    let channel = this.channel;
-    channel.subscribe(`network:event:${this.alias}:transactions`, async (event) => {
+    this.channel.subscribe(`network:event:${this.alias}:transactions`, async (event) => {
       let transactionsPacket = event.data;
 
       try {
@@ -592,10 +597,7 @@ module.exports = class LDPoSChainModule {
       }
 
       try {
-        await channel.invoke('network:emit', {
-          event: `${this.alias}:transactions`,
-          data: transactions
-        });
+        await this.postTransactions(transactions);
       } catch (error) {
         this.logger.error(error);
       }
