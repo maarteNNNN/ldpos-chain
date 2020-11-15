@@ -20,7 +20,7 @@ const DEFAULT_MAX_TRANSACTIONS_PER_BLOCK = 300;
 module.exports = class LDPoSChainModule {
   constructor(options) {
     this.alias = options.alias || DEFAULT_MODULE_ALIAS;
-    this.logger = options.logger;
+    this.logger = options.logger || console;
     if (options.dal) {
       this.dal = options.dal;
     } else {
@@ -122,7 +122,7 @@ module.exports = class LDPoSChainModule {
       let newBlocks = [];
       for (let i = 0; i < fetchBlockEndConfirmations && !newBlocks.length; i++) {
         try {
-          newBlocks = await channel.invoke('network:request', {
+          newBlocks = await this.channel.invoke('network:request', {
             procedure: `${this.alias}:getBlocksFromHeight`,
             data: {
               height: latestGoodBlock.height + 1,
@@ -132,6 +132,10 @@ module.exports = class LDPoSChainModule {
         } catch (error) {
           newBlocks = [];
           this.logger.warn(error);
+        }
+        if (!Array.isArray(newBlocks)) {
+          newBlocks = [];
+          this.logger.warn('Received invalid blocks response while catching up with network - Expected an array of blocks');
         }
         for (let block of newBlocks) {
           try {
@@ -418,6 +422,7 @@ module.exports = class LDPoSChainModule {
       fetchBlockPause,
       fetchBlockEndConfirmations,
       propagationTimeout,
+      timePollInterval,
       maxTransactionsPerBlock
     } = options;
 
@@ -471,6 +476,18 @@ module.exports = class LDPoSChainModule {
     this.ldposClient = ldposClient;
     this.nodeHeight = await this.dal.getLatestHeight();
     this.latestBlock = await this.dal.getBlockAtHeight(this.nodeHeight);
+    if (this.latestBlock == null) {
+      this.latestBlock = {
+        height: 1,
+        timestamp: 0,
+        transactions: [],
+        previousBlockId: null,
+        forgerAddress: null,
+        forgingPublicKey: null,
+        nextForgingPublicKey: null,
+        id: null
+      };
+    }
     this.latestProcessedBlock = this.latestBlock;
 
     while (true) {

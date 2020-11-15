@@ -2,7 +2,9 @@ const assert = require('assert');
 const DAL = require('./utils/dal');
 const Channel = require('./utils/channel');
 const NetworkModule = require('./utils/network');
+const MockLDPoSChainModule = require('./utils/chain');
 const wait = require('./utils/wait');
+
 const LDPoSChainModule = require('../index');
 
 describe('Unit tests', async () => {
@@ -16,7 +18,11 @@ describe('Unit tests', async () => {
     });
     channel = new Channel({
       modules: {
-        network: new NetworkModule()
+        network: new NetworkModule({
+          modules: {
+            ldpos_chain: new MockLDPoSChainModule()
+          }
+        })
       }
     });
     options = {
