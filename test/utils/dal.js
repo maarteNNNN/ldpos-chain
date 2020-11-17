@@ -71,6 +71,10 @@ class DAL {
     return this.blocks.length;
   }
 
+  async getBlocksFromHeight(height, limit) {
+    return this.blocks.slice(height, height + limit);
+  }
+
   async insertBlock(block) {
     this.blocks[block.height] = block;
   }

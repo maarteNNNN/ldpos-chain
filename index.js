@@ -86,6 +86,13 @@ module.exports = class LDPoSChainModule {
       getMaxBlockHeight: {
         handler: async action => {}
       },
+      getBlocksFromHeight: {
+        handler: async action => {
+          let { height, limit } = action;
+          return this.dal.getBlocksFromHeight(height, limit);
+        },
+        isPublic: true
+      },
       getBlocksBetweenHeights: {
         handler: async action => {}
       },
