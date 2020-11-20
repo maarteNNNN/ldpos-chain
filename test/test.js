@@ -33,15 +33,19 @@ describe('Unit tests', async () => {
     await chainModule.load(channel, options);
   });
 
+  afterEach(async () => {
+    await chainModule.unload();
+  });
+
   describe('Core methods', async () => {
 
-    it.only('should trigger bootstrap event after launch', async () => {
+    it('should trigger bootstrap event after launch', async () => {
       let bootstrapEventTriggered = false;
       channel.subscribe(`${chainModule.alias}:bootstrap`, async () => {
         bootstrapEventTriggered = true;
       });
       chainModule.load(channel, options);
-      await wait(1000);
+      await wait(200);
       assert.equal(bootstrapEventTriggered, true);
     });
 

@@ -34,6 +34,7 @@ module.exports = class LDPoSChainModule {
 
     this.verifiedBlockStream = new WritableConsumableStream();
     this.verifiedBlockSignatureStream = new WritableConsumableStream();
+    this.isActive = false;
   }
 
   get dependencies() {
@@ -126,6 +127,9 @@ module.exports = class LDPoSChainModule {
     let latestGoodBlock = this.latestProcessedBlock;
 
     while (true) {
+      if (!this.isActive) {
+        break;
+      }
       let newBlocks = [];
       for (let i = 0; i < fetchBlockEndConfirmations && !newBlocks.length; i++) {
         try {
@@ -408,6 +412,9 @@ module.exports = class LDPoSChainModule {
     let { forgingInterval, timePollInterval } = options;
     let lastSlotIndex = Math.floor(Date.now() / forgingInterval);
     while (true) {
+      if (!this.isActive) {
+        break;
+      }
       await this.wait(timePollInterval);
       let currentSlotIndex = Math.floor(Date.now() / forgingInterval);
       if (currentSlotIndex > lastSlotIndex) {
@@ -498,6 +505,9 @@ module.exports = class LDPoSChainModule {
     this.latestProcessedBlock = this.latestBlock;
 
     while (true) {
+      if (!this.isActive) {
+        break;
+      }
       this.latestBlockSignatureMap.clear();
       // If the node is already on the latest network height, it will just return it.
       this.networkHeight = await this.catchUpWithNetwork({
@@ -584,7 +594,9 @@ module.exports = class LDPoSChainModule {
         this.nodeHeight = nextHeight;
         this.networkHeight = nextHeight;
       } catch (error) {
-        this.logger.error(error);
+        if (this.isActive) {
+          this.logger.error(error);
+        }
       }
     }
   }
@@ -694,6 +706,7 @@ module.exports = class LDPoSChainModule {
   async load(channel, options) {
     this.options = options;
     this.channel = channel;
+    this.isActive = true;
 
     this.genesis = require(options.genesisPath || DEFAULT_GENESIS_PATH);
     await this.dal.init({
@@ -709,7 +722,7 @@ module.exports = class LDPoSChainModule {
   }
 
   async unload() {
-
+    this.isActive = false;
   }
 
   async wait(duration) {
