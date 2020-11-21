@@ -29,7 +29,6 @@ module.exports = class LDPoSChainModule {
     this.pendingTransactionMap = new Map();
     this.pendingBlocks = [];
     this.latestBlock = null;
-    this.latestBlockSignatureMap = new Map();
     this.latestProcessedBlock = this.latestBlock;
 
     this.verifiedBlockStream = new WritableConsumableStream();
@@ -150,7 +149,7 @@ module.exports = class LDPoSChainModule {
         }
         for (let block of newBlocks) {
           try {
-            this.verifyBlock(block, latestGoodBlock.id);
+            this.verifyBlock(block, latestGoodBlock);
             latestGoodBlock = block;
           } catch (error) {
             this.logger.warn(`Received invalid block while catching up with network - ${error.message}`);
@@ -189,28 +188,30 @@ module.exports = class LDPoSChainModule {
   }
 
   async receiveLatestBlock(timeout) {
-    return this.verifiedBlockStream.once(timeout);
+    let block = await this.verifiedBlockStream.once(timeout);
+    this.latestBlock = {
+      ...block,
+      signatures: []
+    };
+    return this.latestBlock;
   }
 
   async receiveLatestBlockSignatures(latestBlock, requiredSignatureCount, timeout) {
-    let signatureMap = new Map();
+    let signerSet = new Set();
     while (true) {
       let startTime = Date.now();
       let blockSignature = await this.verifiedBlockSignatureStream.once(timeout);
       if (blockSignature.blockId === latestBlock.id) {
-        signatureMap.set(blockSignature.signerAddress, blockSignature);
+        latestBlock.signatures[blockSignature.signerAddress] = blockSignature;
+        signerSet.add(blockSignature.signerAddress);
       }
       let timeDiff = Date.now() - startTime;
       timeout -= timeDiff;
-      if (timeout <= 0 || signatureMap.size >= requiredSignatureCount) {
+      if (timeout <= 0 || signerSet.size >= requiredSignatureCount) {
         break;
       }
     }
-    let signatures = {};
-    for (let [key, value] of signatureMap) {
-      signatures[key] = value;
-    }
-    return signatures;
+    return latestBlock.signatures;
   }
 
   async getCurrentBlockTimeSlot(forgingInterval) {
@@ -218,7 +219,7 @@ module.exports = class LDPoSChainModule {
   }
 
   async getForgingDelegateAddressAtTimestamp(timestamp) {
-    let activeDelegates = await this.getTopActiveDelegates(this.delegateCount);
+    let activeDelegates = await this.dal.getTopActiveDelegates(this.delegateCount);
     let slotIndex = Math.floor(timestamp / this.forgingInterval);
     let activeDelegateIndex = slotIndex % activeDelegates.length;
     return activeDelegates[activeDelegateIndex].address;
@@ -321,11 +322,19 @@ module.exports = class LDPoSChainModule {
     }
   }
 
-  async verifyBlock(block, lastBlockId) {
+  async verifyBlock(block, lastBlock) {
     if (!block) {
       throw new Error('Block was not specified');
     }
-    let targetDelegateAddress = this.getForgingDelegateAddressAtTimestamp(block.timestamp);
+    let lastBlockId = lastBlock ? lastBlock.id : null;
+    let lastBlockHeight = lastBlock ? lastBlock.height : 0;
+    let expectedBlockHeight = lastBlockHeight + 1;
+    if (block.height !== expectedBlockHeight) {
+      throw new Error(
+        `Block height was invalid - Was ${block.height} but expected ${expectedBlockHeight}`
+      );
+    }
+    let targetDelegateAddress = await this.getForgingDelegateAddressAtTimestamp(block.timestamp);
     let targetDelegateAccount = await this.dal.getAccount(targetDelegateAddress);
     if (block.forgerAddress !== targetDelegateAccount.address) {
       throw new Error(
@@ -405,7 +414,13 @@ module.exports = class LDPoSChainModule {
   }
 
   async signBlock(block) {
-    return this.ldposClient.signBlock(block);
+    let signature = this.ldposClient.signBlock(block);
+    let blockSignature = {
+      blockId: block.id,
+      signerAddress: this.ldposClient.getAccountAddress(),
+      signature
+    };
+    return blockSignature;
   }
 
   async waitUntilNextBlockTimeSlot(options) {
@@ -508,7 +523,6 @@ module.exports = class LDPoSChainModule {
       if (!this.isActive) {
         break;
       }
-      this.latestBlockSignatureMap.clear();
       // If the node is already on the latest network height, it will just return it.
       this.networkHeight = await this.catchUpWithNetwork({
         forgingInterval,
@@ -525,7 +539,8 @@ module.exports = class LDPoSChainModule {
         timePollInterval
       });
 
-      let isCurrentForgingDelegate = forgingWalletAddress && forgingWalletAddress === this.getCurrentForgingDelegateAddress();
+      let currentForgingDelegateAddress = await this.getCurrentForgingDelegateAddress();
+      let isCurrentForgingDelegate = forgingWalletAddress && forgingWalletAddress === currentForgingDelegateAddress;
 
       if (isCurrentForgingDelegate) {
         (async () => {
@@ -560,7 +575,7 @@ module.exports = class LDPoSChainModule {
           (async () => {
             try {
               let selfSignature = await this.signBlock(latestBlock);
-              this.latestBlockSignatureMap.set(selfSignature.id, selfSignature);
+              latestBlock[selfSignature.signerAddress] = selfSignature;
               await this.wait(forgingSignatureBroadcastDelay);
               await this.broadcastBlockSignature(selfSignature);
             } catch (error) {
@@ -570,7 +585,7 @@ module.exports = class LDPoSChainModule {
         }
 
         // Will throw if the required number of valid signatures cannot be gathered in time.
-        latestBlockSignatures = await this.receiveLatestBlockSignatures(latestBlock, delegateMajorityCount, forgingSignatureBroadcastDelay + propagationTimeout);
+        await this.receiveLatestBlockSignatures(latestBlock, delegateMajorityCount, forgingSignatureBroadcastDelay + propagationTimeout);
 
         if (this.pendingBlocks.length) {
           let latestPendingBlock = this.pendingBlocks[this.pendingBlocks.length - 1];
@@ -586,10 +601,6 @@ module.exports = class LDPoSChainModule {
           }
         }
         await this.processBlock(latestBlock);
-        this.latestBlock = {
-          ...latestBlock,
-          signatures: latestBlockSignatures
-        };
         this.latestProcessedBlock = this.latestBlock;
         this.nodeHeight = nextHeight;
         this.networkHeight = nextHeight;
@@ -645,9 +656,8 @@ module.exports = class LDPoSChainModule {
     channel.subscribe(`network:event:${this.alias}:block`, async (event) => {
       let block = event.data;
 
-      let lastBlockId = this.latestBlock ? this.latestBlock.id : null;
       try {
-        this.verifyBlock(block, lastBlockId);
+        this.verifyBlock(block, this.latestBlock);
       } catch (error) {
         this.logger.error(
           new Error(`Received invalid block - ${error.message}`)
@@ -686,9 +696,11 @@ module.exports = class LDPoSChainModule {
         return;
       }
 
-      if (this.latestBlockSignatureMap.has(blockSignature.id)) {
+      let { signatures } = this.latestBlock;
+
+      if (signatures[blockSignature.signerAddress]) {
         this.logger.error(
-          new Error(`Block signature ${blockSignature.id} has already been received before`)
+          new Error(`Block signature of signer ${blockSignature.signerAddress} has already been received before`)
         );
         return;
       }
