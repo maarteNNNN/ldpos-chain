@@ -4,8 +4,8 @@ const genesisBlock = require('./genesis/testnet/genesis.json');
 const { createLDPoSClient } = require('ldpos-client');
 const WritableConsumableStream = require('writable-consumable-stream');
 
-const { verifyBlockSchema } = require('schemas/block-schema');
-const { verifyTransactionBundleSchema } = require('schemas/transactions-bundle-schema');
+const { verifyBlockSchema } = require('./schemas/block-schema');
+const { verifyTransactionBundleSchema } = require('./schemas/transaction-bundle-schema');
 
 const DEFAULT_MODULE_ALIAS = 'ldpos_chain';
 const DEFAULT_GENESIS_PATH = './genesis/mainnet/genesis.json';
