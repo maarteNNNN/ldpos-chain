@@ -4,6 +4,9 @@ const genesisBlock = require('./genesis/testnet/genesis.json');
 const { createLDPoSClient } = require('ldpos-client');
 const WritableConsumableStream = require('writable-consumable-stream');
 
+const { verifyBlockSchema } = require('schemas/block-schema');
+const { verifyTransactionBundleSchema } = require('schemas/transactions-bundle-schema');
+
 const DEFAULT_MODULE_ALIAS = 'ldpos_chain';
 const DEFAULT_GENESIS_PATH = './genesis/mainnet/genesis.json';
 const DEFAULT_DELEGATE_COUNT = 21;
@@ -296,22 +299,15 @@ module.exports = class LDPoSChainModule {
     await this.dal.insertBlock(sanitizedBlock);
   }
 
-  verifyTransactionsPacketSchema(transactionsPacket) {
-    if (!transactionsPacket) {
-      throw new Error('Transactions packet was not specified');
-    }
-    // TODO 222: Verify that transactions have all required properties in the correct formats
-  }
+  async verifyTransactionBundle(transactionBundle) {
+    verifyTransactionBundleSchema(transactionBundle);
 
-  async verifyTransactionsPacket(transactionsPacket) {
-    this.verifyTransactionsPacketSchema(transactionsPacket);
-
-    let areTransactionSignaturesValid = this.ldposClient.verifyTransactionsPacket(transactionsPacket);
+    let areTransactionSignaturesValid = this.ldposClient.verifyTransactionBundle(transactionBundle);
     if (!areTransactionSignaturesValid) {
       throw new Error('Transactions signature was invalid');
     }
 
-    let { transactions } = transactionsPacket;
+    let { transactions } = transactionBundle;
     let { senderAddress } = transactions[0];
     let totalTransactionsAmount = 0;
     for (let txn of transactions) {
@@ -327,15 +323,8 @@ module.exports = class LDPoSChainModule {
     }
   }
 
-  verifyBlockSchema(block) {
-    if (!block) {
-      throw new Error('Block was not specified');
-    }
-    // TODO 222: Verify that block has all required properties in the correct formats
-  }
-
   async verifyBlock(block, lastBlock) {
-    this.verifyBlockSchema(block);
+    verifyBlockSchema(block);
     let lastBlockId = lastBlock ? lastBlock.id : null;
     let lastBlockHeight = lastBlock ? lastBlock.height : 0;
     let expectedBlockHeight = lastBlockHeight + 1;
@@ -636,10 +625,10 @@ module.exports = class LDPoSChainModule {
 
   async startTransactionPropagationLoop() {
     this.channel.subscribe(`network:event:${this.alias}:transactions`, async (event) => {
-      let transactionsPacket = event.data;
+      let transactionBundle = event.data;
 
       try {
-        await this.verifyTransactionsPacket(transactionsPacket);
+        await this.verifyTransactionBundle(transactionBundle);
       } catch (error) {
         this.logger.error(
           new Error(`Received invalid Transactions - ${error.message}`)
@@ -647,7 +636,7 @@ module.exports = class LDPoSChainModule {
         return;
       }
 
-      let { transactions } = transactionsPacket;
+      let { transactions } = transactionBundle;
 
       for (let txn of transactions) {
         if (this.pendingTransactionMap.has(txn.id)) {
