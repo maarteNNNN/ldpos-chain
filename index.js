@@ -296,10 +296,15 @@ module.exports = class LDPoSChainModule {
     await this.dal.insertBlock(sanitizedBlock);
   }
 
-  async verifyTransactionsPacket(transactionsPacket) {
+  verifyTransactionsPacketSchema(transactionsPacket) {
     if (!transactionsPacket) {
       throw new Error('Transactions packet was not specified');
     }
+    // TODO 222: Verify that transactions have all required properties in the correct formats
+  }
+
+  async verifyTransactionsPacket(transactionsPacket) {
+    this.verifyTransactionsPacketSchema(transactionsPacket);
 
     let areTransactionSignaturesValid = this.ldposClient.verifyTransactionsPacket(transactionsPacket);
     if (!areTransactionSignaturesValid) {
@@ -322,16 +327,26 @@ module.exports = class LDPoSChainModule {
     }
   }
 
-  async verifyBlock(block, lastBlock) {
+  verifyBlockSchema(block) {
     if (!block) {
       throw new Error('Block was not specified');
     }
+    // TODO 222: Verify that block has all required properties in the correct formats
+  }
+
+  async verifyBlock(block, lastBlock) {
+    this.verifyBlockSchema(block);
     let lastBlockId = lastBlock ? lastBlock.id : null;
     let lastBlockHeight = lastBlock ? lastBlock.height : 0;
     let expectedBlockHeight = lastBlockHeight + 1;
     if (block.height !== expectedBlockHeight) {
       throw new Error(
         `Block height was invalid - Was ${block.height} but expected ${expectedBlockHeight}`
+      );
+    }
+    if (block.timestamp % this.forgingInterval !== 0 || block.timestamp - lastBlock.timestamp < this.forgingInterval) {
+      throw new Error(
+        `Block timestamp ${block.timestamp} was invalid`
       );
     }
     let targetDelegateAddress = await this.getForgingDelegateAddressAtTimestamp(block.timestamp);
@@ -658,9 +673,16 @@ module.exports = class LDPoSChainModule {
 
       try {
         this.verifyBlock(block, this.latestBlock);
+        let currentBlockTimeSlot = this.getCurrentBlockTimeSlot(this.forgingInterval);
+        let timestampDiff = block.timestamp - currentBlockTimeSlot;
+        if (timestampDiff > 10 || timestampDiff < 0) {
+          throw new Error(`Block ${block.id} timestamp did not fit within the expected time slot`);
+        }
       } catch (error) {
         this.logger.error(
-          new Error(`Received invalid block - ${error.message}`)
+          new Error(
+            `Received invalid block ${block && block.id} - ${error.message}`
+          )
         );
         return;
       }
