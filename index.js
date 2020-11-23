@@ -152,7 +152,7 @@ module.exports = class LDPoSChainModule {
         }
         for (let block of newBlocks) {
           try {
-            this.verifyBlock(block, latestGoodBlock);
+            await this.verifyBlock(block, latestGoodBlock);
             latestGoodBlock = block;
           } catch (error) {
             this.logger.warn(`Received invalid block while catching up with network - ${error.message}`);
@@ -191,12 +191,7 @@ module.exports = class LDPoSChainModule {
   }
 
   async receiveLatestBlock(timeout) {
-    let block = await this.verifiedBlockStream.once(timeout);
-    this.latestBlock = {
-      ...block,
-      signatures: []
-    };
-    return this.latestBlock;
+    return this.verifiedBlockStream.once(timeout);
   }
 
   async receiveLatestBlockSignatures(latestBlock, requiredSignatureCount, timeout) {
@@ -661,11 +656,18 @@ module.exports = class LDPoSChainModule {
       let block = event.data;
 
       try {
-        this.verifyBlock(block, this.latestBlock);
+        await this.verifyBlock(block, this.latestBlock);
         let currentBlockTimeSlot = this.getCurrentBlockTimeSlot(this.forgingInterval);
         let timestampDiff = block.timestamp - currentBlockTimeSlot;
         if (timestampDiff > this.forgingInterval || timestampDiff < 0) {
-          throw new Error(`Block ${block.id} timestamp did not fit within the expected time slot`);
+          throw new Error(
+            `Block ${block.id} timestamp ${block.timestamp} did not fit within the expected time slot`
+          );
+        }
+        if (this.latestBlock && Math.abs(block.timestamp - this.latestBlock.timestamp) < this.forgingInterval) {
+          throw new Error(
+            `Block ${block.id} was forged within the same time slot as the last block ${this.latestBlock.id}`
+          );
         }
       } catch (error) {
         this.logger.error(
@@ -675,7 +677,6 @@ module.exports = class LDPoSChainModule {
         );
         return;
       }
-
       if (this.latestBlock && this.latestBlock.id === block.id) {
         this.logger.error(
           new Error(`Block ${block.id} has already been received before`)
@@ -683,7 +684,12 @@ module.exports = class LDPoSChainModule {
         return;
       }
 
-      this.verifiedBlockStream.write(block);
+      this.latestBlock = {
+        ...block,
+        signatures: []
+      };
+
+      this.verifiedBlockStream.write(this.latestBlock);
 
       try {
         await this.broadcastBlock(block);
