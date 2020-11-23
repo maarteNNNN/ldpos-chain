@@ -246,7 +246,9 @@ module.exports = class LDPoSChainModule {
     let affectedAddresses = new Set();
     for (let txn of transactions) {
       affectedAddresses.add(txn.senderAddress);
-      affectedAddresses.add(txn.recipientAddress);
+      if (txn.recipientAddress) {
+        affectedAddresses.add(txn.recipientAddress);
+      }
     }
     affectedAddresses.add(block.forgerAddress);
 
@@ -259,6 +261,7 @@ module.exports = class LDPoSChainModule {
     }
     let forgerAccount = accounts[block.forgerAddress];
     for (let txn of transactions) {
+      // TODO 222: Also handle vote and multisig transactions.
       let { senderAddress, recipientAddress, amount, fee } = txn;
       let txnAmount = BigInt(amount);
       let txnFee = BigInt(fee);
