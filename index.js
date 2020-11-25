@@ -20,6 +20,7 @@ const DEFAULT_PROPAGATION_TIMEOUT = 5000;
 const DEFAULT_PROPAGATION_RANDOMNESS = 10000;
 const DEFAULT_TIME_POLL_INTERVAL = 200;
 const DEFAULT_MAX_TRANSACTIONS_PER_BLOCK = 300;
+const DEFAULT_MAX_TRANSACTIONS_PER_BUNDLE = 25;
 
 module.exports = class LDPoSChainModule {
   constructor(options) {
@@ -304,10 +305,30 @@ module.exports = class LDPoSChainModule {
     let { transactions } = transactionBundle;
     let { senderAddress } = transactions[0];
 
+    if (transactions.length > this.maxTransactionsPerBundle) {
+      throw new Error(
+        `Transaction bundle contained ${
+          transactions.length
+        } transactions which is above the maximum limit of ${
+          this.maxTransactionsPerBundle
+        }`
+      );
+    }
+
+    for (let txn of transactions) {
+      if (txn.senderAddress !== senderAddress) {
+        throw new Error(
+          'A transaction in the bundle had a senderAddress which did not match that of the others'
+        );
+      }
+    }
+
     let senderAccount = await this.dal.getAccount(senderAddress);
     if (!senderAccount) {
       throw new Error(`Transactions sender account ${senderAddress} could not be found`);
     }
+
+    // TODO 222: If senderAccount is a multisig account, then check all member signatures.
 
     let areTransactionSignaturesValid = this.ldposClient.verifyTransactionBundle(transactionBundle, senderAccount.sigPublicKey);
     if (!areTransactionSignaturesValid) {
@@ -457,7 +478,8 @@ module.exports = class LDPoSChainModule {
       propagationTimeout,
       propagationRandomness,
       timePollInterval,
-      maxTransactionsPerBlock
+      maxTransactionsPerBlock,
+      maxTransactionsPerBundle
     } = options;
 
     if (forgingInterval == null) {
@@ -493,10 +515,14 @@ module.exports = class LDPoSChainModule {
     if (maxTransactionsPerBlock == null) {
       maxTransactionsPerBlock = DEFAULT_MAX_TRANSACTIONS_PER_BLOCK;
     }
+    if (maxTransactionsPerBundle == null) {
+      maxTransactionsPerBundle = DEFAULT_MAX_TRANSACTIONS_PER_BUNDLE;
+    }
 
     this.delegateCount = delegateCount;
     this.forgingInterval = forgingInterval;
     this.propagationRandomness = propagationRandomness;
+    this.maxTransactionsPerBundle = maxTransactionsPerBundle;
 
     let delegateMajorityCount = Math.ceil(delegateCount / 2);
 
@@ -636,7 +662,7 @@ module.exports = class LDPoSChainModule {
       let transactionBundle = event.data;
 
       try {
-        await this.verifyTransactionBundle(transactionBundle); // TODO 22222 Check that transactions.length is less than maximum allowed
+        await this.verifyTransactionBundle(transactionBundle);
       } catch (error) {
         this.logger.error(
           new Error(`Received invalid transaction bundle - ${error.message}`)
