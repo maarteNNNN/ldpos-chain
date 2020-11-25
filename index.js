@@ -17,6 +17,7 @@ const DEFAULT_FETCH_BLOCK_END_CONFIRMATIONS = 10;
 const DEFAULT_FORGING_BLOCK_BROADCAST_DELAY = 2000;
 const DEFAULT_FORGING_SIGNATURE_BROADCAST_DELAY = 5000;
 const DEFAULT_PROPAGATION_TIMEOUT = 5000;
+const DEFAULT_PROPAGATION_RANDOMNESS = 10000;
 const DEFAULT_TIME_POLL_INTERVAL = 200;
 const DEFAULT_MAX_TRANSACTIONS_PER_BLOCK = 300;
 
@@ -60,9 +61,9 @@ module.exports = class LDPoSChainModule {
 
   get actions() {
     return {
-      postTransactions: {
+      postTransactionBundle: {
         handler: async action => {
-          return this.postTransactions(action.transactions);
+          return this.postTransactionBundle(action.transactionBundle);
         }
       },
       getNodeStatus: {
@@ -261,7 +262,7 @@ module.exports = class LDPoSChainModule {
     }
     let forgerAccount = accounts[block.forgerAddress];
     for (let txn of transactions) {
-      // TODO 222: Also handle vote and multisig transactions.
+      // TODO 222: Also handle vote transactions.
       let { senderAddress, recipientAddress, amount, fee } = txn;
       let txnAmount = BigInt(amount);
       let txnFee = BigInt(fee);
@@ -300,21 +301,22 @@ module.exports = class LDPoSChainModule {
   async verifyTransactionBundle(transactionBundle) {
     verifyTransactionBundleSchema(transactionBundle);
 
-    let areTransactionSignaturesValid = this.ldposClient.verifyTransactionBundle(transactionBundle);
-    if (!areTransactionSignaturesValid) {
-      throw new Error('Transactions signature was invalid');
-    }
-
     let { transactions } = transactionBundle;
     let { senderAddress } = transactions[0];
-    let totalTransactionsAmount = 0;
-    for (let txn of transactions) {
-      totalTransactionsAmount += txn.amount;
-    }
 
     let senderAccount = await this.dal.getAccount(senderAddress);
     if (!senderAccount) {
       throw new Error(`Transactions sender account ${senderAddress} could not be found`);
+    }
+
+    let areTransactionSignaturesValid = this.ldposClient.verifyTransactionBundle(transactionBundle, senderAccount.sigPublicKey);
+    if (!areTransactionSignaturesValid) {
+      throw new Error('Transactions signature was invalid');
+    }
+
+    let totalTransactionsAmount = 0;
+    for (let txn of transactions) {
+      totalTransactionsAmount += txn.amount;
     }
     if (totalTransactionsAmount > senderAccount.balance) {
       throw new Error('Total transactions amount was greater than the sender account balance');
@@ -453,6 +455,7 @@ module.exports = class LDPoSChainModule {
       fetchBlockPause,
       fetchBlockEndConfirmations,
       propagationTimeout,
+      propagationRandomness,
       timePollInterval,
       maxTransactionsPerBlock
     } = options;
@@ -481,6 +484,9 @@ module.exports = class LDPoSChainModule {
     if (propagationTimeout == null) {
       propagationTimeout = DEFAULT_PROPAGATION_TIMEOUT;
     }
+    if (propagationRandomness == null) {
+      propagationRandomness = DEFAULT_PROPAGATION_RANDOMNESS;
+    }
     if (timePollInterval == null) {
       timePollInterval = DEFAULT_TIME_POLL_INTERVAL;
     }
@@ -490,6 +496,7 @@ module.exports = class LDPoSChainModule {
 
     this.delegateCount = delegateCount;
     this.forgingInterval = forgingInterval;
+    this.propagationRandomness = propagationRandomness;
 
     let delegateMajorityCount = Math.ceil(delegateCount / 2);
 
@@ -560,6 +567,9 @@ module.exports = class LDPoSChainModule {
           let blockTransactions = pendingTransactions.slice(0, maxTransactionsPerBlock);
           let blockTimestamp = this.getCurrentBlockTimeSlot(forgingInterval);
           let forgedBlock = this.forgeBlock(nextHeight, blockTimestamp, blockTransactions);
+          for (let txn of blockTransactions) {
+            this.pendingTransactionMap.delete(txn.id);
+          }
           await this.wait(forgingBlockBroadcastDelay);
           try {
             await this.broadcastBlock(forgedBlock);
@@ -614,22 +624,22 @@ module.exports = class LDPoSChainModule {
     }
   }
 
-  async postTransactions(transactions) {
+  async postTransactionBundle(transactions) {
     return this.channel.invoke('network:emit', {
-      event: `${this.alias}:transactions`,
+      event: `${this.alias}:transactionBundle`,
       data: transactions
     });
   }
 
   async startTransactionPropagationLoop() {
-    this.channel.subscribe(`network:event:${this.alias}:transactions`, async (event) => {
+    this.channel.subscribe(`network:event:${this.alias}:transactionBundle`, async (event) => {
       let transactionBundle = event.data;
 
       try {
-        await this.verifyTransactionBundle(transactionBundle);
+        await this.verifyTransactionBundle(transactionBundle); // TODO 22222 Check that transactions.length is less than maximum allowed
       } catch (error) {
         this.logger.error(
-          new Error(`Received invalid Transactions - ${error.message}`)
+          new Error(`Received invalid transaction bundle - ${error.message}`)
         );
         return;
       }
@@ -644,9 +654,17 @@ module.exports = class LDPoSChainModule {
           return;
         }
       }
+      for (let txn of transactions) {
+        this.pendingTransactionMap.set(txn.id, txn);
+      }
+
+      // This is a performance optimization to ensure that peers
+      // will not receive multiple instances of the same transaction bundle at the same time.
+      let randomPropagationDelay = Math.round(Math.random() * this.propagationRandomness);
+      await this.wait(randomPropagationDelay);
 
       try {
-        await this.postTransactions(transactions);
+        await this.postTransactionBundle(transactionBundle);
       } catch (error) {
         this.logger.error(error);
       }
@@ -694,6 +712,11 @@ module.exports = class LDPoSChainModule {
 
       this.verifiedBlockStream.write(this.latestBlock);
 
+      // This is a performance optimization to ensure that peers
+      // will not receive multiple instances of the same block at the same time.
+      let randomPropagationDelay = Math.round(Math.random() * this.propagationRandomness);
+      await this.wait(randomPropagationDelay);
+
       try {
         await this.broadcastBlock(block);
       } catch (error) {
@@ -726,6 +749,11 @@ module.exports = class LDPoSChainModule {
       }
 
       this.verifiedBlockSignatureStream.write(blockSignature);
+
+      // This is a performance optimization to ensure that peers
+      // will not receive multiple instances of the same signature at the same time.
+      let randomPropagationDelay = Math.round(Math.random() * this.propagationRandomness);
+      await this.wait(randomPropagationDelay);
 
       try {
         await this.broadcastBlockSignature(blockSignature);

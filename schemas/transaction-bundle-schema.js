@@ -10,6 +10,9 @@ function verifyTransactionBundleSchema(transactionBundle) {
   if (!Array.isArray(transactionBundle.transactions)) {
     throw new Error('Transaction bundle transactions must be an array');
   }
+  if (!transactionBundle.transactions.length) {
+    throw new Error('Transaction bundle transactions array must not be empty');
+  }
   for (let txn of transactionBundle.transactions) {
     verifyTransactionSchema(txn);
   }
