@@ -328,19 +328,19 @@ module.exports = class LDPoSChainModule {
       throw new Error(`Transactions sender account ${senderAddress} could not be found`);
     }
 
-    // TODO 222: If senderAccount is a multisig account, then check all member signatures.
-
-    let areTransactionSignaturesValid = this.ldposClient.verifyTransactionBundle(transactionBundle, senderAccount.sigPublicKey);
-    if (!areTransactionSignaturesValid) {
-      throw new Error('Transactions signature was invalid');
-    }
-
     let totalTransactionsAmount = 0;
     for (let txn of transactions) {
       totalTransactionsAmount += txn.amount;
     }
     if (totalTransactionsAmount > senderAccount.balance) {
       throw new Error('Total transactions amount was greater than the sender account balance');
+    }
+
+    // TODO 222: If senderAccount is a multisig account, then check all member signatures.
+
+    let areTransactionSignaturesValid = this.ldposClient.verifyTransactionBundle(transactionBundle, senderAccount.sigPublicKey);
+    if (!areTransactionSignaturesValid) {
+      throw new Error('Transactions signature was invalid');
     }
   }
 
@@ -360,16 +360,16 @@ module.exports = class LDPoSChainModule {
       );
     }
     let targetDelegateAddress = await this.getForgingDelegateAddressAtTimestamp(block.timestamp);
-    let targetDelegateAccount = await this.dal.getAccount(targetDelegateAddress);
-    if (block.forgerAddress !== targetDelegateAccount.address) {
+    if (block.forgerAddress !== targetDelegateAddress) {
       throw new Error(
         `The block forgerAddress ${
           block.forgerAddress
         } did not match the expected forger delegate address ${
-          targetDelegateAccount.address
+          targetDelegateAddress
         }`
       );
     }
+    let targetDelegateAccount = await this.dal.getAccount(targetDelegateAddress);
     let forgingPublicKey;
     if (block.forgingPublicKey === targetDelegateAccount.forgingPublicKey) {
       forgingPublicKey = targetDelegateAccount.forgingPublicKey;
