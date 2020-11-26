@@ -618,7 +618,11 @@ module.exports = class LDPoSChainModule {
               await this.wait(forgingSignatureBroadcastDelay);
               if (this.latestDoubleForgedBlockTimestamp === latestBlock.timestamp) {
                 throw new Error(
-                  `Refused to sign block ${latestBlock.id} because delegate ${latestBlock.forgerAddress} tried to double-forge`
+                  `Refused to send signature for block ${
+                    latestBlock.id
+                  } because delegate ${
+                    latestBlock.forgerAddress
+                  } tried to double-forge`
                 );
               }
               await this.broadcastBlockSignature(selfSignature);
