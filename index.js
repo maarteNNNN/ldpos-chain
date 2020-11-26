@@ -614,8 +614,13 @@ module.exports = class LDPoSChainModule {
           (async () => {
             try {
               let selfSignature = await this.signBlock(latestBlock);
-              latestBlock[selfSignature.signerAddress] = selfSignature;
+              latestBlock.signatures[selfSignature.signerAddress] = selfSignature;
               await this.wait(forgingSignatureBroadcastDelay);
+              if (this.latestDoubleForgedBlockTimestamp === latestBlock.timestamp) {
+                throw new Error(
+                  `Refused to sign block ${latestBlock.id} because delegate ${latestBlock.forgerAddress} tried to double-forge`
+                );
+              }
               await this.broadcastBlockSignature(selfSignature);
             } catch (error) {
               this.logger.error(error);
@@ -706,10 +711,9 @@ module.exports = class LDPoSChainModule {
       try {
         await this.verifyBlock(block, this.latestBlock);
         let currentBlockTimeSlot = this.getCurrentBlockTimeSlot(this.forgingInterval);
-        let timestampDiff = block.timestamp - currentBlockTimeSlot;
-        if (timestampDiff > this.forgingInterval || timestampDiff < 0) {
+        if (block.timestamp !== currentBlockTimeSlot) {
           throw new Error(
-            `Block ${block.id} timestamp ${block.timestamp} did not fit within the expected time slot`
+            `Block ${block.id} timestamp ${block.timestamp} did not correspond to the current time slot`
           );
         }
       } catch (error) {
@@ -726,13 +730,17 @@ module.exports = class LDPoSChainModule {
         );
         return;
       }
+
+      // If double-forged block was received.
       if (block.timestamp === this.latestBlock.timestamp) {
+        this.latestDoubleForgedBlockTimestamp = this.latestBlock.timestamp;
         this.logger.error(
           new Error(`Block ${block.id} was forged with the same timestamp as the last block ${this.latestBlock.id}`)
         );
         return;
       }
       if (block.height === this.latestBlock.height) {
+        this.latestDoubleForgedBlockTimestamp = this.latestBlock.timestamp;
         this.logger.error(
           new Error(`Block ${block.id} was forged at the same height as the last block ${this.latestBlock.id}`)
         );
