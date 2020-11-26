@@ -524,6 +524,7 @@ module.exports = class LDPoSChainModule {
     this.propagationRandomness = propagationRandomness;
     this.maxTransactionsPerBundle = maxTransactionsPerBundle;
 
+    // TODO 222: Should it be 2/3 in order to prevent attempts at double forging + double signing?
     let delegateMajorityCount = Math.ceil(delegateCount / 2);
 
     let ldposClient;
@@ -711,11 +712,6 @@ module.exports = class LDPoSChainModule {
             `Block ${block.id} timestamp ${block.timestamp} did not fit within the expected time slot`
           );
         }
-        if (this.latestBlock && Math.abs(block.timestamp - this.latestBlock.timestamp) < this.forgingInterval) {
-          throw new Error(
-            `Block ${block.id} was forged within the same time slot as the last block ${this.latestBlock.id}`
-          );
-        }
       } catch (error) {
         this.logger.error(
           new Error(
@@ -724,9 +720,21 @@ module.exports = class LDPoSChainModule {
         );
         return;
       }
-      if (this.latestBlock && this.latestBlock.id === block.id) {
-        this.logger.error(
+      if (block.id === this.latestBlock.id) {
+        this.logger.debug(
           new Error(`Block ${block.id} has already been received before`)
+        );
+        return;
+      }
+      if (block.timestamp === this.latestBlock.timestamp) {
+        this.logger.error(
+          new Error(`Block ${block.id} was forged with the same timestamp as the last block ${this.latestBlock.id}`)
+        );
+        return;
+      }
+      if (block.height === this.latestBlock.height) {
+        this.logger.error(
+          new Error(`Block ${block.id} was forged at the same height as the last block ${this.latestBlock.id}`)
         );
         return;
       }
