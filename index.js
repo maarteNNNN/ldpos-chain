@@ -562,12 +562,10 @@ module.exports = class LDPoSChainModule {
             }
             return 0;
           });
+          // TODO 222: Replace transaction signatures with signature hashes before adding them to the block.
           let blockTransactions = pendingTransactions.slice(0, maxTransactionsPerBlock);
           let blockTimestamp = this.getCurrentBlockTimeSlot(forgingInterval);
           let forgedBlock = this.forgeBlock(nextHeight, blockTimestamp, blockTransactions);
-          for (let txn of blockTransactions) {
-            this.pendingTransactionMap.delete(txn.id);
-          }
           await this.wait(forgingBlockBroadcastDelay);
           try {
             await this.broadcastBlock(forgedBlock);
@@ -658,6 +656,7 @@ module.exports = class LDPoSChainModule {
         return;
       }
       this.pendingTransactionMap.set(transaction.id, transaction);
+      // TODO 222: Need a way to expire transactions from pendingTransactionMap deterministically - A transaction could spend a long time in the pendingTransactionMap if the fee is too low.
 
       // This is a performance optimization to ensure that peers
       // will not receive multiple instances of the same transaction at the same time.
@@ -715,6 +714,9 @@ module.exports = class LDPoSChainModule {
         );
         return;
       }
+
+      // TODO 222: Check that all the transaction signature hashes in the block match the signatures of transactions in the pendingTransactionMap, otherwise log error and return here.
+      // TODO 222: Otherwise, if all the transaction signature hashes are correct, delete those transactions from pendingTransactionMap.
 
       this.latestBlock = {
         ...block,
