@@ -140,9 +140,9 @@ describe('Unit tests', async () => {
 
   });
 
-  describe('postTransactionBundle action', async () => {
+  describe('postTransaction action', async () => {
 
-    it('should expose a postTransactionBundle action', async () => {
+    it('should expose a postTransaction action', async () => {
 
     });
 

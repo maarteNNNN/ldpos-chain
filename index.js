@@ -5,7 +5,7 @@ const { createLDPoSClient } = require('ldpos-client');
 const WritableConsumableStream = require('writable-consumable-stream');
 
 const { verifyBlockSchema } = require('./schemas/block-schema');
-const { verifyTransactionBundleSchema } = require('./schemas/transaction-bundle-schema');
+const { verifyTransactionSchema } = require('./schemas/transaction-schema');
 
 const DEFAULT_MODULE_ALIAS = 'ldpos_chain';
 const DEFAULT_GENESIS_PATH = './genesis/mainnet/genesis.json';
@@ -20,7 +20,6 @@ const DEFAULT_PROPAGATION_TIMEOUT = 5000;
 const DEFAULT_PROPAGATION_RANDOMNESS = 10000;
 const DEFAULT_TIME_POLL_INTERVAL = 200;
 const DEFAULT_MAX_TRANSACTIONS_PER_BLOCK = 300;
-const DEFAULT_MAX_TRANSACTIONS_PER_BUNDLE = 25;
 
 module.exports = class LDPoSChainModule {
   constructor(options) {
@@ -62,9 +61,9 @@ module.exports = class LDPoSChainModule {
 
   get actions() {
     return {
-      postTransactionBundle: {
+      postTransaction: {
         handler: async action => {
-          return this.postTransactionBundle(action.transactionBundle);
+          return this.postTransaction(action.transaction);
         }
       },
       getNodeStatus: {
@@ -299,48 +298,25 @@ module.exports = class LDPoSChainModule {
     await this.dal.insertBlock(sanitizedBlock);
   }
 
-  async verifyTransactionBundle(transactionBundle) {
-    verifyTransactionBundleSchema(transactionBundle);
+  async verifyTransaction(transaction) {
+    verifyTransactionSchema(transaction);
 
-    let { transactions } = transactionBundle;
-    let { senderAddress } = transactions[0];
-
-    if (transactions.length > this.maxTransactionsPerBundle) {
-      throw new Error(
-        `Transaction bundle contained ${
-          transactions.length
-        } transactions which is above the maximum limit of ${
-          this.maxTransactionsPerBundle
-        }`
-      );
-    }
-
-    for (let txn of transactions) {
-      if (txn.senderAddress !== senderAddress) {
-        throw new Error(
-          'A transaction in the bundle had a senderAddress which did not match that of the others'
-        );
-      }
-    }
+    let { senderAddress } = transaction;
 
     let senderAccount = await this.dal.getAccount(senderAddress);
     if (!senderAccount) {
-      throw new Error(`Transactions sender account ${senderAddress} could not be found`);
+      throw new Error(`Transaction sender account ${senderAddress} could not be found`);
     }
 
-    let totalTransactionsAmount = 0;
-    for (let txn of transactions) {
-      totalTransactionsAmount += txn.amount;
-    }
-    if (totalTransactionsAmount > senderAccount.balance) {
-      throw new Error('Total transactions amount was greater than the sender account balance');
+    if (transaction.amount > senderAccount.balance) {
+      throw new Error('Transaction amount was greater than the sender account balance');
     }
 
     // TODO 222: If senderAccount is a multisig account, then check all member signatures.
 
-    let areTransactionSignaturesValid = this.ldposClient.verifyTransactionBundle(transactionBundle, senderAccount.sigPublicKey);
-    if (!areTransactionSignaturesValid) {
-      throw new Error('Transactions signature was invalid');
+    let isSignatureValid = this.ldposClient.verifyTransaction(transaction, senderAccount.sigPublicKey);
+    if (!isSignatureValid) {
+      throw new Error('Transaction signature was invalid');
     }
   }
 
@@ -478,8 +454,7 @@ module.exports = class LDPoSChainModule {
       propagationTimeout,
       propagationRandomness,
       timePollInterval,
-      maxTransactionsPerBlock,
-      maxTransactionsPerBundle
+      maxTransactionsPerBlock
     } = options;
 
     if (forgingInterval == null) {
@@ -515,14 +490,10 @@ module.exports = class LDPoSChainModule {
     if (maxTransactionsPerBlock == null) {
       maxTransactionsPerBlock = DEFAULT_MAX_TRANSACTIONS_PER_BLOCK;
     }
-    if (maxTransactionsPerBundle == null) {
-      maxTransactionsPerBundle = DEFAULT_MAX_TRANSACTIONS_PER_BUNDLE;
-    }
 
     this.delegateCount = delegateCount;
     this.forgingInterval = forgingInterval;
     this.propagationRandomness = propagationRandomness;
-    this.maxTransactionsPerBundle = maxTransactionsPerBundle;
 
     // TODO 222: Should it be 2/3 in order to prevent attempts at double forging + double signing?
     let delegateMajorityCount = Math.ceil(delegateCount / 2);
@@ -660,47 +631,41 @@ module.exports = class LDPoSChainModule {
     }
   }
 
-  async postTransactionBundle(transactions) {
+  async postTransaction(transaction) {
     return this.channel.invoke('network:emit', {
-      event: `${this.alias}:transactionBundle`,
-      data: transactions
+      event: `${this.alias}:transaction`,
+      data: transaction
     });
   }
 
   async startTransactionPropagationLoop() {
-    this.channel.subscribe(`network:event:${this.alias}:transactionBundle`, async (event) => {
-      let transactionBundle = event.data;
+    this.channel.subscribe(`network:event:${this.alias}:transaction`, async (event) => {
+      let transaction = event.data;
 
       try {
-        await this.verifyTransactionBundle(transactionBundle);
+        await this.verifyTransaction(transaction);
       } catch (error) {
         this.logger.error(
-          new Error(`Received invalid transaction bundle - ${error.message}`)
+          new Error(`Received invalid transaction - ${error.message}`)
         );
         return;
       }
 
-      let { transactions } = transactionBundle;
-
-      for (let txn of transactions) {
-        if (this.pendingTransactionMap.has(txn.id)) {
-          this.logger.error(
-            new Error(`Transaction ${txn.id} has already been received before`)
-          );
-          return;
-        }
+      if (this.pendingTransactionMap.has(transaction.id)) {
+        this.logger.error(
+          new Error(`Transaction ${transaction.id} has already been received before`)
+        );
+        return;
       }
-      for (let txn of transactions) {
-        this.pendingTransactionMap.set(txn.id, txn);
-      }
+      this.pendingTransactionMap.set(transaction.id, transaction);
 
       // This is a performance optimization to ensure that peers
-      // will not receive multiple instances of the same transaction bundle at the same time.
+      // will not receive multiple instances of the same transaction at the same time.
       let randomPropagationDelay = Math.round(Math.random() * this.propagationRandomness);
       await this.wait(randomPropagationDelay);
 
       try {
-        await this.postTransactionBundle(transactionBundle);
+        await this.postTransaction(transaction);
       } catch (error) {
         this.logger.error(error);
       }
