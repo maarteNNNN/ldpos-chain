@@ -1,6 +1,6 @@
 const verifyTransactionSchema = require('./transaction-schema');
 
-function verifyBlockSchema(block) {
+function verifyBlockSchema(block, maxTransactionsPerBlock) {
   if (!block) {
     throw new Error('Block was not specified');
   }
@@ -12,6 +12,11 @@ function verifyBlockSchema(block) {
   }
   if (!Array.isArray(block.transactions)) {
     throw new Error('Block transactions must be an array');
+  }
+  if (block.transactions.length > maxTransactionsPerBlock) {
+    throw new Error(
+      `Block contained too many transactions - Maximum allowed is ${maxTransactionsPerBlock}`
+    );
   }
   for (let txn of block.transactions) {
     verifyTransactionSchema(txn);

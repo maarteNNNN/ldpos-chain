@@ -296,6 +296,10 @@ module.exports = class LDPoSChainModule {
       );
     }
     await this.dal.insertBlock(sanitizedBlock);
+
+    for (let txn of transactions) {
+      this.pendingTransactionMap.delete(txn.id);
+    }
   }
 
   async verifyTransaction(transaction) {
@@ -321,7 +325,7 @@ module.exports = class LDPoSChainModule {
   }
 
   async verifyBlock(block, lastBlock) {
-    verifyBlockSchema(block);
+    verifyBlockSchema(block, this.maxTransactionsPerBlock);
     let lastBlockId = lastBlock ? lastBlock.id : null;
     let lastBlockHeight = lastBlock ? lastBlock.height : 0;
     let expectedBlockHeight = lastBlockHeight + 1;
@@ -494,6 +498,7 @@ module.exports = class LDPoSChainModule {
     this.delegateCount = delegateCount;
     this.forgingInterval = forgingInterval;
     this.propagationRandomness = propagationRandomness;
+    this.maxTransactionsPerBlock = maxTransactionsPerBlock;
 
     // TODO 222: Should it be 2/3 in order to prevent attempts at double forging + double signing?
     let delegateMajorityCount = Math.ceil(delegateCount / 2);
@@ -562,8 +567,14 @@ module.exports = class LDPoSChainModule {
             }
             return 0;
           });
-          // TODO 222: Replace transaction signatures with signature hashes before adding them to the block.
-          let blockTransactions = pendingTransactions.slice(0, maxTransactionsPerBlock);
+          let blockTransactions = pendingTransactions.slice(0, maxTransactionsPerBlock).map((txn) => {
+            let { signature, ...txnWithoutSignature } = txn;
+            let signatureHash = this.sha256(signature);
+            return {
+              ...txnWithoutSignature,
+              signatureHash
+            };
+          });
           let blockTimestamp = this.getCurrentBlockTimeSlot(forgingInterval);
           let forgedBlock = this.forgeBlock(nextHeight, blockTimestamp, blockTransactions);
           await this.wait(forgingBlockBroadcastDelay);
@@ -715,8 +726,23 @@ module.exports = class LDPoSChainModule {
         return;
       }
 
-      // TODO 222: Check that all the transaction signature hashes in the block match the signatures of transactions in the pendingTransactionMap, otherwise log error and return here.
-      // TODO 222: Otherwise, if all the transaction signature hashes are correct, delete those transactions from pendingTransactionMap.
+      let { transactions } = block;
+      for (let txn of transactions) {
+        if (!this.pendingTransactionMap.has(txn.id)) {
+          this.logger.error(
+            new Error(`Block ${block.id} contained an unrecognized transaction ${txn.id}`)
+          );
+          return;
+        }
+        let pendingTxn = this.pendingTransactionMap.get(txn.id);
+        let pendingTxnSignatureHash = this.sha256(pendingTxn.signature);
+        if (txn.signatureHash !== pendingTxnSignatureHash) {
+          this.logger.error(
+            new Error(`Block ${block.id} contained a transaction ${txn.id} with an invalid signature hash`)
+          );
+          return;
+        }
+      }
 
       this.latestBlock = {
         ...block,
