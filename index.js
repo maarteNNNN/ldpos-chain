@@ -500,7 +500,6 @@ module.exports = class LDPoSChainModule {
     this.propagationRandomness = propagationRandomness;
     this.maxTransactionsPerBlock = maxTransactionsPerBlock;
 
-    // TODO 222: Should it be 2/3 in order to prevent attempts at double forging + double signing?
     let delegateMajorityCount = Math.ceil(delegateCount / 2);
 
     let ldposClient;
