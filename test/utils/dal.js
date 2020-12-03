@@ -10,18 +10,17 @@ class DAL {
     let { accounts } = genesis;
 
     for (let account of accounts) {
+      let { votes, ...accountWithoutVotes } = account;
       this.accounts[account.address] = {
-        ...account,
+        ...accountWithoutVotes,
         balance: BigInt(account.balance),
         updateHeight: 1
       };
-      for (let vote of account.votes) {
-        if (!this.votes[vote]) {
-          this.votes[vote] = [];
+      for (let delegate of votes) {
+        if (!this.votes[delegate]) {
+          this.votes[delegate] = new Set();
         }
-        this.votes[vote].push({
-          ...account
-        });
+        this.votes[delegate].add(account.address);
       }
     }
   }
@@ -33,30 +32,63 @@ class DAL {
   async getAccount(accountAddress) {
     let account = this.accounts[account.address];
     if (!account) {
-      throw new Error(`Account ${accountAddress} does not exist`);
+      let error = new Error(`Account ${accountAddress} did not exist`);
+      error.name = 'InvalidActionError';
+      throw error;
     }
     return account;
-  }
-
-  async setAccountBalance(accountAddress, balance, updateHeight) {
-    let account = this.accounts[account.address];
-    if (!account) {
-      throw new Error(`Account ${accountAddress} does not exist`);
-    }
-    account.balance = balance;
-    account.updateHeight = updateHeight;
   }
 
   async updateAccount(accountAddress, changePacket, updateHeight) {
     let account = this.accounts[account.address];
     if (!account) {
-      throw new Error(`Account ${accountAddress} does not exist`);
+      let error = new Error(`Account ${accountAddress} did not exist`);
+      error.name = 'InvalidActionError';
+      throw error;
     }
     let changedKeys = Object.keys(changePacket);
     for (let key of changedKeys) {
       account[key] = changePacket[key];
     }
     account.updateHeight = updateHeight;
+  }
+
+  async insertVote(voterAddress, delegateAddress) {
+    if (!this.accounts[delegateAddress]) {
+      let error = new Error(`Delegate ${delegateAddress} did not exist`);
+      error.name = 'InvalidActionError';
+      throw error;
+    }
+    if (!this.accounts[voterAddress]) {
+      let error = new Error(`Voter ${voterAddress} did not exist`);
+      error.name = 'InvalidActionError';
+      throw error;
+    }
+    if (!this.votes[delegateAddress]) {
+      this.votes[delegateAddress] = new Set();
+    }
+    this.votes[delegateAddress].add(voterAddress);
+  }
+
+  async removeVote(voterAddress, delegateAddress) {
+    if (!this.accounts[delegateAddress]) {
+      let error = new Error(`Delegate ${delegateAddress} did not exist`);
+      error.name = 'InvalidActionError';
+      throw error;
+    }
+    if (!this.accounts[voterAddress]) {
+      let error = new Error(`Voter ${voterAddress} did not exist`);
+      error.name = 'InvalidActionError';
+      throw error;
+    }
+    if (!this.votes[delegateAddress] || !this.votes[delegateAddress].has(voterAddress)) {
+      let error = new Error(
+        `Account ${voterAddress} was not voting for delegate ${delegateAddress}`
+      );
+      error.name = 'InvalidActionError';
+      throw error;
+    }
+    this.votes[delegateAddress].delete(voterAddress);
   }
 
   async getBlockAtHeight(height) {
@@ -83,10 +115,11 @@ class DAL {
     let delegateList = [];
     let delegateAddressList = Object.keys(this.votes);
     for (let delegateAddress of delegateAddressList) {
-      let voterList = this.votes[delegateAddress];
+      let voterAddressList = [...this.votes[delegateAddress]];
       let voteWeight = 0;
-      for (let voter of voterList) {
-        voteWeight += voter.balance;
+      for (let voterAddress of voterAddressList) {
+        let voter = this.accounts[voterAddress] || {};
+        voteWeight += voter.balance || 0;
       }
       delegateList.push({
         address: delegateAddress,

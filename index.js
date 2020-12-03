@@ -261,24 +261,47 @@ module.exports = class LDPoSChainModule {
       accounts[account.address] = account;
     }
     let forgerAccount = accounts[block.forgerAddress];
+    let voteChangeList = [];
     for (let txn of transactions) {
-      // TODO 222: Also handle vote transactions.
-      let { senderAddress, recipientAddress, amount, fee } = txn;
-      let txnAmount = BigInt(amount);
-      let txnFee = BigInt(fee);
-      let senderAccount = accounts[senderAddress];
-      let recipientAccount = accounts[recipientAddress];
-      if (senderAccount.updateHeight < height) {
-        senderAccount.balance = senderAccount.balance - txnAmount - txnFee;
-      }
-      if (recipientAccount.updateHeight < height) {
-        recipientAccount.balance = recipientAccount.balance + txnAmount;
+      let { type } = txn;
+      if (type === 'vote' || type === 'unvote') {
+        let { senderAddress, fee, delegateAddress } = txn;
+        let txnFee = BigInt(fee);
+        let senderAccount = accounts[senderAddress];
+        if (senderAccount.updateHeight < height) {
+          senderAccount.balance = senderAccount.balance - txnFee;
+        }
+        voteChangeList.push({
+          type,
+          voterAddress: senderAddress,
+          delegateAddress
+        });
+      } else if (type === 'transfer') {
+        let { senderAddress, recipientAddress, amount, fee } = txn;
+        let txnAmount = BigInt(amount);
+        let txnFee = BigInt(fee);
+        let senderAccount = accounts[senderAddress];
+        let recipientAccount = accounts[recipientAddress];
+        if (senderAccount.updateHeight < height) {
+          senderAccount.balance = senderAccount.balance - txnAmount - txnFee;
+        }
+        if (recipientAccount.updateHeight < height) {
+          recipientAccount.balance = recipientAccount.balance + txnAmount;
+        }
       }
     }
     await Promise.all(
       accountList.map(async (account) => {
         if (account.updateHeight < height) {
-          await this.dal.updateAccount(account.address, { balance: account.balance }, height);
+          try {
+            await this.dal.updateAccount(account.address, { balance: account.balance }, height);
+          } catch (error) {
+            if (error.name === 'InvalidActionError') {
+              this.logger.warn(error);
+            } else {
+              throw error;
+            }
+          }
         }
       })
     );
@@ -286,15 +309,40 @@ module.exports = class LDPoSChainModule {
     sanitizedBlock.signatureHash = this.sha256(signature);
 
     if (block.forgingPublicKey === forgerAccount.nextForgingPublicKey) {
-      await this.dal.updateAccount(
-        forgerAccount.address,
-        {
-          forgingPublicKey: block.forgingPublicKey,
-          nextForgingPublicKey: block.nextForgingPublicKey
-        },
-        height
-      );
+      try {
+        await this.dal.updateAccount(
+          forgerAccount.address,
+          {
+            forgingPublicKey: block.forgingPublicKey,
+            nextForgingPublicKey: block.nextForgingPublicKey
+          },
+          height
+        );
+      } catch (error) {
+        if (error.name === 'InvalidActionError') {
+          this.logger.warn(error);
+        } else {
+          throw error;
+        }
+      }
     }
+
+    for (let voteChange of voteChangeList) {
+      try {
+        if (voteChange.type === 'vote') {
+          await this.dal.insertVote(voteChange.voterAddress, voteChange.delegateAddress);
+        } else if (voteChange.type === 'unvote') {
+          await this.dal.removeVote(voteChange.voterAddress, voteChange.delegateAddress);
+        }
+      } catch (error) {
+        if (error.name === 'InvalidActionError') {
+          this.logger.warn(error);
+        } else {
+          throw error;
+        }
+      }
+    }
+
     await this.dal.insertBlock(sanitizedBlock);
 
     for (let txn of transactions) {
@@ -307,9 +355,13 @@ module.exports = class LDPoSChainModule {
 
     let { senderAddress } = transaction;
 
-    let senderAccount = await this.dal.getAccount(senderAddress);
-    if (!senderAccount) {
-      throw new Error(`Transaction sender account ${senderAddress} could not be found`);
+    let senderAccount;
+    try {
+      senderAccount = await this.dal.getAccount(senderAddress);
+    } catch (error) {
+      throw new Error(
+        `Failed to fetch account ${senderAddress} because of error: ${error.message}`
+      );
     }
 
     if (transaction.amount > senderAccount.balance) {
@@ -349,7 +401,18 @@ module.exports = class LDPoSChainModule {
         }`
       );
     }
-    let targetDelegateAccount = await this.dal.getAccount(targetDelegateAddress);
+    let targetDelegateAccount;
+    try {
+      targetDelegateAccount = await this.dal.getAccount(targetDelegateAddress);
+    } catch (error) {
+      throw new Error(
+        `Failed to fetch delegate account ${
+          targetDelegateAddress
+        } because of error: ${
+          error.message
+        }`
+      );
+    }
     let forgingPublicKey;
     if (block.forgingPublicKey === targetDelegateAccount.forgingPublicKey) {
       forgingPublicKey = targetDelegateAccount.forgingPublicKey;
@@ -357,7 +420,7 @@ module.exports = class LDPoSChainModule {
         throw new Error(
           `Delegate ${
             targetDelegateAccount.address
-          } does not have a forgingPublicKey`
+          } did not have a forgingPublicKey`
         );
       }
     } else if (block.forgingPublicKey === targetDelegateAccount.nextForgingPublicKey) {
@@ -365,7 +428,7 @@ module.exports = class LDPoSChainModule {
         throw new Error(
           `Failed to increment the forging key for delegate ${
             targetDelegateAccount.address
-          } because it does not have a nextForgingPublicKey`
+          } because it did not have a nextForgingPublicKey`
         );
       }
       forgingPublicKey = targetDelegateAccount.nextForgingPublicKey;
@@ -400,7 +463,14 @@ module.exports = class LDPoSChainModule {
     if (latestBlock.id !== blockId) {
       throw new Error(`Signature blockId ${blockId} did not match the latest block id ${latestBlock.id}`);
     }
-    let signerAccount = await this.dal.getAccount(signerAddress);
+    let signerAccount;
+    try {
+      signerAccount = await this.dal.getAccount(signerAddress);
+    } catch (error) {
+      throw new Error(
+        `Failed to fetch signer account ${signerAddress} because of error: ${error.message}`
+      );
+    }
     return this.ldposClient.verifyBlockSignature(latestBlock, signature, signerAccount.forgingPublicKey);
   }
 
@@ -666,7 +736,6 @@ module.exports = class LDPoSChainModule {
         return;
       }
       this.pendingTransactionMap.set(transaction.id, transaction);
-      // TODO 222: Need a way to expire transactions from pendingTransactionMap deterministically - A transaction could spend a long time in the pendingTransactionMap if the fee is too low.
 
       // This is a performance optimization to ensure that peers
       // will not receive multiple instances of the same transaction at the same time.
