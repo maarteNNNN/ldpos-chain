@@ -21,6 +21,9 @@ const DEFAULT_PROPAGATION_RANDOMNESS = 10000;
 const DEFAULT_TIME_POLL_INTERVAL = 200;
 const DEFAULT_MAX_TRANSACTIONS_PER_BLOCK = 300;
 
+const MULTISIG_ACCOUNT_TYPE = 'multisig';
+const NO_PEER_LIMIT = -1;
+
 module.exports = class LDPoSChainModule {
   constructor(options) {
     this.alias = options.alias || DEFAULT_MODULE_ALIAS;
@@ -63,7 +66,7 @@ module.exports = class LDPoSChainModule {
     return {
       postTransaction: {
         handler: async action => {
-          return this.postTransaction(action.transaction);
+          return this.broadcastTransaction(action.transaction);
         }
       },
       getNodeStatus: {
@@ -254,7 +257,7 @@ module.exports = class LDPoSChainModule {
     affectedAddresses.add(block.forgerAddress);
 
     let accountList = await Promise.all(
-      [...affectedAddresses].map((address) => this.dal.getAccount(address))
+      [...affectedAddresses].map(address => this.dal.getAccount(address))
     );
     let accounts = {};
     for (account of accountList) {
@@ -368,11 +371,81 @@ module.exports = class LDPoSChainModule {
       throw new Error('Transaction amount was greater than the sender account balance');
     }
 
-    // TODO 222: If senderAccount is a multisig account, then check all member signatures.
+    if (senderAccount.type === MULTISIG_ACCOUNT_TYPE) {
+      if (!Array.isArray(transaction.signatures)) {
+        throw new Error(
+          `Transaction from multisig account ${
+            senderAccount.address
+          } did not have valid member signatures`
+        );
+      }
 
-    let isSignatureValid = this.ldposClient.verifyTransaction(transaction, senderAccount.sigPublicKey);
-    if (!isSignatureValid) {
-      throw new Error('Transaction signature was invalid');
+      let processedSignatures = new Map();
+      for (let signaturePacket of transaction.signatures) {
+        let signatureParts = signaturePacket.split(':');
+        let publicKey = signatureParts[0];
+        if (processedSignatures.has(publicKey)) {
+          throw new Error(
+            `Transaction from multisig account ${
+              senderAccount.address
+            } had multiple signatures associated with the same member public key ${
+              publicKey
+            }`
+          );
+        }
+        let signature = signatureParts[1];
+        processedSignatures.set(publicKey, {
+          publicKey,
+          signature
+        });
+      }
+
+      if (processedSignatures.size < senderAccount.multisigRequiredSignatureCount) {
+        throw new Error(
+          `Transaction from multisig account ${
+            senderAccount.address
+          } did not have enough member signatures - At least ${
+            senderAccount.multisigRequiredSignatureCount
+          } distinct signatures are required`
+        );
+      }
+
+      let multisigMemberPublicKeySet;
+      try {
+        let multisigMemberAccounts = await Promise.all(
+          senderAccount.multisigMembers.map(memberAddress => this.dal.getAccount(memberAddress))
+        );
+        multisigMemberPublicKeySet = new Set(multisigMemberAccounts.map(memberAccount => memberAccount.multisigPublicKey));
+      } catch (error) {
+        throw new Error(
+          `Failed to fetch member list for multisig account ${
+            senderAddress
+          } because of error: ${error.message}`
+        );
+      }
+      for (let signaturePacket of processedSignatures.values()) {
+        let { publicKey, signature } = signaturePacket;
+        if (!multisigMemberPublicKeySet.has(publicKey)) {
+          throw new Error(
+            `Signature with public key ${
+              publicKey
+            } was not associated with any member of multisig account ${
+              senderAccount.address
+            }`
+          );
+        }
+        if (!this.ldposClient.verifyMultisigTransactionSignature(transaction, publicKey, signature)) {
+          throw new Error(
+            `Multisig transaction signature of member ${
+              memberAccount.address
+            } was invalid`
+          );
+        }
+      }
+    } else {
+      if (!this.ldposClient.verifyTransaction(transaction, senderAccount.sigPublicKey)) {
+        throw new Error('Transaction signature was invalid');
+      }
     }
   }
 
@@ -477,14 +550,16 @@ module.exports = class LDPoSChainModule {
   async broadcastBlock(block) {
     await channel.invoke('network:emit', {
       event: `${this.alias}:block`,
-      data: block
+      data: block,
+      peerLimit: NO_PEER_LIMIT
     });
   }
 
   async broadcastBlockSignature(signature) {
     await channel.invoke('network:emit', {
       event: `${this.alias}:blockSignature`,
-      data: signature
+      data: signature,
+      peerLimit: NO_PEER_LIMIT
     });
   }
 
@@ -575,6 +650,7 @@ module.exports = class LDPoSChainModule {
     let ldposClient;
     let forgingWalletAddress;
 
+    // TODO 222: Load client from options.cryptoClientLibPath
     if (options.forgingPassphrase) {
       ldposClient = await createLDPoSClient({
         passphrase: options.forgingPassphrase,
@@ -582,7 +658,12 @@ module.exports = class LDPoSChainModule {
       });
 
       forgingWalletAddress = ldposClient.getAccountAddress();
+    } else {
+      ldposClient = await createLDPoSClient({
+        adapter: this.dal
+      });
     }
+
     this.ldposClient = ldposClient;
     this.nodeHeight = await this.dal.getLatestHeight();
     this.latestBlock = await this.dal.getBlockAtHeight(this.nodeHeight);
@@ -709,10 +790,11 @@ module.exports = class LDPoSChainModule {
     }
   }
 
-  async postTransaction(transaction) {
+  async broadcastTransaction(transaction) {
     return this.channel.invoke('network:emit', {
       event: `${this.alias}:transaction`,
-      data: transaction
+      data: transaction,
+      peerLimit: NO_PEER_LIMIT
     });
   }
 
@@ -724,7 +806,7 @@ module.exports = class LDPoSChainModule {
         await this.verifyTransaction(transaction);
       } catch (error) {
         this.logger.error(
-          new Error(`Received invalid transaction - ${error.message}`)
+          new Error(`Received invalid transaction ${transaction.id} - ${error.message}`)
         );
         return;
       }
@@ -743,7 +825,7 @@ module.exports = class LDPoSChainModule {
       await this.wait(randomPropagationDelay);
 
       try {
-        await this.postTransaction(transaction);
+        await this.broadcastTransaction(transaction);
       } catch (error) {
         this.logger.error(error);
       }
