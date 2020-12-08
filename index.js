@@ -267,19 +267,7 @@ module.exports = class LDPoSChainModule {
     let voteChangeList = [];
     for (let txn of transactions) {
       let { type } = txn;
-      if (type === 'vote' || type === 'unvote') {
-        let { senderAddress, fee, delegateAddress } = txn;
-        let txnFee = BigInt(fee);
-        let senderAccount = accounts[senderAddress];
-        if (senderAccount.updateHeight < height) {
-          senderAccount.balance = senderAccount.balance - txnFee;
-        }
-        voteChangeList.push({
-          type,
-          voterAddress: senderAddress,
-          delegateAddress
-        });
-      } else if (type === 'transfer') {
+      if (type === 'transfer') {
         let { senderAddress, recipientAddress, amount, fee } = txn;
         let txnAmount = BigInt(amount);
         let txnFee = BigInt(fee);
@@ -291,6 +279,20 @@ module.exports = class LDPoSChainModule {
         if (recipientAccount.updateHeight < height) {
           recipientAccount.balance = recipientAccount.balance + txnAmount;
         }
+      } else if (type === 'vote' || type === 'unvote') {
+        let { senderAddress, fee, delegateAddress } = txn;
+        let txnFee = BigInt(fee);
+        let senderAccount = accounts[senderAddress];
+        if (senderAccount.updateHeight < height) {
+          senderAccount.balance = senderAccount.balance - txnFee;
+        }
+        voteChangeList.push({
+          type,
+          voterAddress: senderAddress,
+          delegateAddress
+        });
+      } else if (type === 'registerMultisig') {
+        // TODO 222: Process multisig registration transaction.
       }
     }
     await Promise.all(
