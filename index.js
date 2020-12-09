@@ -1,7 +1,6 @@
 const pkg = require('./package.json');
 const crypto = require('crypto');
 const genesisBlock = require('./genesis/testnet/genesis.json');
-const { createLDPoSClient } = require('ldpos-client');
 const WritableConsumableStream = require('writable-consumable-stream');
 
 const { verifyBlockSchema } = require('./schemas/block-schema');
@@ -9,6 +8,7 @@ const { verifyTransactionSchema } = require('./schemas/transaction-schema');
 
 const DEFAULT_MODULE_ALIAS = 'ldpos_chain';
 const DEFAULT_GENESIS_PATH = './genesis/mainnet/genesis.json';
+const DEFAULT_CRYPTO_CLIENT_LIB_PATH = 'ldpos-client';
 const DEFAULT_DELEGATE_COUNT = 21;
 const DEFAULT_FORGING_INTERVAL = 30000;
 const DEFAULT_FETCH_BLOCK_LIMIT = 20;
@@ -684,16 +684,18 @@ module.exports = class LDPoSChainModule {
     let ldposClient;
     let forgingWalletAddress;
 
-    // TODO 222: Load client from options.cryptoClientLibPath
+    this.cryptoClientLibPath = options.cryptoClientLibPath || DEFAULT_CRYPTO_CLIENT_LIB_PATH;
+    let { createClient } = require(this.cryptoClientLibPath);
+
     if (options.forgingPassphrase) {
-      ldposClient = await createLDPoSClient({
+      ldposClient = await createClient({
         passphrase: options.forgingPassphrase,
         adapter: this.dal
       });
 
       forgingWalletAddress = ldposClient.getAccountAddress();
     } else {
-      ldposClient = await createLDPoSClient({
+      ldposClient = await createClient({
         adapter: this.dal
       });
     }
