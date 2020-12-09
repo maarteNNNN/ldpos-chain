@@ -53,7 +53,7 @@ class DAL {
     account.updateHeight = updateHeight;
   }
 
-  async insertVote(voterAddress, delegateAddress) {
+  async addVote(voterAddress, delegateAddress) {
     if (!this.accounts[delegateAddress]) {
       let error = new Error(`Delegate ${delegateAddress} did not exist`);
       error.name = 'InvalidActionError';
@@ -91,6 +91,10 @@ class DAL {
     this.votes[delegateAddress].delete(voterAddress);
   }
 
+  async registerMultisig(multisigAddress, memberAddresses) {
+    // TODO 222: Implement.
+  }
+
   async getBlockAtHeight(height) {
     return this.blocks[height];
   }
@@ -107,7 +111,7 @@ class DAL {
     return this.blocks.slice(height, height + limit);
   }
 
-  async insertBlock(block) {
+  async addBlock(block) {
     this.blocks[block.height] = block;
   }
 

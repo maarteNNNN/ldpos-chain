@@ -24,6 +24,8 @@ const DEFAULT_MAX_TRANSACTIONS_PER_BLOCK = 300;
 const MULTISIG_ACCOUNT_TYPE = 'multisig';
 const NO_PEER_LIMIT = -1;
 
+// TODO 222: Allow a minimum fee to be speficied in config for each transaction type.
+
 module.exports = class LDPoSChainModule {
   constructor(options) {
     this.alias = options.alias || DEFAULT_MODULE_ALIAS;
@@ -265,6 +267,7 @@ module.exports = class LDPoSChainModule {
     }
     let forgerAccount = accounts[block.forgerAddress];
     let voteChangeList = [];
+    let multisigRegistrationList = [];
     for (let txn of transactions) {
       let { type } = txn;
       if (type === 'transfer') {
@@ -279,20 +282,26 @@ module.exports = class LDPoSChainModule {
         if (recipientAccount.updateHeight < height) {
           recipientAccount.balance = recipientAccount.balance + txnAmount;
         }
-      } else if (type === 'vote' || type === 'unvote') {
-        let { senderAddress, fee, delegateAddress } = txn;
+      } else {
+        let { senderAddress, fee } = txn;
         let txnFee = BigInt(fee);
         let senderAccount = accounts[senderAddress];
         if (senderAccount.updateHeight < height) {
           senderAccount.balance = senderAccount.balance - txnFee;
         }
-        voteChangeList.push({
-          type,
-          voterAddress: senderAddress,
-          delegateAddress
-        });
-      } else if (type === 'registerMultisig') {
-        // TODO 222: Process multisig registration transaction.
+        if (type === 'vote' || type === 'unvote') {
+          voteChangeList.push({
+            type,
+            voterAddress: senderAddress,
+            delegateAddress: txn.delegateAddress
+          });
+        } else if (type === 'registerMultisig') {
+          // TODO 222: Process multisig registration transaction.
+          multisigRegistrationList.push({
+            multisigAddress: senderAddress,
+            memberAddresses: txn.memberAddresses
+          });
+        }
       }
     }
     await Promise.all(
@@ -335,7 +344,7 @@ module.exports = class LDPoSChainModule {
     for (let voteChange of voteChangeList) {
       try {
         if (voteChange.type === 'vote') {
-          await this.dal.insertVote(voteChange.voterAddress, voteChange.delegateAddress);
+          await this.dal.addVote(voteChange.voterAddress, voteChange.delegateAddress);
         } else if (voteChange.type === 'unvote') {
           await this.dal.removeVote(voteChange.voterAddress, voteChange.delegateAddress);
         }
@@ -348,7 +357,11 @@ module.exports = class LDPoSChainModule {
       }
     }
 
-    await this.dal.insertBlock(sanitizedBlock);
+    for (let multisigRegistration of multisigRegistrationList) {
+      await this.dal.registerMultisig(multisigRegistration.multisigAddress, multisigRegistration.memberAddresses);
+    }
+
+    await this.dal.addBlock(sanitizedBlock);
 
     for (let txn of transactions) {
       this.pendingTransactionMap.delete(txn.id);
