@@ -21,7 +21,6 @@ const DEFAULT_PROPAGATION_RANDOMNESS = 10000;
 const DEFAULT_TIME_POLL_INTERVAL = 200;
 const DEFAULT_MAX_TRANSACTIONS_PER_BLOCK = 300;
 
-const MULTISIG_ACCOUNT_TYPE = 'multisig';
 const NO_PEER_LIMIT = -1;
 
 // TODO 222: Allow a minimum fee to be speficied in config for each transaction type.
@@ -296,10 +295,10 @@ module.exports = class LDPoSChainModule {
             delegateAddress: txn.delegateAddress
           });
         } else if (type === 'registerMultisig') {
-          // TODO 222: Process multisig registration transaction.
           multisigRegistrationList.push({
             multisigAddress: senderAddress,
-            memberAddresses: txn.memberAddresses
+            memberAddresses: txn.memberAddresses,
+            requiredSignatureCount: txn.requiredSignatureCount
           });
         }
       }
@@ -358,7 +357,16 @@ module.exports = class LDPoSChainModule {
     }
 
     for (let multisigRegistration of multisigRegistrationList) {
-      await this.dal.registerMultisig(multisigRegistration.multisigAddress, multisigRegistration.memberAddresses);
+      let { multisigAddress, memberAddresses, requiredSignatureCount } = multisigRegistration;
+      try {
+        await this.dal.registerMultisig(multisigAddress, memberAddresses, requiredSignatureCount);
+      } catch (error) {
+        if (error.name === 'InvalidActionError') {
+          this.logger.warn(error);
+        } else {
+          throw error;
+        }
+      }
     }
 
     await this.dal.addBlock(sanitizedBlock);
@@ -386,10 +394,10 @@ module.exports = class LDPoSChainModule {
       throw new Error('Transaction amount was greater than the sender account balance');
     }
 
-    if (senderAccount.type === MULTISIG_ACCOUNT_TYPE) {
+    if (senderAccount.type === 'multisig') {
       if (!Array.isArray(transaction.signatures)) {
         throw new Error(
-          `Transaction from multisig account ${
+          `Transaction from multisig wallet ${
             senderAccount.address
           } did not have valid member signatures`
         );
@@ -401,7 +409,7 @@ module.exports = class LDPoSChainModule {
         let publicKey = signatureParts[0];
         if (processedSignatures.has(publicKey)) {
           throw new Error(
-            `Transaction from multisig account ${
+            `Transaction from multisig wallet ${
               senderAccount.address
             } had multiple signatures associated with the same member public key ${
               publicKey
@@ -417,7 +425,7 @@ module.exports = class LDPoSChainModule {
 
       if (processedSignatures.size < senderAccount.multisigRequiredSignatureCount) {
         throw new Error(
-          `Transaction from multisig account ${
+          `Transaction from multisig wallet ${
             senderAccount.address
           } did not have enough member signatures - At least ${
             senderAccount.multisigRequiredSignatureCount
@@ -425,15 +433,26 @@ module.exports = class LDPoSChainModule {
         );
       }
 
+      let multisigMemberAddresses;
+      try {
+        multisigMemberAddresses = await this.dal.getMultisigMembers(senderAddress);
+      } catch (error) {
+        throw new Error(
+          `Failed to fetch member addresses for multisig wallet ${
+            senderAddress
+          } because of error: ${error.message}`
+        );
+      }
+
       let multisigMemberPublicKeySet;
       try {
         let multisigMemberAccounts = await Promise.all(
-          senderAccount.multisigMembers.map(memberAddress => this.dal.getAccount(memberAddress))
+          multisigMemberAddresses.map(memberAddress => this.dal.getAccount(memberAddress))
         );
         multisigMemberPublicKeySet = new Set(multisigMemberAccounts.map(memberAccount => memberAccount.multisigPublicKey));
       } catch (error) {
         throw new Error(
-          `Failed to fetch member list for multisig account ${
+          `Failed to fetch member accounts for multisig wallet ${
             senderAddress
           } because of error: ${error.message}`
         );
@@ -444,7 +463,7 @@ module.exports = class LDPoSChainModule {
           throw new Error(
             `Signature with public key ${
               publicKey
-            } was not associated with any member of multisig account ${
+            } was not associated with any member of multisig wallet ${
               senderAccount.address
             }`
           );

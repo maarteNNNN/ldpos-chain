@@ -3,6 +3,7 @@ class DAL {
     this.accounts = {};
     this.votes = {};
     this.blocks = [null];
+    this.multisigMembers = {};
   }
 
   async init(options) {
@@ -91,8 +92,46 @@ class DAL {
     this.votes[delegateAddress].delete(voterAddress);
   }
 
-  async registerMultisig(multisigAddress, memberAddresses) {
-    // TODO 222: Implement.
+  async registerMultisig(multisigAddress, memberAddresses, requiredSignatureCount) {
+    let multisigAccount = this.accounts[multisigAddress];
+    if (!multisigAccount) {
+      let error = new Error(
+        `Account ${multisigAddress} did not exist for multisig wallet registration`
+      );
+      error.name = 'InvalidActionError';
+      throw error;
+    }
+    if (this.multisigMembers[multisigAddress]) {
+      let error = new Error(
+        `Multisig address ${multisigAddress} has already been registered`
+      );
+      error.name = 'InvalidActionError';
+      throw error;
+    }
+    for (let memberAddress of memberAddresses) {
+      if (!this.accounts[memberAddress]) {
+        let error = new Error(
+          `Account ${memberAddress} did not exist for multisig member registration`
+        );
+        error.name = 'InvalidActionError';
+        throw error;
+      }
+    }
+    multisigAccount.type = 'multisig';
+    multisigAccount.multisigRequiredSignatureCount = requiredSignatureCount;
+    this.multisigMembers[multisigAddress] = new Set(memberAddresses);
+  }
+
+  async getMultisigMembers(multisigAddress) {
+    let memberAddresses = this.multisigMembers[multisigAddress];
+    if (!memberAddresses) {
+      let error = new Error(
+        `Address ${multisigAddress} is not registered as a multisig wallet`
+      );
+      error.name = 'InvalidActionError';
+      throw error;
+    }
+    return [...memberAddresses];
   }
 
   async getBlockAtHeight(height) {
