@@ -162,7 +162,7 @@ class DAL {
       let voteWeight = 0;
       for (let voterAddress of voterAddressList) {
         let voter = this.accounts[voterAddress] || {};
-        voteWeight += voter.balance || 0;
+        voteWeight += voter.balance || 0n;
       }
       delegateList.push({
         address: delegateAddress,

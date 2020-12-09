@@ -5,6 +5,10 @@ const WritableConsumableStream = require('writable-consumable-stream');
 
 const { verifyBlockSchema } = require('./schemas/block-schema');
 const { verifyTransactionSchema } = require('./schemas/transaction-schema');
+const { verifyTransferTransactionSchema } = require('./schemas/transfer-transaction-schema');
+const { verifyVoteTransactionSchema } = require('./schemas/vote-transaction-schema');
+const { verifyUnvoteTransactionSchema } = require('./schemas/unvote-transaction-schema');
+const { verifyRegisterMultisigTransactionSchema } = require('./schemas/register-multisig-transaction-schema');
 
 const DEFAULT_MODULE_ALIAS = 'ldpos_chain';
 const DEFAULT_GENESIS_PATH = './genesis/mainnet/genesis.json';
@@ -20,10 +24,16 @@ const DEFAULT_PROPAGATION_TIMEOUT = 5000;
 const DEFAULT_PROPAGATION_RANDOMNESS = 10000;
 const DEFAULT_TIME_POLL_INTERVAL = 200;
 const DEFAULT_MAX_TRANSACTIONS_PER_BLOCK = 300;
+const DEFAULT_MAX_MULTISIG_MEMBERS = 20;
+
+const DEFAULT_MIN_TRANSACTION_FEES = {
+  transfer: '10000000',
+  vote: '10000000',
+  unvote: '10000000',
+  registerMultisig: '10000000'
+};
 
 const NO_PEER_LIMIT = -1;
-
-// TODO 222: Allow a minimum fee to be speficied in config for each transaction type.
 
 module.exports = class LDPoSChainModule {
   constructor(options) {
@@ -153,14 +163,18 @@ module.exports = class LDPoSChainModule {
         }
         if (!Array.isArray(newBlocks)) {
           newBlocks = [];
-          this.logger.warn('Received invalid blocks response while catching up with network - Expected an array of blocks');
+          this.logger.warn(
+            'Received invalid blocks response while catching up with the network - Expected an array of blocks'
+          );
         }
         for (let block of newBlocks) {
           try {
             await this.verifyBlock(block, latestGoodBlock);
             latestGoodBlock = block;
           } catch (error) {
-            this.logger.warn(`Received invalid block while catching up with network - ${error.message}`);
+            this.logger.warn(
+              `Received invalid block while catching up with the network - ${error.message}`
+            );
             newBlocks = [];
             latestGoodBlock = this.latestProcessedBlock;
             this.latestBlock = latestGoodBlock;
@@ -185,7 +199,9 @@ module.exports = class LDPoSChainModule {
           this.latestProcessedBlock = block;
         }
       } catch (error) {
-        this.logger.error(`Failed to process block while catching up with network - ${error.message}`);
+        this.logger.error(
+          `Failed to process block while catching up with the network - ${error.message}`
+        );
       }
       this.pendingBlocks = this.pendingBlocks.filter(block => block);
       await this.wait(fetchBlockPause);
@@ -376,10 +392,44 @@ module.exports = class LDPoSChainModule {
     }
   }
 
-  async verifyTransaction(transaction) {
+  async verifySimplifiedTransaction(transaction, enforceMinFee) {
     verifyTransactionSchema(transaction);
 
-    let { senderAddress } = transaction;
+    let { senderAddress, amount, fee, type } = transaction;
+
+    if (type === 'transfer') {
+      verifyTransferTransactionSchema(transaction);
+    } else if (type === 'vote') {
+      verifyVoteTransactionSchema(transaction);
+    } else if (type === 'unvote') {
+      verifyUnvoteTransactionSchema(transaction);
+    } else if (type === 'registerMultisig') {
+      verifyRegisterMultisigTransactionSchema(transaction, this.maxMultisigMembers);
+    } else {
+      throw new Error(
+        `Transaction type ${type} was invalid`
+      );
+    }
+
+    let txnAmount = amount || 0n;
+    let txnFee = fee || 0n;
+    let txnTotal = txnAmount + txnFee;
+
+    if (enforceMinFee) {
+      let minFee = this.minTransactionFees[type] || 0n;
+
+      if (txnFee < minFee) {
+        throw new Error(
+          `Transaction fee ${
+            txnFee
+          } was below the minimum fee of ${
+            minFee
+          } for transactions of type ${
+            type
+          }`
+        );
+      }
+    }
 
     let senderAccount;
     try {
@@ -390,9 +440,19 @@ module.exports = class LDPoSChainModule {
       );
     }
 
-    if (transaction.amount > senderAccount.balance) {
-      throw new Error('Transaction amount was greater than the sender account balance');
+    if (txnTotal > senderAccount.balance) {
+      throw new Error(
+        `Transaction amount plus fee was greater than the balance of sender ${
+          senderAddress
+        }`
+      );
     }
+  }
+
+  async verifyTransaction(transaction) {
+    await this.verifySimplifiedTransaction(transaction, true);
+
+    let { senderAddress } = transaction;
 
     if (senderAccount.type === 'multisig') {
       if (!Array.isArray(transaction.signatures)) {
@@ -485,6 +545,7 @@ module.exports = class LDPoSChainModule {
 
   async verifyBlock(block, lastBlock) {
     verifyBlockSchema(block, this.maxTransactionsPerBlock);
+
     let lastBlockId = lastBlock ? lastBlock.id : null;
     let lastBlockHeight = lastBlock ? lastBlock.height : 0;
     let expectedBlockHeight = lastBlockHeight + 1;
@@ -547,7 +608,21 @@ module.exports = class LDPoSChainModule {
       );
     }
     if (!this.ldposClient.verifyBlock(block, forgingPublicKey, lastBlockId)) {
-      throw new Error(`Block ${block ? block.id : 'without ID'} was invalid`);
+      throw new Error(`Block ${block.id || 'without ID'} was invalid`);
+    }
+
+    try {
+      for (let transaction of block.transactions) {
+        await this.verifySimplifiedTransaction(transaction, false);
+      }
+    } catch (error) {
+      throw new Error(
+        `Failed to validate transactions in block ${
+          block.id || 'without ID'
+        } because of error: ${
+          error.message
+        }`
+      );
     }
   }
 
@@ -637,7 +712,9 @@ module.exports = class LDPoSChainModule {
       propagationTimeout,
       propagationRandomness,
       timePollInterval,
-      maxTransactionsPerBlock
+      maxTransactionsPerBlock,
+      maxMultisigMembers,
+      minTransactionFees
     } = options;
 
     if (forgingInterval == null) {
@@ -673,11 +750,24 @@ module.exports = class LDPoSChainModule {
     if (maxTransactionsPerBlock == null) {
       maxTransactionsPerBlock = DEFAULT_MAX_TRANSACTIONS_PER_BLOCK;
     }
+    if (maxMultisigMembers == null) {
+      maxMultisigMembers = DEFAULT_MAX_MULTISIG_MEMBERS;
+    }
 
     this.delegateCount = delegateCount;
     this.forgingInterval = forgingInterval;
     this.propagationRandomness = propagationRandomness;
     this.maxTransactionsPerBlock = maxTransactionsPerBlock;
+    this.maxMultisigMembers = maxMultisigMembers;
+    let unsanitizedMinTransactionFees = {
+      ...DEFAULT_MIN_TRANSACTION_FEES,
+      ...minTransactionFees
+    };
+    this.minTransactionFees = {};
+    let transactionTypeList = Object.keys(unsanitizedMinTransactionFees);
+    for (let transactionType of transactionTypeList) {
+      this.minTransactionFees[transactionType] = BigInt(unsanitizedMinTransactionFees[transactionType]);
+    }
 
     let delegateMajorityCount = Math.ceil(delegateCount / 2);
 

@@ -18,9 +18,6 @@ function verifyBlockSchema(block, maxTransactionsPerBlock) {
       `Block contained too many transactions - Maximum allowed is ${maxTransactionsPerBlock}`
     );
   }
-  for (let txn of block.transactions) {
-    verifyTransactionSchema(txn);
-  }
   if (typeof block.previousBlockId !== 'string') {
     throw new Error('Block previousBlockId must be a string');
   }
