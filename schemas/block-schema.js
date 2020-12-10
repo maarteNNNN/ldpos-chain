@@ -1,5 +1,3 @@
-const verifyTransactionSchema = require('./transaction-schema');
-
 function verifyBlockSchema(block, maxTransactionsPerBlock) {
   if (!block) {
     throw new Error('Block was not specified');

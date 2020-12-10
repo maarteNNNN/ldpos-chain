@@ -9,6 +9,7 @@ const { verifyTransferTransactionSchema } = require('./schemas/transfer-transact
 const { verifyVoteTransactionSchema } = require('./schemas/vote-transaction-schema');
 const { verifyUnvoteTransactionSchema } = require('./schemas/unvote-transaction-schema');
 const { verifyRegisterMultisigTransactionSchema } = require('./schemas/register-multisig-transaction-schema');
+const { verifyBlockSignaturesSchema } = require('./schemas/block-signatures-schema');
 
 const DEFAULT_MODULE_ALIAS = 'ldpos_chain';
 const DEFAULT_GENESIS_PATH = './genesis/mainnet/genesis.json';
@@ -26,7 +27,7 @@ const DEFAULT_TIME_POLL_INTERVAL = 200;
 const DEFAULT_MAX_TRANSACTIONS_PER_BLOCK = 300;
 const DEFAULT_MAX_MULTISIG_MEMBERS = 20;
 
-const DEFAULT_MIN_TRANSACTION_FEES = {
+const DEFAULT_MIN_TRANSACTION_FEES = { // TODO 222 Modify the fees to account for complexity.
   transfer: '10000000',
   vote: '10000000',
   unvote: '10000000',
@@ -46,6 +47,7 @@ module.exports = class LDPoSChainModule {
     }
     this.pendingTransactionMap = new Map();
     this.pendingBlocks = [];
+    this.latestFullySignedBlock = null;
     this.latestBlock = null;
     this.latestProcessedBlock = this.latestBlock;
 
@@ -111,6 +113,24 @@ module.exports = class LDPoSChainModule {
         },
         isPublic: true
       },
+      getLatestBlockSignatures: {
+        handler: async action => {
+          if (!this.latestFullySignedBlock) {
+            throw new Error('Node does not have the latest block signatures');
+          }
+          if (action.blockId && action.blockId !== this.latestFullySignedBlock.id) {
+            throw new Error(
+              `The specified blockId ${
+                action.blockId
+              } did not match the id of the latest block ${
+                this.latestFullySignedBlock.id
+              } on this node`
+            );
+          }
+          return this.latestFullySignedBlock.signatures;
+        },
+        isPublic: true
+      },
       getBlocksBetweenHeights: {
         handler: async action => {}
       },
@@ -129,10 +149,9 @@ module.exports = class LDPoSChainModule {
       fetchBlockEndConfirmations,
       fetchBlockLimit,
       fetchBlockPause,
-      delegateCount
+      blockFinality,
+      delegateMajorityCount
     } = options;
-
-    let finality = Math.ceil(delegateCount / 2);
 
     let now = Date.now();
     if (
@@ -141,61 +160,88 @@ module.exports = class LDPoSChainModule {
       return this.latestProcessedBlock.height;
     }
 
-    let latestGoodBlock = this.latestProcessedBlock;
+    let pendingBlocks = [];
+    let latestVerifiedBlock = this.latestProcessedBlock;
 
     while (true) {
       if (!this.isActive) {
         break;
       }
-      let newBlocks = [];
-      for (let i = 0; i < fetchBlockEndConfirmations && !newBlocks.length; i++) {
+
+      let newBlocks;
+      try {
+        newBlocks = await this.channel.invoke('network:request', {
+          procedure: `${this.alias}:getBlocksFromHeight`,
+          data: {
+            height: latestVerifiedBlock.height + 1,
+            limit: fetchBlockLimit
+          }
+        });
+      } catch (error) {
+        this.logger.warn(error);
+        await this.wait(fetchBlockPause);
+        continue;
+      }
+
+      let latestGoodBlock = latestVerifiedBlock;
+      try {
+        for (let block of newBlocks) {
+          await this.verifyBlock(block, latestGoodBlock);
+          latestGoodBlock = block;
+        }
+      } catch (error) {
+        this.logger.warn(
+          `Received invalid block while catching up with the network - ${error.message}`
+        );
+        pendingBlocks = [];
+        latestVerifiedBlock = this.latestProcessedBlock;
+        await this.wait(fetchBlockPause);
+        continue;
+      }
+
+      latestVerifiedBlock = latestGoodBlock;
+
+      for (let block of newBlocks) {
+        pendingBlocks.push(block);
+      }
+
+      let safeBlockCount = pendingBlocks.length - blockFinality;
+
+      if (!newBlocks.length) {
         try {
-          newBlocks = await this.channel.invoke('network:request', {
-            procedure: `${this.alias}:getBlocksFromHeight`,
+          let latestBlockSignatures = await this.channel.invoke('network:request', {
+            procedure: `${this.alias}:getLatestBlockSignatures`,
             data: {
-              height: latestGoodBlock.height + 1,
-              limit: fetchBlockLimit
+              blockId: this.latestProcessedBlock.id
             }
           });
+          verifyBlockSignaturesSchema(latestBlockSignatures, delegateMajorityCount);
+
+          // TODO 222 888 CHECK THAT THE FORMAT of the blockSignature (from latestFullySignedBlock) is correct. It expects an object
+          await Promise.all(
+            latestBlockSignatures.map(blockSignature => this.verifyBlockSignature(this.latestProcessedBlock, blockSignature))
+          );
+
+          // If we have the latest block with all necessary signatures, then we can have instant finality.
+          safeBlockCount = pendingBlocks.length;
         } catch (error) {
-          newBlocks = [];
-          this.logger.warn(error);
-        }
-        if (!Array.isArray(newBlocks)) {
-          newBlocks = [];
           this.logger.warn(
-            'Received invalid blocks response while catching up with the network - Expected an array of blocks'
+            `Failed to fetch latest block signatures because of error: ${error.message}`
           );
         }
-        for (let block of newBlocks) {
-          try {
-            await this.verifyBlock(block, latestGoodBlock);
-            latestGoodBlock = block;
-          } catch (error) {
-            this.logger.warn(
-              `Received invalid block while catching up with the network - ${error.message}`
-            );
-            newBlocks = [];
-            latestGoodBlock = this.latestProcessedBlock;
-            this.latestBlock = latestGoodBlock;
-            this.pendingBlocks = [];
-            break;
-          }
-        }
+
+        // This is to cover the case where our node has received some bad blocks in the past.
+        pendingBlocks = [];
+        latestVerifiedBlock = this.latestProcessedBlock;
+        await this.wait(fetchBlockPause);
+        continue;
       }
-      if (!newBlocks.length) {
-        break;
-      }
-      for (let block of newBlocks) {
-        this.pendingBlocks.push(block);
-      }
+
       try {
-        let blockCount = this.pendingBlocks.length - finality;
-        for (let i = 0; i < blockCount; i++) {
-          let block = this.pendingBlocks[i];
+        for (let i = 0; i < safeBlockCount; i++) {
+          let block = pendingBlocks[i];
           await this.processBlock(block);
-          this.pendingBlocks[i] = null;
-          this.latestBlock = block;
+          pendingBlocks[i] = null;
           this.latestProcessedBlock = block;
         }
       } catch (error) {
@@ -203,12 +249,15 @@ module.exports = class LDPoSChainModule {
           `Failed to process block while catching up with the network - ${error.message}`
         );
       }
-      this.pendingBlocks = this.pendingBlocks.filter(block => block);
+      pendingBlocks = pendingBlocks.filter(block => block);
+
+      if (!pendingBlocks.length) {
+        this.latestBlock = this.latestProcessedBlock;
+        return this.latestProcessedBlock.height;
+      }
+
       await this.wait(fetchBlockPause);
     }
-
-    this.latestBlock = latestGoodBlock;
-    return latestGoodBlock.height;
   }
 
   async receiveLatestBlock(timeout) {
@@ -627,6 +676,7 @@ module.exports = class LDPoSChainModule {
   }
 
   async verifyBlockSignature(latestBlock, blockSignature) {
+    // TODO 2222: Schema validation
     if (!blockSignature) {
       throw new Error('Block signature was not specified');
     }
@@ -723,6 +773,7 @@ module.exports = class LDPoSChainModule {
     if (delegateCount == null) {
       delegateCount = DEFAULT_DELEGATE_COUNT;
     }
+    // TODO 222 throw error if fetchBlockLimit is less than delegateCount / 2 ????
     if (fetchBlockLimit == null) {
       fetchBlockLimit = DEFAULT_FETCH_BLOCK_LIMIT;
     }
@@ -752,6 +803,16 @@ module.exports = class LDPoSChainModule {
     }
     if (maxMultisigMembers == null) {
       maxMultisigMembers = DEFAULT_MAX_MULTISIG_MEMBERS;
+    }
+
+    if (fetchBlockLimit < delegateCount) {
+      throw new Error(
+        `The fetchBlockLimit option was ${
+          fetchBlockLimit
+        } which was less than the delegateCount option of ${
+          delegateCount
+        }`
+      );
     }
 
     this.delegateCount = delegateCount;
@@ -806,6 +867,7 @@ module.exports = class LDPoSChainModule {
       };
     }
     this.latestProcessedBlock = this.latestBlock;
+    let blockFinality = Math.ceil(delegateCount / 2);
 
     while (true) {
       if (!this.isActive) {
@@ -817,7 +879,8 @@ module.exports = class LDPoSChainModule {
         fetchBlockLimit,
         fetchBlockPause,
         fetchBlockEndConfirmations,
-        delegateCount
+        delegateMajorityCount,
+        blockFinality
       });
       this.nodeHeight = this.networkHeight;
       let nextHeight = this.networkHeight + 1;
@@ -890,21 +953,9 @@ module.exports = class LDPoSChainModule {
 
         // Will throw if the required number of valid signatures cannot be gathered in time.
         await this.receiveLatestBlockSignatures(latestBlock, delegateMajorityCount, forgingSignatureBroadcastDelay + propagationTimeout);
-
-        if (this.pendingBlocks.length) {
-          let latestPendingBlock = this.pendingBlocks[this.pendingBlocks.length - 1];
-          if (latestBlock.previousBlockId !== latestPendingBlock.id) {
-            throw new Error(
-              `The previousBlockId of the latest received block did not match the previous pending block ID ${
-                latestPendingBlock.id
-              }`
-            );
-          }
-          for (let block of this.pendingBlocks) {
-            await this.processBlock(block);
-          }
-        }
         await this.processBlock(latestBlock);
+
+        this.latestFullySignedBlock = latestBlock;
         this.latestProcessedBlock = this.latestBlock;
         this.nodeHeight = nextHeight;
         this.networkHeight = nextHeight;
