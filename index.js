@@ -27,11 +27,13 @@ const DEFAULT_TIME_POLL_INTERVAL = 200;
 const DEFAULT_MAX_TRANSACTIONS_PER_BLOCK = 300;
 const DEFAULT_MAX_MULTISIG_MEMBERS = 20;
 
-const DEFAULT_MIN_TRANSACTION_FEES = { // TODO 222 Modify the fees to account for complexity.
+// TODO 222: Make sure that all external data is validated with schema.
+
+const DEFAULT_MIN_TRANSACTION_FEES = {
   transfer: '10000000',
-  vote: '10000000',
-  unvote: '10000000',
-  registerMultisig: '10000000'
+  vote: '20000000',
+  unvote: '20000000',
+  registerMultisig: '50000000'
 };
 
 const NO_PEER_LIMIT = -1;
@@ -48,8 +50,8 @@ module.exports = class LDPoSChainModule {
     this.pendingTransactionMap = new Map();
     this.pendingBlocks = [];
     this.latestFullySignedBlock = null;
-    this.latestBlock = null;
-    this.latestProcessedBlock = this.latestBlock;
+    this.latestProcessedBlock = null;
+    this.latestReceivedBlock = this.latestProcessedBlock;
 
     this.verifiedBlockStream = new WritableConsumableStream();
     this.verifiedBlockSignatureStream = new WritableConsumableStream();
@@ -149,7 +151,6 @@ module.exports = class LDPoSChainModule {
       fetchBlockEndConfirmations,
       fetchBlockLimit,
       fetchBlockPause,
-      blockFinality,
       delegateMajorityCount
     } = options;
 
@@ -161,7 +162,7 @@ module.exports = class LDPoSChainModule {
     }
 
     let pendingBlocks = [];
-    let latestVerifiedBlock = this.latestProcessedBlock;
+    let latestGoodBlock = this.latestProcessedBlock;
 
     while (true) {
       if (!this.isActive) {
@@ -173,39 +174,39 @@ module.exports = class LDPoSChainModule {
         newBlocks = await this.channel.invoke('network:request', {
           procedure: `${this.alias}:getBlocksFromHeight`,
           data: {
-            height: latestVerifiedBlock.height + 1,
+            height: latestGoodBlock.height + 1,
             limit: fetchBlockLimit
           }
         });
       } catch (error) {
         this.logger.warn(error);
+        pendingBlocks = [];
+        latestGoodBlock = this.latestProcessedBlock;
         await this.wait(fetchBlockPause);
         continue;
       }
 
-      let latestGoodBlock = latestVerifiedBlock;
+      let latestVerifiedBlock = latestGoodBlock;
       try {
         for (let block of newBlocks) {
-          await this.verifyBlock(block, latestGoodBlock);
-          latestGoodBlock = block;
+          await this.verifyBlock(block, latestVerifiedBlock);
+          latestVerifiedBlock = block;
         }
       } catch (error) {
         this.logger.warn(
           `Received invalid block while catching up with the network - ${error.message}`
         );
         pendingBlocks = [];
-        latestVerifiedBlock = this.latestProcessedBlock;
+        latestGoodBlock = this.latestProcessedBlock;
         await this.wait(fetchBlockPause);
         continue;
       }
-
-      latestVerifiedBlock = latestGoodBlock;
 
       for (let block of newBlocks) {
         pendingBlocks.push(block);
       }
 
-      let safeBlockCount = pendingBlocks.length - blockFinality;
+      let safeBlockCount = pendingBlocks.length - delegateMajorityCount;
 
       if (!newBlocks.length) {
         try {
@@ -217,7 +218,7 @@ module.exports = class LDPoSChainModule {
           });
           verifyBlockSignaturesSchema(latestBlockSignatures, delegateMajorityCount);
 
-          // TODO 222 888 CHECK THAT THE FORMAT of the blockSignature (from latestFullySignedBlock) is correct. It expects an object
+          // TODO 222: Should transaction signatures and block signatures have a similar format? They don't currently.
           await Promise.all(
             latestBlockSignatures.map(blockSignature => this.verifyBlockSignature(this.latestProcessedBlock, blockSignature))
           );
@@ -228,13 +229,12 @@ module.exports = class LDPoSChainModule {
           this.logger.warn(
             `Failed to fetch latest block signatures because of error: ${error.message}`
           );
+          // This is to cover the case where our node has received some bad blocks in the past.
+          pendingBlocks = [];
+          latestGoodBlock = this.latestProcessedBlock;
+          await this.wait(fetchBlockPause);
+          continue;
         }
-
-        // This is to cover the case where our node has received some bad blocks in the past.
-        pendingBlocks = [];
-        latestVerifiedBlock = this.latestProcessedBlock;
-        await this.wait(fetchBlockPause);
-        continue;
       }
 
       try {
@@ -242,7 +242,6 @@ module.exports = class LDPoSChainModule {
           let block = pendingBlocks[i];
           await this.processBlock(block);
           pendingBlocks[i] = null;
-          this.latestProcessedBlock = block;
         }
       } catch (error) {
         this.logger.error(
@@ -252,12 +251,13 @@ module.exports = class LDPoSChainModule {
       pendingBlocks = pendingBlocks.filter(block => block);
 
       if (!pendingBlocks.length) {
-        this.latestBlock = this.latestProcessedBlock;
-        return this.latestProcessedBlock.height;
+        break;
       }
 
+      latestGoodBlock = latestVerifiedBlock;
       await this.wait(fetchBlockPause);
     }
+    return this.latestProcessedBlock.height;
   }
 
   async receiveLatestBlock(timeout) {
@@ -306,7 +306,7 @@ module.exports = class LDPoSChainModule {
       height,
       timestamp,
       transactions,
-      previousBlockId: this.latestBlock ? this.latestBlock.id : null
+      previousBlockId: this.latestProcessedBlock ? this.latestProcessedBlock.id : null
     };
     return this.ldposClient.prepareBlock(block);
   }
@@ -439,6 +439,8 @@ module.exports = class LDPoSChainModule {
     for (let txn of transactions) {
       this.pendingTransactionMap.delete(txn.id);
     }
+
+    this.latestProcessedBlock = block;
   }
 
   async verifySimplifiedTransaction(transaction, enforceMinFee) {
@@ -773,7 +775,6 @@ module.exports = class LDPoSChainModule {
     if (delegateCount == null) {
       delegateCount = DEFAULT_DELEGATE_COUNT;
     }
-    // TODO 222 throw error if fetchBlockLimit is less than delegateCount / 2 ????
     if (fetchBlockLimit == null) {
       fetchBlockLimit = DEFAULT_FETCH_BLOCK_LIMIT;
     }
@@ -803,16 +804,6 @@ module.exports = class LDPoSChainModule {
     }
     if (maxMultisigMembers == null) {
       maxMultisigMembers = DEFAULT_MAX_MULTISIG_MEMBERS;
-    }
-
-    if (fetchBlockLimit < delegateCount) {
-      throw new Error(
-        `The fetchBlockLimit option was ${
-          fetchBlockLimit
-        } which was less than the delegateCount option of ${
-          delegateCount
-        }`
-      );
     }
 
     this.delegateCount = delegateCount;
@@ -853,9 +844,9 @@ module.exports = class LDPoSChainModule {
 
     this.ldposClient = ldposClient;
     this.nodeHeight = await this.dal.getLatestHeight();
-    this.latestBlock = await this.dal.getBlockAtHeight(this.nodeHeight);
-    if (this.latestBlock == null) {
-      this.latestBlock = {
+    this.latestProcessedBlock = await this.dal.getBlockAtHeight(this.nodeHeight);
+    if (this.latestProcessedBlock == null) {
+      this.latestProcessedBlock = {
         height: 1,
         timestamp: 0,
         transactions: [],
@@ -866,8 +857,7 @@ module.exports = class LDPoSChainModule {
         id: null
       };
     }
-    this.latestProcessedBlock = this.latestBlock;
-    let blockFinality = Math.ceil(delegateCount / 2);
+    this.latestReceivedBlock = this.latestProcessedBlock;
 
     while (true) {
       if (!this.isActive) {
@@ -879,8 +869,7 @@ module.exports = class LDPoSChainModule {
         fetchBlockLimit,
         fetchBlockPause,
         fetchBlockEndConfirmations,
-        delegateMajorityCount,
-        blockFinality
+        delegateMajorityCount
       });
       this.nodeHeight = this.networkHeight;
       let nextHeight = this.networkHeight + 1;
@@ -954,9 +943,8 @@ module.exports = class LDPoSChainModule {
         // Will throw if the required number of valid signatures cannot be gathered in time.
         await this.receiveLatestBlockSignatures(latestBlock, delegateMajorityCount, forgingSignatureBroadcastDelay + propagationTimeout);
         await this.processBlock(latestBlock);
-
         this.latestFullySignedBlock = latestBlock;
-        this.latestProcessedBlock = this.latestBlock;
+
         this.nodeHeight = nextHeight;
         this.networkHeight = nextHeight;
       } catch (error) {
@@ -1015,7 +1003,7 @@ module.exports = class LDPoSChainModule {
       let block = event.data;
 
       try {
-        await this.verifyBlock(block, this.latestBlock);
+        await this.verifyBlock(block, this.latestProcessedBlock);
         let currentBlockTimeSlot = this.getCurrentBlockTimeSlot(this.forgingInterval);
         if (block.timestamp !== currentBlockTimeSlot) {
           throw new Error(
@@ -1030,7 +1018,7 @@ module.exports = class LDPoSChainModule {
         );
         return;
       }
-      if (block.id === this.latestBlock.id) {
+      if (block.id === this.latestReceivedBlock.id) {
         this.logger.debug(
           new Error(`Block ${block.id} has already been received before`)
         );
@@ -1038,17 +1026,17 @@ module.exports = class LDPoSChainModule {
       }
 
       // If double-forged block was received.
-      if (block.timestamp === this.latestBlock.timestamp) {
-        this.latestDoubleForgedBlockTimestamp = this.latestBlock.timestamp;
+      if (block.timestamp === this.latestReceivedBlock.timestamp) {
+        this.latestDoubleForgedBlockTimestamp = this.latestReceivedBlock.timestamp;
         this.logger.error(
-          new Error(`Block ${block.id} was forged with the same timestamp as the last block ${this.latestBlock.id}`)
+          new Error(`Block ${block.id} was forged with the same timestamp as the last block ${this.latestReceivedBlock.id}`)
         );
         return;
       }
-      if (block.height === this.latestBlock.height) {
-        this.latestDoubleForgedBlockTimestamp = this.latestBlock.timestamp;
+      if (block.height === this.latestReceivedBlock.height) {
+        this.latestDoubleForgedBlockTimestamp = this.latestReceivedBlock.timestamp;
         this.logger.error(
-          new Error(`Block ${block.id} was forged at the same height as the last block ${this.latestBlock.id}`)
+          new Error(`Block ${block.id} was forged at the same height as the last block ${this.latestReceivedBlock.id}`)
         );
         return;
       }
@@ -1071,12 +1059,12 @@ module.exports = class LDPoSChainModule {
         }
       }
 
-      this.latestBlock = {
+      this.latestReceivedBlock = {
         ...block,
         signatures: []
       };
 
-      this.verifiedBlockStream.write(this.latestBlock);
+      this.verifiedBlockStream.write(this.latestReceivedBlock);
 
       // This is a performance optimization to ensure that peers
       // will not receive multiple instances of the same block at the same time.
@@ -1097,7 +1085,7 @@ module.exports = class LDPoSChainModule {
       let blockSignature = event.data;
 
       try {
-        await this.verifyBlockSignature(this.latestBlock, blockSignature);
+        await this.verifyBlockSignature(this.latestReceivedBlock, blockSignature);
       } catch (error) {
         this.logger.error(
           new Error(`Received invalid block signature - ${error.message}`)
@@ -1105,7 +1093,7 @@ module.exports = class LDPoSChainModule {
         return;
       }
 
-      let { signatures } = this.latestBlock;
+      let { signatures } = this.latestReceivedBlock;
 
       if (signatures[blockSignature.signerAddress]) {
         this.logger.error(
