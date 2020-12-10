@@ -10,6 +10,8 @@ const { verifyVoteTransactionSchema } = require('./schemas/vote-transaction-sche
 const { verifyUnvoteTransactionSchema } = require('./schemas/unvote-transaction-schema');
 const { verifyRegisterMultisigTransactionSchema } = require('./schemas/register-multisig-transaction-schema');
 const { verifyBlockSignaturesSchema } = require('./schemas/block-signatures-schema');
+const { verifyBlockSignatureSchema } = require('./schemas/block-signature-schema');
+const { verifyMultisigTransactionSchema } = require('./schemas/multisig-transaction-schema');
 
 const DEFAULT_MODULE_ALIAS = 'ldpos_chain';
 const DEFAULT_GENESIS_PATH = './genesis/mainnet/genesis.json';
@@ -218,7 +220,6 @@ module.exports = class LDPoSChainModule {
           });
           verifyBlockSignaturesSchema(latestBlockSignatures, delegateMajorityCount);
 
-          // TODO 222: Should transaction signatures and block signatures have a similar format? They don't currently.
           await Promise.all(
             latestBlockSignatures.map(blockSignature => this.verifyBlockSignature(this.latestProcessedBlock, blockSignature))
           );
@@ -498,51 +499,16 @@ module.exports = class LDPoSChainModule {
         }`
       );
     }
+
+    return senderAccount;
   }
 
   async verifyTransaction(transaction) {
-    await this.verifySimplifiedTransaction(transaction, true);
-
+    let senderAccount = await this.verifySimplifiedTransaction(transaction, true);
     let { senderAddress } = transaction;
 
     if (senderAccount.type === 'multisig') {
-      if (!Array.isArray(transaction.signatures)) {
-        throw new Error(
-          `Transaction from multisig wallet ${
-            senderAccount.address
-          } did not have valid member signatures`
-        );
-      }
-
-      let processedSignatures = new Map();
-      for (let signaturePacket of transaction.signatures) {
-        let signatureParts = signaturePacket.split(':');
-        let publicKey = signatureParts[0];
-        if (processedSignatures.has(publicKey)) {
-          throw new Error(
-            `Transaction from multisig wallet ${
-              senderAccount.address
-            } had multiple signatures associated with the same member public key ${
-              publicKey
-            }`
-          );
-        }
-        let signature = signatureParts[1];
-        processedSignatures.set(publicKey, {
-          publicKey,
-          signature
-        });
-      }
-
-      if (processedSignatures.size < senderAccount.multisigRequiredSignatureCount) {
-        throw new Error(
-          `Transaction from multisig wallet ${
-            senderAccount.address
-          } did not have enough member signatures - At least ${
-            senderAccount.multisigRequiredSignatureCount
-          } distinct signatures are required`
-        );
-      }
+      verifyMultisigTransactionSchema(transaction, senderAccount.multisigRequiredSignatureCount);
 
       let multisigMemberAddresses;
       try {
@@ -555,12 +521,14 @@ module.exports = class LDPoSChainModule {
         );
       }
 
-      let multisigMemberPublicKeySet;
+      let multisigMemberAccounts = {};
       try {
-        let multisigMemberAccounts = await Promise.all(
+        let multisigMemberAccountList = await Promise.all(
           multisigMemberAddresses.map(memberAddress => this.dal.getAccount(memberAddress))
         );
-        multisigMemberPublicKeySet = new Set(multisigMemberAccounts.map(memberAccount => memberAccount.multisigPublicKey));
+        for (let memberAccount of multisigMemberAccountList) {
+          multisigMemberAccounts[memberAccount.address] = memberAccount;
+        }
       } catch (error) {
         throw new Error(
           `Failed to fetch member accounts for multisig wallet ${
@@ -568,18 +536,21 @@ module.exports = class LDPoSChainModule {
           } because of error: ${error.message}`
         );
       }
-      for (let signaturePacket of processedSignatures.values()) {
-        let { publicKey, signature } = signaturePacket;
-        if (!multisigMemberPublicKeySet.has(publicKey)) {
+      for (let signaturePacket of transaction.signatures) {
+        let { signerAddress, signature } = signaturePacket;
+
+        if (!multisigMemberAccounts[signerAddress]) {
           throw new Error(
-            `Signature with public key ${
-              publicKey
-            } was not associated with any member of multisig wallet ${
+            `The signer with address ${
+              signerAddress
+            } was not a member of multisig wallet ${
               senderAccount.address
             }`
           );
         }
-        if (!this.ldposClient.verifyMultisigTransactionSignature(transaction, publicKey, signature)) {
+        let memberAccount = multisigMemberAccounts[signerAddress];
+        let signerPublicKey = memberAccount.multisigPublicKey;
+        if (!this.ldposClient.verifyMultisigTransactionSignature(transaction, signerPublicKey, signature)) {
           throw new Error(
             `Multisig transaction signature of member ${
               memberAccount.address
@@ -678,10 +649,8 @@ module.exports = class LDPoSChainModule {
   }
 
   async verifyBlockSignature(latestBlock, blockSignature) {
-    // TODO 2222: Schema validation
-    if (!blockSignature) {
-      throw new Error('Block signature was not specified');
-    }
+    verifyBlockSignatureSchema(blockSignature);
+
     if (!latestBlock) {
       throw new Error('Cannot verify signature because there is no block pending');
     }
