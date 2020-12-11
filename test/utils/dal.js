@@ -31,7 +31,7 @@ class DAL {
   }
 
   async getAccount(accountAddress) {
-    let account = this.accounts[account.address];
+    let account = this.accounts[accountAddress];
     if (!account) {
       let error = new Error(`Account ${accountAddress} did not exist`);
       error.name = 'InvalidActionError';
@@ -41,7 +41,7 @@ class DAL {
   }
 
   async updateAccount(accountAddress, changePacket, updateHeight) {
-    let account = this.accounts[account.address];
+    let account = this.accounts[accountAddress];
     if (!account) {
       let error = new Error(`Account ${accountAddress} did not exist`);
       error.name = 'InvalidActionError';
@@ -159,7 +159,7 @@ class DAL {
     let delegateAddressList = Object.keys(this.votes);
     for (let delegateAddress of delegateAddressList) {
       let voterAddressList = [...this.votes[delegateAddress]];
-      let voteWeight = 0;
+      let voteWeight = 0n;
       for (let voterAddress of voterAddressList) {
         let voter = this.accounts[voterAddress] || {};
         voteWeight += voter.balance || 0n;

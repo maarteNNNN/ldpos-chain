@@ -283,7 +283,7 @@ module.exports = class LDPoSChainModule {
     return latestBlock.signatures;
   }
 
-  async getCurrentBlockTimeSlot(forgingInterval) {
+  getCurrentBlockTimeSlot(forgingInterval) {
     return Math.floor(Date.now() / forgingInterval) * forgingInterval;
   }
 
@@ -676,7 +676,7 @@ module.exports = class LDPoSChainModule {
   }
 
   async broadcastBlock(block) {
-    await channel.invoke('network:emit', {
+    await this.channel.invoke('network:emit', {
       event: `${this.alias}:block`,
       data: block,
       peerLimit: NO_PEER_LIMIT
@@ -684,7 +684,7 @@ module.exports = class LDPoSChainModule {
   }
 
   async broadcastBlockSignature(signature) {
-    await channel.invoke('network:emit', {
+    await this.channel.invoke('network:emit', {
       event: `${this.alias}:blockSignature`,
       data: signature,
       peerLimit: NO_PEER_LIMIT

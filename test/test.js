@@ -27,7 +27,7 @@ describe('Unit tests', async () => {
     });
     options = {
       genesisPath: './test/utils/genesis.json',
-      stakingPassphrase: 'save tree rib blouse weapon broccoli finger tenant accuse taste copper cinnamon'
+      forgingPassphrase: 'clerk aware give dog reopen peasant duty cheese tobacco trouble gold angle'
     };
 
     await chainModule.load(channel, options);

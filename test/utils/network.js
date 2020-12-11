@@ -14,8 +14,8 @@ class NetworkModule {
     this.emitter = emitter;
   }
 
-  async trigger(fromModule, eventName, data) {
-    this.emitter.emit(`network:event:${fromModule}:${eventName}`, data);
+  async trigger(fromModule, eventName, data, info) {
+    this.emitter.emit(`network:event:${fromModule}:${eventName}`, { data, info });
   }
 
   get actions() {
@@ -24,15 +24,21 @@ class NetworkModule {
         let eventParts = event.split(':');
         let moduleName = eventParts[0];
         let eventName = eventParts[1];
-
-        return this.modules[moduleName].events[eventName](data);
+        let targetFunction = this.modules[moduleName].events[eventName];
+        if (!targetFunction) {
+          throw new Error(`The network ${eventName} event did not exist on the ${moduleName} module`);
+        }
+        return targetFunction(data);
       },
       request: async ({ procedure, data }) => {
         let procedureParts = procedure.split(':');
         let moduleName = procedureParts[0];
         let actionName = procedureParts[1];
-
-        return this.modules[moduleName].actions[actionName](data);
+        let targetFunction = this.modules[moduleName].actions[actionName];
+        if (!targetFunction) {
+          throw new Error(`The network ${actionName} action did not exist on the ${moduleName} module`);
+        }
+        return targetFunction(data);
       }
     };
   }

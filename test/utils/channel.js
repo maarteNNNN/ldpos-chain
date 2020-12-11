@@ -12,8 +12,8 @@ class Channel {
     }
   }
 
-  async publish(channelName, data) {
-    this.emitter.emit(channelName, data);
+  async publish(channelName, data, info) {
+    this.emitter.emit(channelName, { data, info });
   }
 
   async subscribe(channelName, handler) {
@@ -24,7 +24,11 @@ class Channel {
     let procedureParts = procedureName.split(':');
     let moduleName = procedureParts[0];
     let actionName = procedureParts[1];
-    return this.modules[moduleName].actions[actionName](data);
+    let targetFunction = this.modules[moduleName].actions[actionName];
+    if (!targetFunction) {
+      throw new Error(`The channel ${actionName} action did not exist on the ${moduleName} module`);
+    }
+    return targetFunction(data);
   }
 }
 

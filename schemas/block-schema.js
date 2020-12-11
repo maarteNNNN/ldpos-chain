@@ -16,8 +16,8 @@ function verifyBlockSchema(block, maxTransactionsPerBlock) {
       `Block contained too many transactions - Maximum allowed is ${maxTransactionsPerBlock}`
     );
   }
-  if (typeof block.previousBlockId !== 'string') {
-    throw new Error('Block previousBlockId must be a string');
+  if (block.previousBlockId != null && typeof block.previousBlockId !== 'string') {
+    throw new Error('Block previousBlockId must be a string if it is specified');
   }
   if (typeof block.forgerAddress !== 'string') {
     throw new Error('Block forgerAddress must be a string');
