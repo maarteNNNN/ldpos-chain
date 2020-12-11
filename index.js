@@ -568,9 +568,7 @@ module.exports = class LDPoSChainModule {
   async verifyBlock(block, lastBlock) {
     verifyBlockSchema(block, this.maxTransactionsPerBlock);
 
-    let lastBlockId = lastBlock ? lastBlock.id : null;
-    let lastBlockHeight = lastBlock ? lastBlock.height : 0;
-    let expectedBlockHeight = lastBlockHeight + 1;
+    let expectedBlockHeight = lastBlock.height + 1;
     if (block.height !== expectedBlockHeight) {
       throw new Error(
         `Block height was invalid - Was ${block.height} but expected ${expectedBlockHeight}`
@@ -629,7 +627,7 @@ module.exports = class LDPoSChainModule {
         }`
       );
     }
-    if (!this.ldposClient.verifyBlock(block, forgingPublicKey, lastBlockId)) {
+    if (!this.ldposClient.verifyBlock(block, forgingPublicKey, lastBlock.id)) {
       throw new Error(`Block ${block.id || 'without ID'} was invalid`);
     }
 
