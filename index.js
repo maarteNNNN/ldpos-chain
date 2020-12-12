@@ -31,6 +31,7 @@ const DEFAULT_MAX_MULTISIG_MEMBERS = 20;
 const DEFAULT_PENDING_TRANSACTION_EXPIRY = 604800000; // 1 week
 const DEFAULT_PENDING_TRANSACTION_EXPIRY_CHECK_INTERVAL = 3600000; // 1 hour
 
+// TODO 222: When an account's publicKey is changed, expire any pending transaction from pendingTransactionMap which uses the old publicKey. Do the same for both sigPublicKey and multisigPublicKey.
 // TODO 222: Make sure that all external data is validated with schema.
 
 const DEFAULT_MIN_TRANSACTION_FEES = {
