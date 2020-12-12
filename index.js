@@ -28,6 +28,8 @@ const DEFAULT_PROPAGATION_RANDOMNESS = 10000;
 const DEFAULT_TIME_POLL_INTERVAL = 200;
 const DEFAULT_MAX_TRANSACTIONS_PER_BLOCK = 300;
 const DEFAULT_MAX_MULTISIG_MEMBERS = 20;
+const DEFAULT_PENDING_TRANSACTION_EXPIRY = 604800000; // 1 week
+const DEFAULT_PENDING_TRANSACTION_EXPIRY_CHECK_INTERVAL = 3600000; // 1 hour
 
 // TODO 222: Make sure that all external data is validated with schema.
 
@@ -736,57 +738,11 @@ module.exports = class LDPoSChainModule {
       minTransactionFees
     } = options;
 
-    if (forgingInterval == null) {
-      forgingInterval = DEFAULT_FORGING_INTERVAL;
-    }
-    if (delegateCount == null) {
-      delegateCount = DEFAULT_DELEGATE_COUNT;
-    }
-    if (fetchBlockLimit == null) {
-      fetchBlockLimit = DEFAULT_FETCH_BLOCK_LIMIT;
-    }
-    if (fetchBlockPause == null) {
-      fetchBlockPause = DEFAULT_FETCH_BLOCK_PAUSE;
-    }
-    if (fetchBlockEndConfirmations == null) {
-      fetchBlockEndConfirmations = DEFAULT_FETCH_BLOCK_END_CONFIRMATIONS;
-    }
-    if (forgingBlockBroadcastDelay == null) {
-      forgingBlockBroadcastDelay = DEFAULT_FORGING_BLOCK_BROADCAST_DELAY;
-    }
-    if (forgingSignatureBroadcastDelay == null) {
-      forgingSignatureBroadcastDelay = DEFAULT_FORGING_SIGNATURE_BROADCAST_DELAY;
-    }
-    if (propagationTimeout == null) {
-      propagationTimeout = DEFAULT_PROPAGATION_TIMEOUT;
-    }
-    if (propagationRandomness == null) {
-      propagationRandomness = DEFAULT_PROPAGATION_RANDOMNESS;
-    }
-    if (timePollInterval == null) {
-      timePollInterval = DEFAULT_TIME_POLL_INTERVAL;
-    }
-    if (maxTransactionsPerBlock == null) {
-      maxTransactionsPerBlock = DEFAULT_MAX_TRANSACTIONS_PER_BLOCK;
-    }
-    if (maxMultisigMembers == null) {
-      maxMultisigMembers = DEFAULT_MAX_MULTISIG_MEMBERS;
-    }
-
     this.delegateCount = delegateCount;
     this.forgingInterval = forgingInterval;
     this.propagationRandomness = propagationRandomness;
     this.maxTransactionsPerBlock = maxTransactionsPerBlock;
     this.maxMultisigMembers = maxMultisigMembers;
-    let unsanitizedMinTransactionFees = {
-      ...DEFAULT_MIN_TRANSACTION_FEES,
-      ...minTransactionFees
-    };
-    this.minTransactionFees = {};
-    let transactionTypeList = Object.keys(unsanitizedMinTransactionFees);
-    for (let transactionType of transactionTypeList) {
-      this.minTransactionFees[transactionType] = BigInt(unsanitizedMinTransactionFees[transactionType]);
-    }
 
     let delegateMajorityCount = Math.ceil(delegateCount / 2);
 
@@ -851,7 +807,7 @@ module.exports = class LDPoSChainModule {
 
       if (isCurrentForgingDelegate) {
         (async () => {
-          let pendingTransactions = [...this.pendingTransactionMap.values()];
+          let pendingTransactions = [...this.pendingTransactionMap.values()].map(pendingTxn => pendingTxn.transaction);
           // Sort by fee from highest to lowest.
           pendingTransactions.sort((a, b) => {
             if (a.fee > b.fee) {
@@ -863,10 +819,10 @@ module.exports = class LDPoSChainModule {
             return 0;
           });
           let blockTransactions = pendingTransactions.slice(0, maxTransactionsPerBlock).map((txn) => {
-            let { signature, ...txnWithoutSignature } = txn;
+            let { signature, ...simplifiedTxn } = txn;
             let signatureHash = this.sha256(signature);
             return {
-              ...txnWithoutSignature,
+              ...simplifiedTxn,
               signatureHash
             };
           });
@@ -949,7 +905,7 @@ module.exports = class LDPoSChainModule {
         );
         return;
       }
-      this.pendingTransactionMap.set(transaction.id, transaction);
+      this.pendingTransactionMap.set(transaction.id, { transaction, receivedTimestamp: Date.now() });
 
       // This is a performance optimization to ensure that peers
       // will not receive multiple instances of the same transaction at the same time.
@@ -1016,7 +972,7 @@ module.exports = class LDPoSChainModule {
           );
           return;
         }
-        let pendingTxn = this.pendingTransactionMap.get(txn.id);
+        let pendingTxn = this.pendingTransactionMap.get(txn.id).transaction;
         let pendingTxnSignatureHash = this.sha256(pendingTxn.signature);
         if (txn.signatureHash !== pendingTxnSignatureHash) {
           this.logger.error(
@@ -1084,16 +1040,67 @@ module.exports = class LDPoSChainModule {
     });
   }
 
+  cleanupPendingTransactionMap(expiry) {
+    let now = Date.now();
+
+    let expiredTransactionList = [...this.pendingTransactionMap.values()]
+      .filter(pendingTxn => now - pendingTxn.receivedTimestamp >= expiry)
+      .map(pendingTxn => pendingTxn.transaction);
+
+    for (let txn of expiredTransactionList) {
+      this.pendingTransactionMap.delete(txn.id);
+    }
+  }
+
+  async startPendingTransactionExpiryLoop() {
+    this._pendingTransactionExpiryCheckIntervalId = setInterval(() => {
+      this.cleanupPendingTransactionMap(this.pendingTransactionExpiry);
+    }, this.pendingTransactionExpiryCheckInterval);
+  }
+
   async load(channel, options) {
-    this.options = options;
     this.channel = channel;
     this.isActive = true;
+
+    let defaultOptions = {
+      forgingInterval: DEFAULT_FORGING_INTERVAL,
+      delegateCount: DEFAULT_DELEGATE_COUNT,
+      fetchBlockLimit: DEFAULT_FETCH_BLOCK_LIMIT,
+      fetchBlockPause: DEFAULT_FETCH_BLOCK_PAUSE,
+      fetchBlockEndConfirmations: DEFAULT_FETCH_BLOCK_END_CONFIRMATIONS,
+      forgingBlockBroadcastDelay: DEFAULT_FORGING_BLOCK_BROADCAST_DELAY,
+      forgingSignatureBroadcastDelay: DEFAULT_FORGING_SIGNATURE_BROADCAST_DELAY,
+      propagationTimeout: DEFAULT_PROPAGATION_TIMEOUT,
+      propagationRandomness: DEFAULT_PROPAGATION_RANDOMNESS,
+      timePollInterval: DEFAULT_TIME_POLL_INTERVAL,
+      maxTransactionsPerBlock: DEFAULT_MAX_TRANSACTIONS_PER_BLOCK,
+      maxMultisigMembers: DEFAULT_MAX_MULTISIG_MEMBERS,
+      pendingTransactionExpiry: DEFAULT_PENDING_TRANSACTION_EXPIRY,
+      pendingTransactionExpiryCheckInterval: DEFAULT_PENDING_TRANSACTION_EXPIRY_CHECK_INTERVAL
+    };
+    this.options = {...defaultOptions, ...options};
+
+    let unsanitizedMinTransactionFees = {
+      ...DEFAULT_MIN_TRANSACTION_FEES,
+      ...this.options.minTransactionFees
+    };
+    let minTransactionFees = {};
+    let transactionTypeList = Object.keys(unsanitizedMinTransactionFees);
+    for (let transactionType of transactionTypeList) {
+      minTransactionFees[transactionType] = BigInt(unsanitizedMinTransactionFees[transactionType]);
+    }
+    this.options.minTransactionFees = minTransactionFees;
+    this.minTransactionFees = minTransactionFees;
+
+    this.pendingTransactionExpiry = this.options.pendingTransactionExpiry;
+    this.pendingTransactionExpiryCheckInterval = this.options.pendingTransactionExpiryCheckInterval;
 
     this.genesis = require(options.genesisPath || DEFAULT_GENESIS_PATH);
     await this.dal.init({
       genesis: this.genesis
     });
 
+    this.startPendingTransactionExpiryLoop();
     this.startTransactionPropagationLoop();
     this.startBlockPropagationLoop();
     this.startBlockSignaturePropagationLoop();
@@ -1104,6 +1111,7 @@ module.exports = class LDPoSChainModule {
 
   async unload() {
     this.isActive = false;
+    clearInterval(this._pendingTransactionExpiryCheckIntervalId);
   }
 
   async wait(duration) {
