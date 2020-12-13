@@ -470,6 +470,7 @@ module.exports = class LDPoSChainModule {
   }
 
   async verifySimplifiedTransaction(transaction, enforceMinFee) {
+    // TODO 222: When verifying the schema, account for differences if the transaction is received directly from network or from a block (e.g. expect signature versus signatureHash). Also note that the schema is different in the case of multisig.
     verifyTransactionSchema(transaction);
 
     let { type, senderAddress, amount, fee, timestamp } = transaction;
@@ -533,8 +534,6 @@ module.exports = class LDPoSChainModule {
       );
     }
 
-    // TODO 222: Check that the transaction format matches the account in terms of regular wallet versus multisig wallet.
-
     return senderAccount;
   }
 
@@ -543,6 +542,7 @@ module.exports = class LDPoSChainModule {
     let { senderAddress } = transaction;
 
     if (senderAccount.type === 'multisig') {
+      // TODO 222: Move this logic into the this.verifySimplifiedTransaction function
       verifyMultisigTransactionSchema(transaction, senderAccount.multisigRequiredSignatureCount);
 
       let multisigMemberAddresses;
