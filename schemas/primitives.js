@@ -4,11 +4,21 @@ function validateWalletAddress(walletAddress) {
 
 }
 
+function validatePublicKey(publicKey) {
+
+}
+
 function validateSignature(signature) {
+
+}
+
+function validateSignatureHash(signatureHash) {
 
 }
 
 module.exports = {
   validateWalletAddress,
-  validateSignature
+  validatePublicKey,
+  validateSignature,
+  validateSignatureHash
 };

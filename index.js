@@ -12,6 +12,7 @@ const { verifyRegisterMultisigTransactionSchema } = require('./schemas/register-
 const { verifyBlockSignaturesSchema } = require('./schemas/block-signatures-schema');
 const { verifyBlockSignatureSchema } = require('./schemas/block-signature-schema');
 const { verifyMultisigTransactionSchema } = require('./schemas/multisig-transaction-schema');
+const { verifySigTransactionSchema } = require('./schemas/sig-transaction-schema');
 
 const DEFAULT_MODULE_ALIAS = 'ldpos_chain';
 const DEFAULT_GENESIS_PATH = './genesis/mainnet/genesis.json';
@@ -41,6 +42,7 @@ const DEFAULT_MIN_TRANSACTION_FEES = {
 };
 
 const NO_PEER_LIMIT = -1;
+const ACCOUNT_TYPE_MULTISIG = 'multisig';
 
 module.exports = class LDPoSChainModule {
   constructor(options) {
@@ -318,10 +320,15 @@ module.exports = class LDPoSChainModule {
     let { transactions, height } = block;
     let affectedAddresses = new Set();
     for (let txn of transactions) {
-      // TODO 222: For multisig, all signatures members are affectedAddresses
       affectedAddresses.add(txn.senderAddress);
       if (txn.recipientAddress) {
         affectedAddresses.add(txn.recipientAddress);
+      }
+      // For multisig transaction, add all signer accounts.
+      if (txn.signatures) {
+        for (let signaturePacket of txn.signatures) {
+          affectedAddresses.add(signaturePacket.signerAddress);
+        }
       }
     }
     affectedAddresses.add(block.forgerAddress);
@@ -342,14 +349,23 @@ module.exports = class LDPoSChainModule {
         senderAddress,
         fee,
         timestamp,
+        signatures,
         sigPublicKey,
         nextSigPublicKey
       } = txn;
       let senderAccount = accounts[senderAddress];
 
-      // TODO 2222: Handle differently if account is a multisig
-      senderAccount.sigPublicKey = sigPublicKey;
-      senderAccount.nextSigPublicKey = nextSigPublicKey;
+      if (signatures) {
+        for (let signaturePacket of signatures) {
+          let memberAccount = accounts[signaturePacket.signerAddress];
+          memberAccount.multisigPublicKey = signaturePacket.multisigPublicKey;
+          memberAccount.nextMultisigPublicKey = signaturePacket.nextMultisigPublicKey;
+        }
+      } else {
+        // If regular transaction (not multisig), update the account sig public keys.
+        senderAccount.sigPublicKey = sigPublicKey;
+        senderAccount.nextSigPublicKey = nextSigPublicKey;
+      }
 
       if (type === 'transfer') {
         let { recipientAddress, amount } = txn;
@@ -388,15 +404,26 @@ module.exports = class LDPoSChainModule {
     await Promise.all(
       accountList.map(async (account) => {
         if (account.updateHeight < height) {
+          let accountUpdatePacket;
+          if (account.type === ACCOUNT_TYPE_MULTISIG) {
+            accountUpdatePacket = {
+              balance: account.balance,
+              multisigPublicKey: account.multisigPublicKey,
+              nextMultisigPublicKey: account.nextMultisigPublicKey,
+              lastTransactionTimestamp: account.lastTransactionTimestamp
+            };
+          } else {
+            accountUpdatePacket = {
+              balance: account.balance,
+              sigPublicKey: account.sigPublicKey,
+              nextSigPublicKey: account.nextSigPublicKey,
+              lastTransactionTimestamp: account.lastTransactionTimestamp
+            };
+          }
           try {
             await this.dal.updateAccount(
               account.address,
-              {
-                balance: account.balance,
-                sigPublicKey: account.sigPublicKey,
-                nextSigPublicKey: account.nextSigPublicKey,
-                lastTransactionTimestamp: account.lastTransactionTimestamp
-              },
+              accountUpdatePacket,
               height
             );
           } catch (error) {
@@ -469,8 +496,7 @@ module.exports = class LDPoSChainModule {
     this.latestProcessedBlock = block;
   }
 
-  async verifySimplifiedTransaction(transaction, enforceMinFee) {
-    // TODO 222: When verifying the schema, account for differences if the transaction is received directly from network or from a block (e.g. expect signature versus signatureHash). Also note that the schema is different in the case of multisig.
+  async verifyTransaction(transaction, fullCheck) {
     verifyTransactionSchema(transaction);
 
     let { type, senderAddress, amount, fee, timestamp } = transaction;
@@ -493,7 +519,7 @@ module.exports = class LDPoSChainModule {
     let txnFee = fee || 0n;
     let txnTotal = txnAmount + txnFee;
 
-    if (enforceMinFee) {
+    if (fullCheck) {
       let minFee = this.minTransactionFees[type] || 0n;
 
       if (txnFee < minFee) {
@@ -534,16 +560,10 @@ module.exports = class LDPoSChainModule {
       );
     }
 
-    return senderAccount;
-  }
-
-  async verifyTransaction(transaction) {
-    let senderAccount = await this.verifySimplifiedTransaction(transaction, true);
     let { senderAddress } = transaction;
 
-    if (senderAccount.type === 'multisig') {
-      // TODO 222: Move this logic into the this.verifySimplifiedTransaction function
-      verifyMultisigTransactionSchema(transaction, senderAccount.multisigRequiredSignatureCount);
+    if (senderAccount.type === ACCOUNT_TYPE_MULTISIG) {
+      verifyMultisigTransactionSchema(transaction, fullCheck, senderAccount.multisigRequiredSignatureCount);
 
       let multisigMemberAddresses;
       try {
@@ -571,30 +591,46 @@ module.exports = class LDPoSChainModule {
           } because of error: ${error.message}`
         );
       }
-      for (let signaturePacket of transaction.signatures) {
-        let { signerAddress, signature } = signaturePacket;
+      if (fullCheck) {
+        for (let signaturePacket of transaction.signatures) {
+          let {
+            signerAddress,
+            signature,
+            multisigPublicKey
+          } = signaturePacket;
 
-        if (!multisigMemberAccounts[signerAddress]) {
-          throw new Error(
-            `The signer with address ${
-              signerAddress
-            } was not a member of multisig wallet ${
-              senderAccount.address
-            }`
-          );
-        }
-        let memberAccount = multisigMemberAccounts[signerAddress];
-        // TODO 222: Implement machanism for switching to nextMultisigPublicKey
-        let signerPublicKey = memberAccount.multisigPublicKey;
-        if (!this.ldposClient.verifyMultisigTransactionSignature(transaction, signerPublicKey, signature)) {
-          throw new Error(
-            `Multisig transaction signature of member ${
-              memberAccount.address
-            } was invalid`
-          );
+          if (!multisigMemberAccounts[signerAddress]) {
+            throw new Error(
+              `The signer with address ${
+                signerAddress
+              } was not a member of multisig wallet ${
+                senderAccount.address
+              }`
+            );
+          }
+          let memberAccount = multisigMemberAccounts[signerAddress];
+          if (
+            multisigPublicKey !== memberAccount.multisigPublicKey &&
+            multisigPublicKey !== memberAccount.nextMultisigPublicKey
+          ) {
+            throw new Error(
+              `Transaction multisigPublicKey did not match the multisigPublicKey or nextMultisigPublicKey of account ${
+                memberAccount.address
+              }`
+            );
+          }
+          if (!this.ldposClient.verifyMultisigTransactionSignature(transaction, multisigPublicKey, signature)) {
+            throw new Error(
+              `Multisig transaction signature of member ${
+                memberAccount.address
+              } was invalid`
+            );
+          }
         }
       }
     } else {
+      verifySigTransactionSchema(transaction, fullCheck);
+
       if (
         transaction.sigPublicKey !== senderAccount.sigPublicKey &&
         transaction.sigPublicKey !== senderAccount.nextSigPublicKey
@@ -605,7 +641,7 @@ module.exports = class LDPoSChainModule {
           }`
         );
       }
-      if (!this.ldposClient.verifyTransaction(transaction, transaction.sigPublicKey)) {
+      if (fullCheck && !this.ldposClient.verifyTransaction(transaction, transaction.sigPublicKey)) {
         throw new Error('Transaction signature was invalid');
       }
     }
@@ -663,7 +699,7 @@ module.exports = class LDPoSChainModule {
 
     try {
       for (let transaction of block.transactions) {
-        await this.verifySimplifiedTransaction(transaction, false);
+        await this.verifyTransaction(transaction, false);
       }
     } catch (error) {
       throw new Error(
@@ -888,7 +924,7 @@ module.exports = class LDPoSChainModule {
                 async (pendingTxnPacket) => {
                   let pendingTxn = pendingTxnPacket.transaction;
                   try {
-                    await this.verifySimplifiedTransaction(pendingTxn, true);
+                    await this.verifyTransaction(pendingTxn, true);
                   } catch (error) {
                     this.logger.debug(
                       `Excluded transaction ${
@@ -980,7 +1016,7 @@ module.exports = class LDPoSChainModule {
       let transaction = event.data;
 
       try {
-        await this.verifyTransaction(transaction);
+        await this.verifyTransaction(transaction, true);
       } catch (error) {
         this.logger.error(
           new Error(`Received invalid transaction ${transaction.id} - ${error.message}`)
