@@ -31,7 +31,6 @@ const DEFAULT_MAX_MULTISIG_MEMBERS = 20;
 const DEFAULT_PENDING_TRANSACTION_EXPIRY = 604800000; // 1 week
 const DEFAULT_PENDING_TRANSACTION_EXPIRY_CHECK_INTERVAL = 3600000; // 1 hour
 
-// TODO 222: When an account's publicKey is changed, expire any pending transaction from pendingTransactionMap which uses the old publicKey. Do the same for both sigPublicKey and multisigPublicKey.
 // TODO 222: Make sure that all external data is validated with schema.
 
 const DEFAULT_MIN_TRANSACTION_FEES = {
@@ -337,12 +336,16 @@ module.exports = class LDPoSChainModule {
     let voteChangeList = [];
     let multisigRegistrationList = [];
     for (let txn of transactions) {
-      let { type, senderAddress, fee, timestamp } = txn;
+      let { type, senderAddress, fee, timestamp, sigPublicKey, nextSigPublicKey } = txn;
+      let senderAccount = accounts[senderAddress];
+
+      senderAccount.sigPublicKey = sigPublicKey;
+      senderAccount.nextSigPublicKey = nextSigPublicKey;
+
       if (type === 'transfer') {
         let { recipientAddress, amount } = txn;
         let txnAmount = BigInt(amount);
         let txnFee = BigInt(fee);
-        let senderAccount = accounts[senderAddress];
         let recipientAccount = accounts[recipientAddress];
         if (senderAccount.updateHeight < height) {
           senderAccount.balance = senderAccount.balance - txnAmount - txnFee;
@@ -354,7 +357,6 @@ module.exports = class LDPoSChainModule {
         }
       } else {
         let txnFee = BigInt(fee);
-        let senderAccount = accounts[senderAddress];
         if (senderAccount.updateHeight < height) {
           senderAccount.balance = senderAccount.balance - txnFee;
           senderAccount.lastTransactionTimestamp = timestamp;
@@ -382,6 +384,8 @@ module.exports = class LDPoSChainModule {
               account.address,
               {
                 balance: account.balance,
+                sigPublicKey: account.sigPublicKey,
+                nextSigPublicKey: account.nextSigPublicKey,
                 lastTransactionTimestamp: account.lastTransactionTimestamp
               },
               height
@@ -569,6 +573,7 @@ module.exports = class LDPoSChainModule {
           );
         }
         let memberAccount = multisigMemberAccounts[signerAddress];
+        // TODO 222: Implement machanism for switching to nextMultisigPublicKey
         let signerPublicKey = memberAccount.multisigPublicKey;
         if (!this.ldposClient.verifyMultisigTransactionSignature(transaction, signerPublicKey, signature)) {
           throw new Error(
@@ -579,7 +584,17 @@ module.exports = class LDPoSChainModule {
         }
       }
     } else {
-      if (!this.ldposClient.verifyTransaction(transaction, senderAccount.sigPublicKey)) {
+      if (
+        transaction.sigPublicKey !== senderAccount.sigPublicKey &&
+        transaction.sigPublicKey !== senderAccount.nextSigPublicKey
+      ) {
+        throw new Error(
+          `Transaction sigPublicKey did not match the sigPublicKey or nextSigPublicKey of account ${
+            senderAccount.address
+          }`
+        );
+      }
+      if (!this.ldposClient.verifyTransaction(transaction, transaction.sigPublicKey)) {
         throw new Error('Transaction signature was invalid');
       }
     }
@@ -621,33 +636,17 @@ module.exports = class LDPoSChainModule {
         }`
       );
     }
-    let forgingPublicKey;
-    if (block.forgingPublicKey === targetDelegateAccount.forgingPublicKey) {
-      forgingPublicKey = targetDelegateAccount.forgingPublicKey;
-      if (!forgingPublicKey) {
-        throw new Error(
-          `Delegate ${
-            targetDelegateAccount.address
-          } did not have a forgingPublicKey`
-        );
-      }
-    } else if (block.forgingPublicKey === targetDelegateAccount.nextForgingPublicKey) {
-      if (!targetDelegateAccount.nextForgingPublicKey) {
-        throw new Error(
-          `Failed to increment the forging key for delegate ${
-            targetDelegateAccount.address
-          } because it did not have a nextForgingPublicKey`
-        );
-      }
-      forgingPublicKey = targetDelegateAccount.nextForgingPublicKey;
-    } else {
+    if (
+      block.forgingPublicKey !== targetDelegateAccount.forgingPublicKey &&
+      block.forgingPublicKey !== targetDelegateAccount.nextForgingPublicKey
+    ) {
       throw new Error(
         `Block forgingPublicKey did not match the forgingPublicKey or nextForgingPublicKey of delegate ${
           targetDelegateAccount.address
         }`
       );
     }
-    if (!this.ldposClient.verifyBlock(block, forgingPublicKey, lastBlock.id)) {
+    if (!this.ldposClient.verifyBlock(block, block.forgingPublicKey, lastBlock.id)) {
       throw new Error(`Block ${block.id || 'without ID'} was invalid`);
     }
 
