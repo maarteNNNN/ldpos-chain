@@ -337,25 +337,27 @@ module.exports = class LDPoSChainModule {
     let voteChangeList = [];
     let multisigRegistrationList = [];
     for (let txn of transactions) {
-      let { type } = txn;
+      let { type, senderAddress, fee, timestamp } = txn;
       if (type === 'transfer') {
-        let { senderAddress, recipientAddress, amount, fee } = txn;
+        let { recipientAddress, amount } = txn;
         let txnAmount = BigInt(amount);
         let txnFee = BigInt(fee);
         let senderAccount = accounts[senderAddress];
         let recipientAccount = accounts[recipientAddress];
         if (senderAccount.updateHeight < height) {
           senderAccount.balance = senderAccount.balance - txnAmount - txnFee;
+          senderAccount.lastTransactionTimestamp = timestamp;
         }
         if (recipientAccount.updateHeight < height) {
           recipientAccount.balance = recipientAccount.balance + txnAmount;
+          recipientAccount.lastTransactionTimestamp = timestamp;
         }
       } else {
-        let { senderAddress, fee } = txn;
         let txnFee = BigInt(fee);
         let senderAccount = accounts[senderAddress];
         if (senderAccount.updateHeight < height) {
           senderAccount.balance = senderAccount.balance - txnFee;
+          senderAccount.lastTransactionTimestamp = timestamp;
         }
         if (type === 'vote' || type === 'unvote') {
           voteChangeList.push({
@@ -376,7 +378,14 @@ module.exports = class LDPoSChainModule {
       accountList.map(async (account) => {
         if (account.updateHeight < height) {
           try {
-            await this.dal.updateAccount(account.address, { balance: account.balance }, height);
+            await this.dal.updateAccount(
+              account.address,
+              {
+                balance: account.balance,
+                lastTransactionTimestamp: account.lastTransactionTimestamp
+              },
+              height
+            );
           } catch (error) {
             if (error.name === 'InvalidActionError') {
               this.logger.warn(error);
@@ -450,7 +459,7 @@ module.exports = class LDPoSChainModule {
   async verifySimplifiedTransaction(transaction, enforceMinFee) {
     verifyTransactionSchema(transaction);
 
-    let { senderAddress, amount, fee, type } = transaction;
+    let { type, senderAddress, amount, fee, timestamp } = transaction;
 
     if (type === 'transfer') {
       verifyTransferTransactionSchema(transaction);
@@ -492,6 +501,14 @@ module.exports = class LDPoSChainModule {
     } catch (error) {
       throw new Error(
         `Failed to fetch account ${senderAddress} because of error: ${error.message}`
+      );
+    }
+
+    if (timestamp < senderAccount.lastTransactionTimestamp) {
+      throw new Error(
+        `Transaction was older than the last transaction processed from the sender ${
+          senderAddress
+        }`
       );
     }
 
@@ -719,6 +736,53 @@ module.exports = class LDPoSChainModule {
     }
   }
 
+  getSortedPendingTransactions(transactions) {
+    // This sorting algorithm groups transactions based on the sender address and
+    // sorts based on the average fee. This is necessary because the signature algorithm is
+    // stateful so the algorithm should give priority to older transactions which
+    // may have been signed using an older public key.
+    let transactionGroupMap = {};
+    for (let txn of transactions) {
+      if (!transactionGroupMap[txn.senderAddress]) {
+        transactionGroupMap[txn.senderAddress] = { transactions: [], totalFees: 0 };
+      }
+      let transactionGroup = transactionGroupMap[txn.senderAddress];
+      transactionGroup.totalFees += txn.fee;
+      transactionGroup.transactions.push(txn);
+    }
+    let transactionGroupList = Object.values(transactionGroupMap);
+    for (let transactionGroup of transactionGroupList) {
+      transactionGroup.transactions.sort((a, b) => {
+        if (a.timestamp < b.timestamp) {
+          return -1;
+        }
+        if (a.timestamp > b.timestamp) {
+          return 1;
+        }
+        return 0;
+      });
+      transactionGroup.averageFee = transactionGroup.totalFees / transactionGroup.transactions.length;
+    }
+
+    transactionGroupList.sort((a, b) => {
+      if (a.averageFee > b.averageFee) {
+        return -1;
+      }
+      if (a.averageFee < b.averageFee) {
+        return 1;
+      }
+      return 0;
+    });
+
+    let sortedTransactions = [];
+    for (let transactionGroup of transactionGroupList) {
+      for (let txn of transactionGroup.transactions) {
+        sortedTransactions.push(txn);
+      }
+    }
+    return sortedTransactions;
+  }
+
   async startBlockProcessingLoop() {
     let options = this.options;
     let channel = this.channel;
@@ -808,17 +872,31 @@ module.exports = class LDPoSChainModule {
 
       if (isCurrentForgingDelegate) {
         (async () => {
-          let pendingTransactions = [...this.pendingTransactionMap.values()].map(pendingTxn => pendingTxn.transaction);
-          // Sort by fee from highest to lowest.
-          pendingTransactions.sort((a, b) => {
-            if (a.fee > b.fee) {
-              return -1;
-            }
-            if (a.fee < b.fee) {
-              return 1;
-            }
-            return 0;
-          });
+          let validTransactions = (
+            await Promise.all(
+              [...this.pendingTransactionMap.values()].map(
+                async (pendingTxnPacket) => {
+                  let pendingTxn = pendingTxnPacket.transaction;
+                  try {
+                    await this.verifySimplifiedTransaction(pendingTxn, true);
+                  } catch (error) {
+                    this.logger.debug(
+                      `Excluded transaction ${
+                        pendingTxn.id
+                      } from block because of error: ${
+                        error.message
+                      }`
+                    );
+                    this.pendingTransactionMap.delete(pendingTxn.id);
+                    return null;
+                  }
+                  return pendingTxn;
+                }
+              )
+            )
+          ).filter(pendingTxn => pendingTxn);
+
+          let pendingTransactions = this.getSortedPendingTransactions(validTransactions);
           let blockTransactions = pendingTransactions.slice(0, maxTransactionsPerBlock).map((txn) => {
             let { signature, ...simplifiedTxn } = txn;
             let signatureHash = this.sha256(signature);
