@@ -318,6 +318,7 @@ module.exports = class LDPoSChainModule {
     let { transactions, height } = block;
     let affectedAddresses = new Set();
     for (let txn of transactions) {
+      // TODO 222: For multisig, all signatures members are affectedAddresses
       affectedAddresses.add(txn.senderAddress);
       if (txn.recipientAddress) {
         affectedAddresses.add(txn.recipientAddress);
@@ -336,9 +337,17 @@ module.exports = class LDPoSChainModule {
     let voteChangeList = [];
     let multisigRegistrationList = [];
     for (let txn of transactions) {
-      let { type, senderAddress, fee, timestamp, sigPublicKey, nextSigPublicKey } = txn;
+      let {
+        type,
+        senderAddress,
+        fee,
+        timestamp,
+        sigPublicKey,
+        nextSigPublicKey
+      } = txn;
       let senderAccount = accounts[senderAddress];
 
+      // TODO 2222: Handle differently if account is a multisig
       senderAccount.sigPublicKey = sigPublicKey;
       senderAccount.nextSigPublicKey = nextSigPublicKey;
 
@@ -523,6 +532,8 @@ module.exports = class LDPoSChainModule {
         }`
       );
     }
+
+    // TODO 222: Check that the transaction format matches the account in terms of regular wallet versus multisig wallet.
 
     return senderAccount;
   }
