@@ -35,10 +35,10 @@ const DEFAULT_PENDING_TRANSACTION_EXPIRY_CHECK_INTERVAL = 3600000; // 1 hour
 // TODO 222: Make sure that all external data is validated with schema.
 
 const DEFAULT_MIN_TRANSACTION_FEES = {
-  transfer: '10000000',
-  vote: '20000000',
-  unvote: '20000000',
-  registerMultisig: '50000000'
+  transfer: '1000000',
+  vote: '2000000',
+  unvote: '2000000',
+  registerMultisig: '5000000'
 };
 
 const NO_PEER_LIMIT = -1;
