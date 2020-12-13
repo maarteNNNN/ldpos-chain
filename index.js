@@ -736,7 +736,7 @@ module.exports = class LDPoSChainModule {
     }
   }
 
-  getSortedPendingTransactions(transactions) {
+  sortPendingTransactions(transactions) {
     // This sorting algorithm groups transactions based on the sender address and
     // sorts based on the average fee. This is necessary because the signature algorithm is
     // stateful so the algorithm should give priority to older transactions which
@@ -896,7 +896,7 @@ module.exports = class LDPoSChainModule {
             )
           ).filter(pendingTxn => pendingTxn);
 
-          let pendingTransactions = this.getSortedPendingTransactions(validTransactions);
+          let pendingTransactions = this.sortPendingTransactions(validTransactions);
           let blockTransactions = pendingTransactions.slice(0, maxTransactionsPerBlock).map((txn) => {
             let { signature, ...simplifiedTxn } = txn;
             let signatureHash = this.sha256(signature);
