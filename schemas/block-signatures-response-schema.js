@@ -1,6 +1,6 @@
 const { verifyBlockSignatureSchema } = require('./block-signature-schema');
 
-function verifyBlockSignaturesSchema(blockSignatures, minRequiredSignatures, networkSymbol) {
+function verifyBlockSignaturesResponseSchema(blockSignatures, minRequiredSignatures, networkSymbol) {
   if (!Array.isArray(blockSignatures)) {
     throw new Error('Block signatures must be an array');
   }
@@ -19,5 +19,5 @@ function verifyBlockSignaturesSchema(blockSignatures, minRequiredSignatures, net
 }
 
 module.exports = {
-  verifyBlockSignaturesSchema
+  verifyBlockSignaturesResponseSchema
 };

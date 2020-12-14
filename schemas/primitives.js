@@ -26,7 +26,7 @@ function validateForgingPublicKey(publicKey) {
   }
 }
 
-function validateNextForgingPublicKey() {
+function validateNextForgingPublicKey(publicKey) {
   try {
     validatePublicKey(publicKey);
   } catch (error) {
@@ -34,7 +34,7 @@ function validateNextForgingPublicKey() {
   }
 }
 
-function validateMultisigPublicKey() {
+function validateMultisigPublicKey(publicKey) {
   try {
     validatePublicKey(publicKey);
   } catch (error) {
@@ -42,7 +42,7 @@ function validateMultisigPublicKey() {
   }
 }
 
-function validateNextMultisigPublicKey() {
+function validateNextMultisigPublicKey(publicKey) {
   try {
     validatePublicKey(publicKey);
   } catch (error) {
@@ -50,7 +50,7 @@ function validateNextMultisigPublicKey() {
   }
 }
 
-function validateSigPublicKey() {
+function validateSigPublicKey(publicKey) {
   try {
     validatePublicKey(publicKey);
   } catch (error) {
@@ -58,7 +58,7 @@ function validateSigPublicKey() {
   }
 }
 
-function validateNextSigPublicKey() {
+function validateNextSigPublicKey(publicKey) {
   try {
     validatePublicKey(publicKey);
   } catch (error) {
@@ -148,7 +148,7 @@ module.exports = {
   validateMultisigPublicKey,
   validateNextMultisigPublicKey,
   validateSigPublicKey,
-  validateNextSigPublicKey
+  validateNextSigPublicKey,
   validateSignature,
   validateSignatureHash,
   validateBlockId,

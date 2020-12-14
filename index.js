@@ -10,9 +10,10 @@ const { verifyVoteTransactionSchema } = require('./schemas/vote-transaction-sche
 const { verifyUnvoteTransactionSchema } = require('./schemas/unvote-transaction-schema');
 const { verifyRegisterMultisigTransactionSchema } = require('./schemas/register-multisig-transaction-schema');
 const { verifyBlockSignatureSchema } = require('./schemas/block-signature-schema');
-const { verifyBlockSignaturesSchema } = require('./schemas/block-signatures-schema');
 const { verifyMultisigTransactionSchema } = require('./schemas/multisig-transaction-schema');
 const { verifySigTransactionSchema } = require('./schemas/sig-transaction-schema');
+const { verifyBlocksResponse } = require('./schemas/blocks-response-schema');
+const { verifyBlockSignaturesResponseSchema } = require('./schemas/block-signatures-response-schema');
 
 const DEFAULT_MODULE_ALIAS = 'ldpos_chain';
 const DEFAULT_GENESIS_PATH = './genesis/mainnet/genesis.json';
@@ -186,6 +187,7 @@ module.exports = class LDPoSChainModule {
             limit: fetchBlockLimit
           }
         });
+        verifyBlocksResponse(newBlocks);
       } catch (error) {
         this.logger.warn(error);
         pendingBlocks = [];
@@ -216,7 +218,7 @@ module.exports = class LDPoSChainModule {
 
       let safeBlockCount = pendingBlocks.length - delegateMajorityCount;
 
-      if (!newBlocks.length) {
+      if (!newBlocks.length && this.latestProcessedBlock.height !== 1) {
         try {
           let latestBlockSignatures = await this.channel.invoke('network:request', {
             procedure: `${this.alias}:getLatestBlockSignatures`,
@@ -224,7 +226,7 @@ module.exports = class LDPoSChainModule {
               blockId: this.latestProcessedBlock.id
             }
           });
-          verifyBlockSignaturesSchema(latestBlockSignatures, delegateMajorityCount, this.networkSymbol);
+          verifyBlockSignaturesResponseSchema(latestBlockSignatures, delegateMajorityCount, this.networkSymbol);
 
           await Promise.all(
             latestBlockSignatures.map(blockSignature => this.verifyBlockSignature(this.latestProcessedBlock, blockSignature))
@@ -660,7 +662,7 @@ module.exports = class LDPoSChainModule {
   }
 
   async verifyBlock(block, lastBlock) {
-    verifyBlockSchema(block, this.maxTransactionsPerBlock);
+    verifyBlockSchema(block, this.maxTransactionsPerBlock, this.networkSymbol);
 
     let expectedBlockHeight = lastBlock.height + 1;
     if (block.height !== expectedBlockHeight) {
@@ -857,6 +859,7 @@ module.exports = class LDPoSChainModule {
       propagationRandomness,
       timePollInterval,
       maxTransactionsPerBlock,
+      minMultisigMembers,
       maxMultisigMembers,
       minTransactionFees
     } = options;
@@ -865,8 +868,8 @@ module.exports = class LDPoSChainModule {
     this.forgingInterval = forgingInterval;
     this.propagationRandomness = propagationRandomness;
     this.maxTransactionsPerBlock = maxTransactionsPerBlock;
-    this.maxMultisigMembers = maxMultisigMembers;
     this.minMultisigMembers = minMultisigMembers;
+    this.maxMultisigMembers = maxMultisigMembers;
 
     let delegateMajorityCount = Math.ceil(delegateCount / 2);
 

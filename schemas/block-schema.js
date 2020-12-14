@@ -8,7 +8,7 @@ const {
   validateBlockHeight
 } = require('./primitives');
 
-function verifyBlockSchema(block, maxTransactionsPerBlock) {
+function verifyBlockSchema(block, maxTransactionsPerBlock, networkSymbol) {
   if (!block) {
     throw new Error('Block was not specified');
   }
@@ -22,7 +22,7 @@ function verifyBlockSchema(block, maxTransactionsPerBlock) {
       `Block contained too many transactions - Maximum allowed is ${maxTransactionsPerBlock}`
     );
   }
-  validateWalletAddress(block.forgerAddress);
+  validateWalletAddress(block.forgerAddress, networkSymbol);
   validateBlockId(block.id);
   if (block.previousBlockId != null) {
     validatePreviousBlockId(block.previousBlockId);
