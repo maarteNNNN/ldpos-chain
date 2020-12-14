@@ -1,8 +1,36 @@
-function verifyRegisterMultisigTransactionSchema(transaction, maxMultisigMembers) {
+const { validateWalletAddress } = require('./primitives');
+
+function verifyRegisterMultisigTransactionSchema(transaction, minMultisigMembers, maxMultisigMembers) {
   if (!transaction) {
     throw new Error('Register multisig transaction was not specified');
   }
-  // TODO 222: Verify transaction properties
+  if (
+    typeof transaction.requiredSignatureCount !== 'number' ||
+    transaction.requiredSignatureCount < 1 ||
+    transaction.requiredSignatureCount > maxMultisigMembers
+  ) {
+    throw new Error(
+      `Register multisig transaction requiredSignatureCount must be a number between 1 and ${
+        maxMultisigMembers
+      }`
+    );
+  }
+  if (
+    !Array.isArray(transaction.memberAddresses) ||
+    transaction.memberAddresses.length < minMultisigMembers ||
+    transaction.memberAddresses.length > maxMultisigMembers
+  ) {
+    throw new Error(
+      `Register multisig transaction memberAddresses must be an array of length between ${
+        minMultisigMembers
+      } and ${
+        maxMultisigMembers
+      }`
+    );
+  }
+  for (let memberAddress of transaction.memberAddresses) {
+    validateWalletAddress(memberAddress);
+  }
 }
 
 module.exports = {

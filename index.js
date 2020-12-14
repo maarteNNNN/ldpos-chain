@@ -28,6 +28,7 @@ const DEFAULT_PROPAGATION_TIMEOUT = 5000;
 const DEFAULT_PROPAGATION_RANDOMNESS = 10000;
 const DEFAULT_TIME_POLL_INTERVAL = 200;
 const DEFAULT_MAX_TRANSACTIONS_PER_BLOCK = 300;
+const DEFAULT_MIN_MULTISIG_MEMBERS = 1;
 const DEFAULT_MAX_MULTISIG_MEMBERS = 20;
 const DEFAULT_PENDING_TRANSACTION_EXPIRY = 604800000; // 1 week
 const DEFAULT_PENDING_TRANSACTION_EXPIRY_CHECK_INTERVAL = 3600000; // 1 hour
@@ -508,7 +509,7 @@ module.exports = class LDPoSChainModule {
     } else if (type === 'unvote') {
       verifyUnvoteTransactionSchema(transaction);
     } else if (type === 'registerMultisig') {
-      verifyRegisterMultisigTransactionSchema(transaction, this.maxMultisigMembers);
+      verifyRegisterMultisigTransactionSchema(transaction, this.minMultisigMembers, this.maxMultisigMembers);
     } else {
       throw new Error(
         `Transaction type ${type} was invalid`
@@ -854,6 +855,7 @@ module.exports = class LDPoSChainModule {
     this.propagationRandomness = propagationRandomness;
     this.maxTransactionsPerBlock = maxTransactionsPerBlock;
     this.maxMultisigMembers = maxMultisigMembers;
+    this.minMultisigMembers = minMultisigMembers;
 
     let delegateMajorityCount = Math.ceil(delegateCount / 2);
 
@@ -1199,6 +1201,7 @@ module.exports = class LDPoSChainModule {
       propagationRandomness: DEFAULT_PROPAGATION_RANDOMNESS,
       timePollInterval: DEFAULT_TIME_POLL_INTERVAL,
       maxTransactionsPerBlock: DEFAULT_MAX_TRANSACTIONS_PER_BLOCK,
+      minMultisigMembers: DEFAULT_MIN_MULTISIG_MEMBERS,
       maxMultisigMembers: DEFAULT_MAX_MULTISIG_MEMBERS,
       pendingTransactionExpiry: DEFAULT_PENDING_TRANSACTION_EXPIRY,
       pendingTransactionExpiryCheckInterval: DEFAULT_PENDING_TRANSACTION_EXPIRY_CHECK_INTERVAL

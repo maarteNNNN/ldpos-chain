@@ -1,8 +1,14 @@
+const { validateSignature, validateWalletAddress, validateBlockId } = require('./primitives');
+
 function verifyBlockSignatureSchema(blockSignature) {
   if (!blockSignature) {
-    throw new Error('Block signature was not specified');
+    throw new Error(
+      'Block signature was not specified'
+    );
   }
-  // TODO 222: Validate properties.
+  validateSignature(blockSignature.signature);
+  validateWalletAddress(blockSignature.signerAddress);
+  validateBlockId(blockSignature.blockId);
 }
 
 module.exports = {
