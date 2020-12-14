@@ -1071,7 +1071,7 @@ module.exports = class LDPoSChainModule {
         let currentBlockTimeSlot = this.getCurrentBlockTimeSlot(this.forgingInterval);
         if (block.timestamp !== currentBlockTimeSlot) {
           throw new Error(
-            `Block timestamp ${block.timestamp} did not correspond to the current time slot`
+            `Block timestamp ${block.timestamp} did not correspond to the current time slot ${currentBlockTimeSlot}`
           );
         }
       } catch (error) {
