@@ -1,11 +1,10 @@
 const {
   validateWalletAddress,
-  validateTransactionAmount,
   validateTransactionFee,
   validateTimestamp
 } = require('./primitives');
 
-function verifyTransactionSchema(transaction) {
+function verifyTransactionSchema(transaction, maxSpendableDigits, networkSymbol) {
   if (!transaction) {
     throw new Error('Transaction was not specified');
   }
@@ -19,9 +18,8 @@ function verifyTransactionSchema(transaction) {
       'Transaction type must be a string which refers to one of the supported transaction types'
     );
   }
-  validateWalletAddress(transaction.senderAddress);
-  validateTransactionAmount(transaction.amount);
-  validateTransactionFee(transaction.fee);
+  validateWalletAddress(transaction.senderAddress, networkSymbol);
+  validateTransactionFee(transaction.fee, maxSpendableDigits);
   validateTimestamp(transaction.timestamp);
 }
 

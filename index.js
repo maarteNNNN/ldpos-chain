@@ -9,8 +9,8 @@ const { verifyTransferTransactionSchema } = require('./schemas/transfer-transact
 const { verifyVoteTransactionSchema } = require('./schemas/vote-transaction-schema');
 const { verifyUnvoteTransactionSchema } = require('./schemas/unvote-transaction-schema');
 const { verifyRegisterMultisigTransactionSchema } = require('./schemas/register-multisig-transaction-schema');
-const { verifyBlockSignaturesSchema } = require('./schemas/block-signatures-schema');
 const { verifyBlockSignatureSchema } = require('./schemas/block-signature-schema');
+const { verifyBlockSignaturesSchema } = require('./schemas/block-signatures-schema');
 const { verifyMultisigTransactionSchema } = require('./schemas/multisig-transaction-schema');
 const { verifySigTransactionSchema } = require('./schemas/sig-transaction-schema');
 
@@ -32,6 +32,7 @@ const DEFAULT_MIN_MULTISIG_MEMBERS = 1;
 const DEFAULT_MAX_MULTISIG_MEMBERS = 20;
 const DEFAULT_PENDING_TRANSACTION_EXPIRY = 604800000; // 1 week
 const DEFAULT_PENDING_TRANSACTION_EXPIRY_CHECK_INTERVAL = 3600000; // 1 hour
+const DEFAULT_MAX_SPENDABLE_DIGITS = 25;
 
 // TODO 222: Make sure that all external data is validated with schema.
 
@@ -223,7 +224,7 @@ module.exports = class LDPoSChainModule {
               blockId: this.latestProcessedBlock.id
             }
           });
-          verifyBlockSignaturesSchema(latestBlockSignatures, delegateMajorityCount);
+          verifyBlockSignaturesSchema(latestBlockSignatures, delegateMajorityCount, this.networkSymbol);
 
           await Promise.all(
             latestBlockSignatures.map(blockSignature => this.verifyBlockSignature(this.latestProcessedBlock, blockSignature))
@@ -498,18 +499,23 @@ module.exports = class LDPoSChainModule {
   }
 
   async verifyTransaction(transaction, fullCheck) {
-    verifyTransactionSchema(transaction);
+    verifyTransactionSchema(transaction, this.maxSpendableDigits, this.networkSymbol);
 
     let { type, senderAddress, amount, fee, timestamp } = transaction;
 
     if (type === 'transfer') {
-      verifyTransferTransactionSchema(transaction);
+      verifyTransferTransactionSchema(transaction, this.maxSpendableDigits, this.networkSymbol);
     } else if (type === 'vote') {
-      verifyVoteTransactionSchema(transaction);
+      verifyVoteTransactionSchema(transaction, this.networkSymbol);
     } else if (type === 'unvote') {
-      verifyUnvoteTransactionSchema(transaction);
+      verifyUnvoteTransactionSchema(transaction, this.networkSymbol);
     } else if (type === 'registerMultisig') {
-      verifyRegisterMultisigTransactionSchema(transaction, this.minMultisigMembers, this.maxMultisigMembers);
+      verifyRegisterMultisigTransactionSchema(
+        transaction,
+        this.minMultisigMembers,
+        this.maxMultisigMembers,
+        this.networkSymbol
+      );
     } else {
       throw new Error(
         `Transaction type ${type} was invalid`
@@ -564,7 +570,12 @@ module.exports = class LDPoSChainModule {
     let { senderAddress } = transaction;
 
     if (senderAccount.type === ACCOUNT_TYPE_MULTISIG) {
-      verifyMultisigTransactionSchema(transaction, fullCheck, senderAccount.multisigRequiredSignatureCount);
+      verifyMultisigTransactionSchema(
+        transaction,
+        fullCheck,
+        senderAccount.multisigRequiredSignatureCount,
+        this.networkSymbol
+      );
 
       let multisigMemberAddresses;
       try {
@@ -714,7 +725,7 @@ module.exports = class LDPoSChainModule {
   }
 
   async verifyBlockSignature(latestBlock, blockSignature) {
-    verifyBlockSignatureSchema(blockSignature);
+    verifyBlockSignatureSchema(blockSignature, this.networkSymbol);
 
     if (!latestBlock) {
       throw new Error('Cannot verify signature because there is no block pending');
@@ -1204,7 +1215,8 @@ module.exports = class LDPoSChainModule {
       minMultisigMembers: DEFAULT_MIN_MULTISIG_MEMBERS,
       maxMultisigMembers: DEFAULT_MAX_MULTISIG_MEMBERS,
       pendingTransactionExpiry: DEFAULT_PENDING_TRANSACTION_EXPIRY,
-      pendingTransactionExpiryCheckInterval: DEFAULT_PENDING_TRANSACTION_EXPIRY_CHECK_INTERVAL
+      pendingTransactionExpiryCheckInterval: DEFAULT_PENDING_TRANSACTION_EXPIRY_CHECK_INTERVAL,
+      maxSpendableDigits: DEFAULT_MAX_SPENDABLE_DIGITS
     };
     this.options = {...defaultOptions, ...options};
 
@@ -1222,11 +1234,14 @@ module.exports = class LDPoSChainModule {
 
     this.pendingTransactionExpiry = this.options.pendingTransactionExpiry;
     this.pendingTransactionExpiryCheckInterval = this.options.pendingTransactionExpiryCheckInterval;
+    this.maxSpendableDigits = this.options.maxSpendableDigits;
 
     this.genesis = require(options.genesisPath || DEFAULT_GENESIS_PATH);
     await this.dal.init({
       genesis: this.genesis
     });
+
+    this.networkSymbol = await this.dal.getNetworkSymbol();
 
     this.startPendingTransactionExpiryLoop();
     this.startTransactionPropagationLoop();

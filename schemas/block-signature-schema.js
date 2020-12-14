@@ -1,13 +1,17 @@
-const { validateSignature, validateWalletAddress, validateBlockId } = require('./primitives');
+const {
+  validateSignature,
+  validateWalletAddress,
+  validateBlockId
+} = require('./primitives');
 
-function verifyBlockSignatureSchema(blockSignature) {
+function verifyBlockSignatureSchema(blockSignature, networkSymbol) {
   if (!blockSignature) {
     throw new Error(
       'Block signature was not specified'
     );
   }
   validateSignature(blockSignature.signature);
-  validateWalletAddress(blockSignature.signerAddress);
+  validateWalletAddress(blockSignature.signerAddress, networkSymbol);
   validateBlockId(blockSignature.blockId);
 }
 

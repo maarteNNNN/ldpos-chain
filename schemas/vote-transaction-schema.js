@@ -1,8 +1,12 @@
-function verifyVoteTransactionSchema(transaction) {
+const {
+  validateWalletAddress
+} = require('./primitives');
+
+function verifyVoteTransactionSchema(transaction, networkSymbol) {
   if (!transaction) {
     throw new Error('Vote transaction was not specified');
   }
-  // TODO 222: Verify transaction properties
+  validateWalletAddress(transaction.delegateAddress, networkSymbol);
 }
 
 module.exports = {

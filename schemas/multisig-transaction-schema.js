@@ -1,6 +1,11 @@
-const { validateWalletAddress, validateSignature, validatePublicKey } = require('./primitives');
+const {
+  validateWalletAddress,
+  validateSignature,
+  validateMultisigPublicKey,
+  validateNextMultisigPublicKey,
+} = require('./primitives');
 
-function verifyMultisigTransactionSchema(multisigTransaction, fullCheck, minRequiredSignatures) {
+function verifyMultisigTransactionSchema(multisigTransaction, fullCheck, minRequiredSignatures, networkSymbol) {
   if (!multisigTransaction) {
     throw new Error('Multisig transaction was not specified');
   }
@@ -23,10 +28,10 @@ function verifyMultisigTransactionSchema(multisigTransaction, fullCheck, minRequ
       signatureHash
     } = signaturePacket;
 
-    validatePublicKey(multisigPublicKey);
-    validatePublicKey(nextMultisigPublicKey);
+    validateMultisigPublicKey(multisigPublicKey);
+    validateNextMultisigPublicKey(nextMultisigPublicKey);
 
-    validateWalletAddress(signerAddress);
+    validateWalletAddress(signerAddress, networkSymbol);
     if (fullCheck) {
       validateSignature(signature);
     } else {

@@ -1,8 +1,12 @@
-function verifyUnvoteTransactionSchema(transaction) {
+const {
+  validateWalletAddress
+} = require('./primitives');
+
+function verifyUnvoteTransactionSchema(transaction, networkSymbol) {
   if (!transaction) {
     throw new Error('Unvote transaction was not specified');
   }
-  // TODO 222: Verify transaction properties
+  validateWalletAddress(transaction.delegateAddress, networkSymbol);
 }
 
 module.exports = {

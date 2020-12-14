@@ -1,12 +1,12 @@
 const { verifyBlockSignatureSchema } = require('./block-signature-schema');
 
-function verifyBlockSignaturesSchema(blockSignatures, minRequiredSignatures) {
+function verifyBlockSignaturesSchema(blockSignatures, minRequiredSignatures, networkSymbol) {
   if (!Array.isArray(blockSignatures)) {
     throw new Error('Block signatures must be an array');
   }
   let signerSet = new Set();
   for (let blockSignature of blockSignatures) {
-    verifyBlockSignatureSchema(blockSignature);
+    verifyBlockSignatureSchema(blockSignature, networkSymbol);
     signerSet.add(blockSignature.signerAddress);
   }
   if (signerSet.size < minRequiredSignatures) {

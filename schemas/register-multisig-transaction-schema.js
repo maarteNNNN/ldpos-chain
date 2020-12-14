@@ -1,6 +1,6 @@
 const { validateWalletAddress } = require('./primitives');
 
-function verifyRegisterMultisigTransactionSchema(transaction, minMultisigMembers, maxMultisigMembers) {
+function verifyRegisterMultisigTransactionSchema(transaction, minMultisigMembers, maxMultisigMembers, networkSymbol) {
   if (!transaction) {
     throw new Error('Register multisig transaction was not specified');
   }
@@ -29,7 +29,7 @@ function verifyRegisterMultisigTransactionSchema(transaction, minMultisigMembers
     );
   }
   for (let memberAddress of transaction.memberAddresses) {
-    validateWalletAddress(memberAddress);
+    validateWalletAddress(memberAddress, networkSymbol);
   }
 }
 

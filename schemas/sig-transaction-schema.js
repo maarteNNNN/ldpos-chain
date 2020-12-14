@@ -1,11 +1,16 @@
-const { validatePublicKey, validateSignature, validateSignatureHash } = require('./primitives');
+const {
+  validateSigPublicKey,
+  validateNextSigPublicKey,
+  validateSignature,
+  validateSignatureHash
+} = require('./primitives');
 
 function verifySigTransactionSchema(sigTransaction, fullCheck) {
   if (!sigTransaction) {
     throw new Error('Multisig transaction was not specified');
   }
-  validatePublicKey(sigTransaction.sigPublicKey);
-  validatePublicKey(sigTransaction.nextSigPublicKey);
+  validateSigPublicKey(sigTransaction.sigPublicKey);
+  validateNextSigPublicKey(sigTransaction.nextSigPublicKey);
   if (fullCheck) {
     validateSignature(sigTransaction.signature);
   } else {

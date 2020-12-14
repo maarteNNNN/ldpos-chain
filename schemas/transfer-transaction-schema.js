@@ -1,8 +1,14 @@
-function verifyTransferTransactionSchema(transaction) {
+const {
+  validateWalletAddress,
+  validateTransactionAmount
+} = require('./primitives');
+
+function verifyTransferTransactionSchema(transaction, maxSpendableDigits, networkSymbol) {
   if (!transaction) {
     throw new Error('Transfer transaction was not specified');
   }
-  // TODO 222: Verify transaction properties
+  validateWalletAddress(transaction.receiverAddress, networkSymbol);
+  validateTransactionAmount(transaction.amount, maxSpendableDigits);
 }
 
 module.exports = {
