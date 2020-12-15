@@ -448,6 +448,8 @@ module.exports = class LDPoSChainModule {
     let { signature, signatures, ...sanitizedBlock } = block;
     sanitizedBlock.signatureHash = this.sha256(signature);
 
+    // TODO 222: Also update the accounts of all the delegates who signed the block using their forging keys
+
     if (block.forgingPublicKey === forgerAccount.nextForgingPublicKey) {
       try {
         await this.dal.updateAccount(
