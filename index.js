@@ -1197,9 +1197,11 @@ module.exports = class LDPoSChainModule {
   }
 
   async startPendingTransactionExpiryLoop() {
-    this._pendingTransactionExpiryCheckIntervalId = setInterval(() => {
-      this.cleanupPendingTransactionMap(this.pendingTransactionExpiry);
-    }, this.pendingTransactionExpiryCheckInterval);
+    if (this.isActive) {
+      this._pendingTransactionExpiryCheckIntervalId = setInterval(() => {
+        this.cleanupPendingTransactionMap(this.pendingTransactionExpiry);
+      }, this.pendingTransactionExpiryCheckInterval);
+    }
   }
 
   async load(channel, options) {

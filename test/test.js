@@ -11,6 +11,7 @@ describe('Unit tests', async () => {
   let chainModule;
   let channel;
   let options;
+  let bootstrapEventTriggered;
 
   beforeEach(async () => {
     chainModule = new LDPoSChainModule({
@@ -30,6 +31,10 @@ describe('Unit tests', async () => {
       forgingPassphrase: 'clerk aware give dog reopen peasant duty cheese tobacco trouble gold angle'
     };
 
+    bootstrapEventTriggered = false;
+    channel.subscribe(`${chainModule.alias}:bootstrap`, async () => {
+      bootstrapEventTriggered = true;
+    });
     await chainModule.load(channel, options);
   });
 
@@ -40,11 +45,6 @@ describe('Unit tests', async () => {
   describe('Core methods', async () => {
 
     it('should trigger bootstrap event after launch', async () => {
-      let bootstrapEventTriggered = false;
-      channel.subscribe(`${chainModule.alias}:bootstrap`, async () => {
-        bootstrapEventTriggered = true;
-      });
-      chainModule.load(channel, options);
       await wait(200);
       assert.equal(bootstrapEventTriggered, true);
     });
