@@ -983,6 +983,10 @@ module.exports = class LDPoSChainModule {
         timePollInterval
       });
 
+      if (!this.isActive) {
+        break;
+      }
+
       let currentForgingDelegateAddress = await this.getCurrentForgingDelegateAddress();
       let isCurrentForgingDelegate = forgingWalletAddress && forgingWalletAddress === currentForgingDelegateAddress;
 
