@@ -445,29 +445,6 @@ module.exports = class LDPoSChainModule {
         }
       })
     );
-    let { signature, signatures, ...sanitizedBlock } = block;
-    sanitizedBlock.signatureHash = this.sha256(signature);
-
-    // TODO 222: Also update the accounts of all the delegates who signed the block using their forging keys
-
-    if (block.forgingPublicKey === forgerAccount.nextForgingPublicKey) {
-      try {
-        await this.dal.updateAccount(
-          forgerAccount.address,
-          {
-            forgingPublicKey: block.forgingPublicKey,
-            nextForgingPublicKey: block.nextForgingPublicKey
-          },
-          height
-        );
-      } catch (error) {
-        if (error.name === 'InvalidActionError') {
-          this.logger.warn(error);
-        } else {
-          throw error;
-        }
-      }
-    }
 
     for (let voteChange of voteChangeList) {
       try {
@@ -497,6 +474,49 @@ module.exports = class LDPoSChainModule {
         }
       }
     }
+
+    let { signature, signatures, ...sanitizedBlock } = block;
+    sanitizedBlock.signatureHash = this.sha256(signature);
+
+    if (block.forgingPublicKey === forgerAccount.nextForgingPublicKey) {
+      try {
+        await this.dal.updateAccount(
+          forgerAccount.address,
+          {
+            forgingPublicKey: block.forgingPublicKey,
+            nextForgingPublicKey: block.nextForgingPublicKey
+          },
+          height
+        );
+      } catch (error) {
+        if (error.name === 'InvalidActionError') {
+          this.logger.warn(error);
+        } else {
+          throw error;
+        }
+      }
+    }
+
+    await Promise.all(
+      signatures.map(async (blockSignature) => {
+        try {
+          await this.dal.updateAccount(
+            blockSignature.signerAddress,
+            {
+              forgingPublicKey: blockSignature.forgingPublicKey,
+              nextForgingPublicKey: blockSignature.nextForgingPublicKey
+            },
+            height
+          );
+        } catch (error) {
+          if (error.name === 'InvalidActionError') {
+            this.logger.warn(error);
+          } else {
+            throw error;
+          }
+        }
+      })
+    );
 
     await this.dal.setLatestBlockSignatures(signatures);
     await this.dal.addBlock(sanitizedBlock);
