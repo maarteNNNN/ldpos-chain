@@ -350,6 +350,7 @@ module.exports = class LDPoSChainModule {
     let forgerAccount = accounts[block.forgerAddress];
     let voteChangeList = [];
     let multisigRegistrationList = [];
+
     for (let txn of transactions) {
       let {
         type,
@@ -408,6 +409,7 @@ module.exports = class LDPoSChainModule {
         }
       }
     }
+
     await Promise.all(
       accountList.map(async (account) => {
         if (account.updateHeight < height) {
@@ -507,7 +509,7 @@ module.exports = class LDPoSChainModule {
   async verifyTransaction(transaction, fullCheck) {
     verifyTransactionSchema(transaction, this.maxSpendableDigits, this.networkSymbol);
 
-    let { type, senderAddress, amount, fee, timestamp } = transaction;
+    let { id, type, senderAddress, amount, fee, timestamp } = transaction;
 
     if (type === 'transfer') {
       verifyTransferTransactionSchema(transaction, this.maxSpendableDigits, this.networkSymbol);
@@ -570,6 +572,22 @@ module.exports = class LDPoSChainModule {
         `Transaction amount plus fee was greater than the balance of sender ${
           senderAddress
         }`
+      );
+    }
+
+    let wasTransactionAlreadyProcessed;
+    try {
+      wasTransactionAlreadyProcessed = await this.dal.hasTransaction(id);
+    } catch (error) {
+      throw new Error(
+        `Failed to check if transaction has already been processed because of error: ${
+          error.message
+        }`
+      );
+    }
+    if (wasTransactionAlreadyProcessed) {
+      throw new Error(
+        `Transaction ${id} has already been processed`
       );
     }
 
@@ -645,6 +663,12 @@ module.exports = class LDPoSChainModule {
             );
           }
         }
+      } else {
+        if (!this.ldposClient.verifyTransactionId(transaction)) {
+          throw new Error(
+            `Multisig transaction id ${id} was invalid`
+          );
+        }
       }
     } else {
       verifySigTransactionSchema(transaction, fullCheck);
@@ -659,8 +683,16 @@ module.exports = class LDPoSChainModule {
           }`
         );
       }
-      if (fullCheck && !this.ldposClient.verifyTransaction(transaction, transaction.sigPublicKey)) {
-        throw new Error('Transaction signature was invalid');
+      if (fullCheck) {
+        if (!this.ldposClient.verifyTransaction(transaction, transaction.sigPublicKey)) {
+          throw new Error('Transaction signature was invalid');
+        }
+      } else {
+        if (!this.ldposClient.verifyTransactionId(transaction)) {
+          throw new Error(
+            `Transaction id ${id} was invalid`
+          );
+        }
       }
     }
   }

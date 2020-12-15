@@ -3,6 +3,7 @@ class DAL {
     this.accounts = {};
     this.votes = {};
     this.blocks = [null];
+    this.transactions = {};
     this.multisigMembers = {};
     this.latestBlockSignatures = [];
   }
@@ -157,6 +158,21 @@ class DAL {
 
   async getLatestBlockSignatures() {
     return this.latestBlockSignatures;
+  }
+
+  async hasTransaction(transactionId) {
+    let transaction = this.transactions[transactionId];
+    return !!transaction;
+  }
+
+  async getTransaction(transactionId) {
+    let transaction = this.transactions[transactionId];
+    if (!transaction) {
+      let error = new Error(`Transaction ${transactionId} did not exist`);
+      error.name = 'InvalidActionError';
+      throw error;
+    }
+    return transaction;
   }
 
   async addBlock(block) {
