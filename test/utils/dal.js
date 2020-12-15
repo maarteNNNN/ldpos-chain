@@ -4,6 +4,7 @@ class DAL {
     this.votes = {};
     this.blocks = [null];
     this.multisigMembers = {};
+    this.latestBlockSignatures = [];
   }
 
   async init(options) {
@@ -148,6 +149,14 @@ class DAL {
 
   async getBlocksFromHeight(height, limit) {
     return this.blocks.slice(height, height + limit);
+  }
+
+  async setLatestBlockSignatures(signatures) {
+    this.latestBlockSignatures = signatures;
+  }
+
+  async getLatestBlockSignatures() {
+    return this.latestBlockSignatures;
   }
 
   async addBlock(block) {

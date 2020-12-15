@@ -494,6 +494,7 @@ module.exports = class LDPoSChainModule {
       }
     }
 
+    await this.dal.setLatestBlockSignatures(signatures);
     await this.dal.addBlock(sanitizedBlock);
 
     for (let txn of transactions) {
@@ -910,7 +911,9 @@ module.exports = class LDPoSChainModule {
         id: null
       };
     }
+    this.latestProcessedBlock.signatures = await this.dal.getLatestBlockSignatures();
     this.latestReceivedBlock = this.latestProcessedBlock;
+    this.latestFullySignedBlock = this.latestProcessedBlock;
 
     while (true) {
       if (!this.isActive) {
