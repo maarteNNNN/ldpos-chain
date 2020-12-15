@@ -218,12 +218,15 @@ module.exports = class LDPoSChainModule {
 
       let safeBlockCount = pendingBlocks.length - delegateMajorityCount;
 
-      if (!newBlocks.length && this.latestProcessedBlock.height !== 1) {
+      if (!newBlocks.length) {
+        if (latestGoodBlock.height === 1) {
+          break;
+        }
         try {
           let latestBlockSignatures = await this.channel.invoke('network:request', {
             procedure: `${this.alias}:getLatestBlockSignatures`,
             data: {
-              blockId: this.latestProcessedBlock.id
+              blockId: latestGoodBlock.id
             }
           });
           verifyBlockSignaturesResponseSchema(latestBlockSignatures, delegateMajorityCount, this.networkSymbol);
