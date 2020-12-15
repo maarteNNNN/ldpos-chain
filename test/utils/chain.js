@@ -1,5 +1,7 @@
 class LDPoSChainModule {
-  constructor() {}
+  constructor() {
+    this.receivedBlockIdSet = new Set();
+  }
 
   setNetwork(network) {
     this.network = network;
@@ -8,7 +10,10 @@ class LDPoSChainModule {
   get events() {
     return {
       block: async (block) => {
-        this.network.trigger('ldpos_chain', 'block', block);
+        if (block && block.id && !this.receivedBlockIdSet.has(block.id)) {
+          this.receivedBlockIdSet.add(block.id);
+          this.network.trigger('ldpos_chain', 'block', block);
+        }
       },
       blockSignature: async (blockSignature) => {
 
