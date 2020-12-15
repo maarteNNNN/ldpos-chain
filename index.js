@@ -808,13 +808,7 @@ module.exports = class LDPoSChainModule {
   }
 
   async signBlock(block) {
-    let signature = this.ldposClient.signBlock(block);
-    let blockSignature = {
-      blockId: block.id,
-      signerAddress: this.ldposClient.getAccountAddress(),
-      signature
-    };
-    return blockSignature;
+    return this.ldposClient.signBlock(block, true);
   }
 
   async waitUntilNextBlockTimeSlot(options) {

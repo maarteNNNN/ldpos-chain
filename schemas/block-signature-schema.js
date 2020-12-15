@@ -1,7 +1,9 @@
 const {
   validateSignature,
   validateWalletAddress,
-  validateBlockId
+  validateBlockId,
+  validateForgingPublicKey,
+  validateNextForgingPublicKey
 } = require('./primitives');
 
 function verifyBlockSignatureSchema(blockSignature, networkSymbol) {
@@ -12,6 +14,8 @@ function verifyBlockSignatureSchema(blockSignature, networkSymbol) {
   }
   validateSignature(blockSignature.signature);
   validateWalletAddress(blockSignature.signerAddress, networkSymbol);
+  validateForgingPublicKey(blockSignature.forgingPublicKey);
+  validateNextForgingPublicKey(blockSignature.nextForgingPublicKey);
   validateBlockId(blockSignature.blockId);
 }
 
