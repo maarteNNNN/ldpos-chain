@@ -653,7 +653,6 @@ module.exports = class LDPoSChainModule {
         for (let signaturePacket of transaction.signatures) {
           let {
             signerAddress,
-            signature,
             multisigPublicKey
           } = signaturePacket;
 
@@ -677,7 +676,7 @@ module.exports = class LDPoSChainModule {
               }`
             );
           }
-          if (!this.ldposClient.verifyMultisigTransactionSignature(transaction, multisigPublicKey, signature)) {
+          if (!this.ldposClient.verifyMultisigTransactionSignature(transaction, signaturePacket)) {
             throw new Error(
               `Multisig transaction signature of member ${
                 memberAccount.address
@@ -706,7 +705,7 @@ module.exports = class LDPoSChainModule {
         );
       }
       if (fullCheck) {
-        if (!this.ldposClient.verifyTransaction(transaction, transaction.sigPublicKey)) {
+        if (!this.ldposClient.verifyTransaction(transaction)) {
           throw new Error('Transaction signature was invalid');
         }
       } else {
@@ -765,7 +764,7 @@ module.exports = class LDPoSChainModule {
         }`
       );
     }
-    if (!this.ldposClient.verifyBlock(block, block.forgingPublicKey, lastBlock.id)) {
+    if (!this.ldposClient.verifyBlock(block, lastBlock.id)) {
       throw new Error(`Block ${block.id || 'without ID'} was invalid`);
     }
 
@@ -791,7 +790,7 @@ module.exports = class LDPoSChainModule {
       throw new Error('Cannot verify signature because there is no block pending');
     }
     let { signatures } = latestBlock;
-    let { signature, signerAddress, blockId } = blockSignature;
+    let { signerAddress, blockId } = blockSignature;
 
     if (signatures && signatures[signerAddress]) {
       throw new Error(
@@ -810,7 +809,36 @@ module.exports = class LDPoSChainModule {
         `Failed to fetch signer account ${signerAddress} because of error: ${error.message}`
       );
     }
-    return this.ldposClient.verifyBlockSignature(latestBlock, signature, signerAccount.forgingPublicKey);
+    
+    if (
+      blockSignature.forgingPublicKey !== signerAccount.forgingPublicKey &&
+      blockSignature.forgingPublicKey !== signerAccount.nextForgingPublicKey
+    ) {
+      throw new Error(
+        `Block signature forgingPublicKey did not match the forgingPublicKey or nextForgingPublicKey of the signer account ${
+          signerAddress
+        }`
+      );
+    }
+
+    let activeDelegates;
+    try {
+      activeDelegates = await this.dal.getTopActiveDelegates(this.delegateCount);
+    } catch (error) {
+      throw new Error(
+        `Failed to fetch top active delegates because of error: ${
+          error.message
+        }`
+      );
+    }
+
+    if (!activeDelegates.some(activeDelegates => activeDelegates.address === signerAddress)) {
+      throw new Error(
+        `Account ${signerAddress} is not a top active delegate and therefore cannot be a block signer`
+      );
+    }
+
+    return this.ldposClient.verifyBlockSignature(latestBlock, blockSignature);
   }
 
   async broadcastBlock(block) {

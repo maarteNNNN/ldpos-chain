@@ -7,13 +7,16 @@ const wait = require('./utils/wait');
 
 const LDPoSChainModule = require('../index');
 
-describe('Unit tests', async () => {
+// This test suite can be adapted to check whether or not a custom chain module is compatible with Lisk DEX.
+
+describe('DEX API tests', async () => {
   let chainModule;
   let channel;
   let options;
   let bootstrapEventTriggered;
 
   beforeEach(async () => {
+    // This boilerplate logic can be replaced with that of an alterantive chain module with different mocks.
     chainModule = new LDPoSChainModule({
       dal: new DAL()
     });
@@ -42,7 +45,7 @@ describe('Unit tests', async () => {
     await chainModule.unload();
   });
 
-  describe('Core methods', async () => {
+  describe('module state', async () => {
 
     it('should trigger bootstrap event after launch', async () => {
       await wait(200);
