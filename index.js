@@ -964,9 +964,6 @@ module.exports = class LDPoSChainModule {
     this.latestFullySignedBlock = this.latestProcessedBlock;
 
     while (true) {
-      if (!this.isActive) {
-        break;
-      }
       // If the node is already on the latest network height, it will just return it.
       this.networkHeight = await this.catchUpWithNetwork({
         forgingInterval,
