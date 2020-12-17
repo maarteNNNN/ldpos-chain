@@ -47,11 +47,6 @@ describe('DEX API tests', async () => {
 
   describe('module state', async () => {
 
-    it('should trigger bootstrap event after launch', async () => {
-      await wait(200);
-      assert.equal(bootstrapEventTriggered, true);
-    });
-
     it('should expose an info property', async () => {
       let moduleInfo = chainModule.info;
       assert.equal(!!moduleInfo.author, true);
@@ -71,91 +66,109 @@ describe('DEX API tests', async () => {
 
   });
 
-  describe('getMultisigWalletMembers action', async () => {
+  describe('module actions', async () => {
 
-    it('should expose a getMultisigWalletMembers action', async () => {
+    describe('getMultisigWalletMembers action', async () => {
+
+      it('should expose a getMultisigWalletMembers action', async () => {
+
+      });
+
+    });
+
+    describe('getMinMultisigRequiredSignatures action', async () => {
+
+      it('should expose a getMinMultisigRequiredSignatures action', async () => {
+
+      });
+
+    });
+
+    describe('getOutboundTransactions action', async () => {
+
+      it('should expose a getOutboundTransactions action', async () => {
+
+      });
+
+    });
+
+    describe('getInboundTransactionsFromBlock action', async () => {
+
+      it('should expose a getInboundTransactionsFromBlock action', async () => {
+
+      });
+
+    });
+
+    describe('getOutboundTransactionsFromBlock action', async () => {
+
+      it('should expose a getOutboundTransactionsFromBlock action', async () => {
+
+      });
+
+    });
+
+    describe('getLastBlockAtTimestamp action', async () => {
+
+      it('should expose a getLastBlockAtTimestamp action', async () => {
+
+      });
+
+    });
+
+    describe('getMaxBlockHeight action', async () => {
+
+      it('should expose a getMaxBlockHeight action', async () => {
+
+      });
+
+    });
+
+    describe('getBlocksBetweenHeights action', async () => {
+
+      it('should expose a getBlocksBetweenHeights action', async () => {
+
+      });
+
+    });
+
+    describe('getBlockAtHeight action', async () => {
+
+      it('should expose a getBlockAtHeight action', async () => {
+
+      });
+
+    });
+
+    describe('postTransaction action', async () => {
+
+      it('should expose a postTransaction action', async () => {
+
+      });
+
+    });
+
+    describe('postSignature action', async () => {
+
+      it('should expose a postSignature action', async () => {
+
+      });
 
     });
 
   });
 
-  describe('getMinMultisigRequiredSignatures action', async () => {
+  describe('module events', async () => {
 
-    it('should expose a getMinMultisigRequiredSignatures action', async () => {
-
+    it('should trigger bootstrap event after launch', async () => {
+      await wait(200);
+      assert.equal(bootstrapEventTriggered, true);
     });
-
-  });
-
-  describe('getOutboundTransactions action', async () => {
-
-    it('should expose a getOutboundTransactions action', async () => {
-
-    });
-
-  });
-
-  describe('getInboundTransactionsFromBlock action', async () => {
-
-    it('should expose a getInboundTransactionsFromBlock action', async () => {
-
-    });
-
-  });
-
-  describe('getOutboundTransactionsFromBlock action', async () => {
-
-    it('should expose a getOutboundTransactionsFromBlock action', async () => {
-
-    });
-
-  });
-
-  describe('getLastBlockAtTimestamp action', async () => {
-
-    it('should expose a getLastBlockAtTimestamp action', async () => {
-
-    });
-
-  });
-
-  describe('getMaxBlockHeight action', async () => {
-
-    it('should expose a getMaxBlockHeight action', async () => {
-
-    });
-
-  });
-
-  describe('getBlocksBetweenHeights action', async () => {
-
-    it('should expose a getBlocksBetweenHeights action', async () => {
-
-    });
-
-  });
-
-  describe('getBlockAtHeight action', async () => {
-
-    it('should expose a getBlockAtHeight action', async () => {
-
-    });
-
-  });
-
-  describe('postTransaction action', async () => {
-
-    it('should expose a postTransaction action', async () => {
-
-    });
-
-  });
-
-  describe('chainChanges event', async () => {
 
     it('should expose a chainChanges event', async () => {
 
     });
 
   });
+
 });

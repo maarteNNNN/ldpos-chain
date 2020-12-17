@@ -809,7 +809,7 @@ module.exports = class LDPoSChainModule {
         `Failed to fetch signer account ${signerAddress} because of error: ${error.message}`
       );
     }
-    
+
     if (
       blockSignature.forgingPublicKey !== signerAccount.forgingPublicKey &&
       blockSignature.forgingPublicKey !== signerAccount.nextForgingPublicKey
