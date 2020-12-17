@@ -2,6 +2,7 @@
   "accounts": [
     {
       "address": "5c75e6041a05d266914cbf3837da81e29b4a7e66b9f9f8804809e914f6012293ldpos",
+      "type": "sig",
       "forgingKeyIndex": 0,
       "forgingPublicKey": "kDV3ud1DL6FbTE5P+lXLzjmCRaNgHbzvKCxX6LPcTIU=",
       "multisigKeyIndex": 0,

@@ -32,11 +32,23 @@ class DAL {
     return 'ldpos';
   }
 
+  async upsertAccount(account, updateHeight) {
+    this.accounts[account.address] = {
+      ...account,
+      updateHeight
+    };
+  }
+
+  async hasAccount(accountAddress) {
+    return !!this.accounts[accountAddress];
+  }
+
   async getAccount(accountAddress) {
     let account = this.accounts[accountAddress];
     if (!account) {
       let error = new Error(`Account ${accountAddress} did not exist`);
-      error.name = 'InvalidActionError';
+      error.name = 'AccountDidNotExistError';
+      error.type = 'InvalidActionError';
       throw error;
     }
     return account;
@@ -46,7 +58,8 @@ class DAL {
     let account = this.accounts[accountAddress];
     if (!account) {
       let error = new Error(`Account ${accountAddress} did not exist`);
-      error.name = 'InvalidActionError';
+      error.name = 'AccountDidNotExistError';
+      error.type = 'InvalidActionError';
       throw error;
     }
     let changedKeys = Object.keys(changePacket);
@@ -56,15 +69,17 @@ class DAL {
     account.updateHeight = updateHeight;
   }
 
-  async addVote(voterAddress, delegateAddress) {
+  async upsertVote(voterAddress, delegateAddress) {
     if (!this.accounts[delegateAddress]) {
       let error = new Error(`Delegate ${delegateAddress} did not exist`);
-      error.name = 'InvalidActionError';
+      error.name = 'DelegateAccountDidNotExistError';
+      error.type = 'InvalidActionError';
       throw error;
     }
     if (!this.accounts[voterAddress]) {
       let error = new Error(`Voter ${voterAddress} did not exist`);
-      error.name = 'InvalidActionError';
+      error.name = 'VoterAccountDidNotExistError';
+      error.type = 'InvalidActionError';
       throw error;
     }
     if (!this.votes[delegateAddress]) {
@@ -76,19 +91,22 @@ class DAL {
   async removeVote(voterAddress, delegateAddress) {
     if (!this.accounts[delegateAddress]) {
       let error = new Error(`Delegate ${delegateAddress} did not exist`);
-      error.name = 'InvalidActionError';
+      error.name = 'DelegateAccountDidNotExistError';
+      error.type = 'InvalidActionError';
       throw error;
     }
     if (!this.accounts[voterAddress]) {
       let error = new Error(`Voter ${voterAddress} did not exist`);
-      error.name = 'InvalidActionError';
+      error.name = 'VoterAccountDidNotExistError';
+      error.type = 'InvalidActionError';
       throw error;
     }
     if (!this.votes[delegateAddress] || !this.votes[delegateAddress].has(voterAddress)) {
       let error = new Error(
         `Account ${voterAddress} was not voting for delegate ${delegateAddress}`
       );
-      error.name = 'InvalidActionError';
+      error.name = 'VoteDidNotExistError';
+      error.type = 'InvalidActionError';
       throw error;
     }
     this.votes[delegateAddress].delete(voterAddress);
@@ -100,22 +118,26 @@ class DAL {
       let error = new Error(
         `Account ${multisigAddress} did not exist for multisig wallet registration`
       );
-      error.name = 'InvalidActionError';
-      throw error;
-    }
-    if (this.multisigMembers[multisigAddress]) {
-      let error = new Error(
-        `Multisig address ${multisigAddress} has already been registered`
-      );
-      error.name = 'InvalidActionError';
+      error.name = 'MultisigAccountDidNotExistError';
+      error.type = 'InvalidActionError';
       throw error;
     }
     for (let memberAddress of memberAddresses) {
-      if (!this.accounts[memberAddress]) {
+      let memberAccount = this.accounts[memberAddress];
+      if (!memberAccount) {
         let error = new Error(
           `Account ${memberAddress} did not exist for multisig member registration`
         );
-        error.name = 'InvalidActionError';
+        error.name = 'MemberAccountDidNotExistError';
+        error.type = 'InvalidActionError';
+        throw error;
+      }
+      if (!memberAccount.multisigPublicKey) {
+        let error = new Error(
+          `Account ${memberAddress} was not initialized for multisig member registration`
+        );
+        error.name = 'MemberAccountWasNotInitializedError';
+        error.type = 'InvalidActionError';
         throw error;
       }
     }
@@ -130,7 +152,8 @@ class DAL {
       let error = new Error(
         `Address ${multisigAddress} is not registered as a multisig wallet`
       );
-      error.name = 'InvalidActionError';
+      error.name = 'MultisigAccountDidNotExistError';
+      error.type = 'InvalidActionError';
       throw error;
     }
     return [...memberAddresses];
@@ -153,11 +176,19 @@ class DAL {
   }
 
   async setLatestBlockSignatures(signatures) {
-    this.latestBlockSignatures = signatures;
+    this.latestBlockSignatures = signatures.map((blockSignature) => {
+      return {...blockSignature};
+    });
   }
 
   async getLatestBlockSignatures() {
     return this.latestBlockSignatures;
+  }
+
+  async upsertTransaction(transaction) {
+    this.transactions[transaction.id] = {
+      ...transaction
+    };
   }
 
   async hasTransaction(transactionId) {
@@ -169,17 +200,19 @@ class DAL {
     let transaction = this.transactions[transactionId];
     if (!transaction) {
       let error = new Error(`Transaction ${transactionId} did not exist`);
-      error.name = 'InvalidActionError';
+      error.name = 'TransactionDidNotExistError';
+      error.type = 'InvalidActionError';
       throw error;
     }
     return transaction;
   }
 
-  async addBlock(block) {
+  async upsertBlock(block) {
     this.blocks[block.height] = block;
   }
 
   async getTopActiveDelegates(delegateCount) {
+    // TODO 222: Exclude all delegates who have not yet been initialized (no multisigPublicKey on account).
     let delegateList = [];
     let delegateAddressList = Object.keys(this.votes);
     for (let delegateAddress of delegateAddressList) {

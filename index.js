@@ -9,11 +9,14 @@ const { verifyTransferTransactionSchema } = require('./schemas/transfer-transact
 const { verifyVoteTransactionSchema } = require('./schemas/vote-transaction-schema');
 const { verifyUnvoteTransactionSchema } = require('./schemas/unvote-transaction-schema');
 const { verifyRegisterMultisigTransactionSchema } = require('./schemas/register-multisig-transaction-schema');
+const { verifyInitTransactionSchema } = require('./schemas/init-transaction-schema');
 const { verifyBlockSignatureSchema } = require('./schemas/block-signature-schema');
 const { verifyMultisigTransactionSchema } = require('./schemas/multisig-transaction-schema');
 const { verifySigTransactionSchema } = require('./schemas/sig-transaction-schema');
 const { verifyBlocksResponse } = require('./schemas/blocks-response-schema');
 const { verifyBlockSignaturesResponseSchema } = require('./schemas/block-signatures-response-schema');
+
+// TODO 222: Should multisig members sign the initial registerMultisig transaction or is the signature from the multisig wallet itself the only requirement?
 
 const DEFAULT_MODULE_ALIAS = 'ldpos_chain';
 const DEFAULT_GENESIS_PATH = './genesis/mainnet/genesis.json';
@@ -35,17 +38,17 @@ const DEFAULT_PENDING_TRANSACTION_EXPIRY = 604800000; // 1 week
 const DEFAULT_PENDING_TRANSACTION_EXPIRY_CHECK_INTERVAL = 3600000; // 1 hour
 const DEFAULT_MAX_SPENDABLE_DIGITS = 25;
 
-// TODO 222: Make sure that all external data is validated with schema.
-
 const DEFAULT_MIN_TRANSACTION_FEES = {
   transfer: '1000000',
   vote: '2000000',
   unvote: '2000000',
-  registerMultisig: '5000000'
+  registerMultisig: '5000000',
+  init: '1000000'
 };
 
 const NO_PEER_LIMIT = -1;
 const ACCOUNT_TYPE_MULTISIG = 'multisig';
+const ADDRESS_BASE_LENGTH = 64;
 
 module.exports = class LDPoSChainModule {
   constructor(options) {
@@ -97,10 +100,25 @@ module.exports = class LDPoSChainModule {
         handler: async () => {}
       },
       getMultisigWalletMembers: {
-        handler: async action => {}
+        handler: async action => {
+          let { walletAddress } = action;
+          return this.dal.getMultisigMembers(walletAddress);
+        }
       },
       getMinMultisigRequiredSignatures: {
-        handler: async action => {}
+        handler: async action => {
+          let { walletAddress } = action;
+          let account = await this.dal.getAccount(walletAddress);
+          if (account.type !== 'multisig') {
+            let error = new Error(
+              `Account ${walletAddress} was not a multisig account`
+            );
+            error.name = 'AccountWasNotMultisigError';
+            error.type = 'InvalidActionError';
+            throw error;
+          }
+          return account.multisigRequiredSignatureCount;
+        }
       },
       getOutboundTransactions: {
         handler: async action => {}
@@ -325,31 +343,64 @@ module.exports = class LDPoSChainModule {
 
   async processBlock(block) {
     let { transactions, height } = block;
-    let affectedAddresses = new Set();
+    let senderAddressSet = new Set();
+    let recipientAddressSet = new Set();
+
     for (let txn of transactions) {
-      affectedAddresses.add(txn.senderAddress);
+      senderAddressSet.add(txn.senderAddress);
       if (txn.recipientAddress) {
-        affectedAddresses.add(txn.recipientAddress);
+        recipientAddressSet.add(txn.recipientAddress);
       }
       // For multisig transaction, add all signer accounts.
       if (txn.signatures) {
         for (let signaturePacket of txn.signatures) {
-          affectedAddresses.add(signaturePacket.signerAddress);
+          senderAddressSet.add(signaturePacket.signerAddress);
         }
       }
     }
-    affectedAddresses.add(block.forgerAddress);
+    let forgerAccount = await this.dal.getAccount(block.forgerAddress);
 
-    let accountList = await Promise.all(
-      [...affectedAddresses].map(address => this.dal.getAccount(address))
+    let senderAccountList = await Promise.all(
+      [...senderAddressSet].map(async (address) => this.dal.getAccount(address))
     );
-    let accounts = {};
-    for (account of accountList) {
-      accounts[account.address] = account;
+
+    let recipientAccountList = await Promise.all(
+      [...senderAddressSet].map(async (address) => {
+        let account;
+        try {
+          account = await this.dal.getAccount(address);
+        } catch (error) {
+          if (error.name === 'AccountDidNotExistError') {
+            return {
+              address,
+              type: 'sig',
+              balance: 0n
+            };
+          } else {
+            throw new Error(
+              `Failed to fetch recipient account during block processing because of error: ${
+                error.message
+              }`
+            );
+          }
+        }
+        return account;
+      })
+    );
+
+    let senderAccounts = {};
+    for (account of senderAccountList) {
+      senderAccounts[account.address] = account;
     }
-    let forgerAccount = accounts[block.forgerAddress];
+
+    let recipientAccounts = {};
+    for (account of recipientAccountList) {
+      recipientAccounts[account.address] = account;
+    }
+
     let voteChangeList = [];
     let multisigRegistrationList = [];
+    let initList = [];
 
     for (let txn of transactions) {
       let {
@@ -361,11 +412,11 @@ module.exports = class LDPoSChainModule {
         sigPublicKey,
         nextSigPublicKey
       } = txn;
-      let senderAccount = accounts[senderAddress];
+      let senderAccount = senderAccounts[senderAddress];
 
       if (signatures) {
         for (let signaturePacket of signatures) {
-          let memberAccount = accounts[signaturePacket.signerAddress];
+          let memberAccount = senderAccounts[signaturePacket.signerAddress];
           memberAccount.multisigPublicKey = signaturePacket.multisigPublicKey;
           memberAccount.nextMultisigPublicKey = signaturePacket.nextMultisigPublicKey;
         }
@@ -379,18 +430,18 @@ module.exports = class LDPoSChainModule {
         let { recipientAddress, amount } = txn;
         let txnAmount = BigInt(amount);
         let txnFee = BigInt(fee);
-        let recipientAccount = accounts[recipientAddress];
-        if (senderAccount.updateHeight < height) {
+        let recipientAccount = recipientAccounts[recipientAddress];
+        if (!senderAccount.updateHeight || senderAccount.updateHeight < height) {
           senderAccount.balance = senderAccount.balance - txnAmount - txnFee;
           senderAccount.lastTransactionTimestamp = timestamp;
         }
-        if (recipientAccount.updateHeight < height) {
+        if (!recipientAccount.updateHeight || recipientAccount.updateHeight < height) {
           recipientAccount.balance = recipientAccount.balance + txnAmount;
           recipientAccount.lastTransactionTimestamp = timestamp;
         }
       } else {
         let txnFee = BigInt(fee);
-        if (senderAccount.updateHeight < height) {
+        if (!senderAccount.updateHeight || senderAccount.updateHeight < height) {
           senderAccount.balance = senderAccount.balance - txnFee;
           senderAccount.lastTransactionTimestamp = timestamp;
         }
@@ -399,6 +450,18 @@ module.exports = class LDPoSChainModule {
             type,
             voterAddress: senderAddress,
             delegateAddress: txn.delegateAddress
+          });
+        } else if (type === 'init') {
+          initList.push({
+            accountAddress: senderAddress,
+            keys: {
+              sigPublicKey: txn.sigPublicKey,
+              nextSigPublicKey: txn.nextSigPublicKey,
+              multisigPublicKey: txn.multisigPublicKey,
+              nextMultisigPublicKey: txn.nextMultisigPublicKey,
+              forgingPublicKey: txn.forgingPublicKey,
+              nextForgingPublicKey: txn.nextForgingPublicKey
+            }
           });
         } else if (type === 'registerMultisig') {
           multisigRegistrationList.push({
@@ -411,8 +474,8 @@ module.exports = class LDPoSChainModule {
     }
 
     await Promise.all(
-      accountList.map(async (account) => {
-        if (account.updateHeight < height) {
+      senderAccountList.map(async (account) => {
+        if (!account.updateHeight || account.updateHeight < height) {
           let accountUpdatePacket;
           if (account.type === ACCOUNT_TYPE_MULTISIG) {
             accountUpdatePacket = {
@@ -436,7 +499,30 @@ module.exports = class LDPoSChainModule {
               height
             );
           } catch (error) {
-            if (error.name === 'InvalidActionError') {
+            if (error.type === 'InvalidActionError') {
+              this.logger.warn(error);
+            } else {
+              throw error;
+            }
+          }
+        }
+      })
+    );
+
+    await Promise.all(
+      recipientAccountList.map(async (account) => {
+        if (!account.updateHeight || account.updateHeight < height) {
+          let accountUpdatePacket = {
+            balance: account.balance
+          };
+          try {
+            await this.dal.updateAccount(
+              account.address,
+              accountUpdatePacket,
+              height
+            );
+          } catch (error) {
+            if (error.type === 'InvalidActionError') {
               this.logger.warn(error);
             } else {
               throw error;
@@ -449,12 +535,12 @@ module.exports = class LDPoSChainModule {
     for (let voteChange of voteChangeList) {
       try {
         if (voteChange.type === 'vote') {
-          await this.dal.addVote(voteChange.voterAddress, voteChange.delegateAddress);
+          await this.dal.upsertVote(voteChange.voterAddress, voteChange.delegateAddress);
         } else if (voteChange.type === 'unvote') {
           await this.dal.removeVote(voteChange.voterAddress, voteChange.delegateAddress);
         }
       } catch (error) {
-        if (error.name === 'InvalidActionError') {
+        if (error.type === 'InvalidActionError') {
           this.logger.warn(error);
         } else {
           throw error;
@@ -467,7 +553,25 @@ module.exports = class LDPoSChainModule {
       try {
         await this.dal.registerMultisig(multisigAddress, memberAddresses, requiredSignatureCount);
       } catch (error) {
-        if (error.name === 'InvalidActionError') {
+        if (error.type === 'InvalidActionError') {
+          this.logger.warn(error);
+        } else {
+          throw error;
+        }
+      }
+    }
+
+    for (let init of initList) {
+      try {
+        await this.dal.updateAccount(
+          init.accountAddress,
+          {
+            ...init.keys
+          },
+          height
+        );
+      } catch (error) {
+        if (error.type === 'InvalidActionError') {
           this.logger.warn(error);
         } else {
           throw error;
@@ -489,7 +593,7 @@ module.exports = class LDPoSChainModule {
           height
         );
       } catch (error) {
-        if (error.name === 'InvalidActionError') {
+        if (error.type === 'InvalidActionError') {
           this.logger.warn(error);
         } else {
           throw error;
@@ -509,7 +613,7 @@ module.exports = class LDPoSChainModule {
             height
           );
         } catch (error) {
-          if (error.name === 'InvalidActionError') {
+          if (error.type === 'InvalidActionError') {
             this.logger.warn(error);
           } else {
             throw error;
@@ -518,8 +622,12 @@ module.exports = class LDPoSChainModule {
       })
     );
 
+    await Promise.all(
+      transactions.map(async (txn) => this.dal.upsertTransaction(txn))
+    );
+
     await this.dal.setLatestBlockSignatures(signatures);
-    await this.dal.addBlock(sanitizedBlock);
+    await this.dal.upsertBlock(sanitizedBlock);
 
     for (let txn of transactions) {
       this.pendingTransactionMap.delete(txn.id);
@@ -546,6 +654,8 @@ module.exports = class LDPoSChainModule {
         this.maxMultisigMembers,
         this.networkSymbol
       );
+    } else if (type === 'init') {
+      verifyInitTransactionSchema(transaction, fullCheck);
     } else {
       throw new Error(
         `Transaction type ${type} was invalid`
@@ -581,22 +691,7 @@ module.exports = class LDPoSChainModule {
       );
     }
 
-    if (timestamp < senderAccount.lastTransactionTimestamp) {
-      throw new Error(
-        `Transaction was older than the last transaction processed from the sender ${
-          senderAddress
-        }`
-      );
-    }
-
-    if (txnTotal > senderAccount.balance) {
-      throw new Error(
-        `Transaction amount plus fee was greater than the balance of sender ${
-          senderAddress
-        }`
-      );
-    }
-
+    // TODO 2222: What if the last block processing failed part-way through and some transactions were processed but not others?
     let wasTransactionAlreadyProcessed;
     try {
       wasTransactionAlreadyProcessed = await this.dal.hasTransaction(id);
@@ -610,6 +705,22 @@ module.exports = class LDPoSChainModule {
     if (wasTransactionAlreadyProcessed) {
       throw new Error(
         `Transaction ${id} has already been processed`
+      );
+    }
+
+    if (timestamp < senderAccount.lastTransactionTimestamp) {
+      throw new Error(
+        `Transaction was older than the last transaction processed from the sender ${
+          senderAddress
+        }`
+      );
+    }
+
+    if (txnTotal > senderAccount.balance) {
+      throw new Error(
+        `Transaction amount plus fee was greater than the balance of sender ${
+          senderAddress
+        }`
       );
     }
 
@@ -658,7 +769,7 @@ module.exports = class LDPoSChainModule {
 
           if (!multisigMemberAccounts[signerAddress]) {
             throw new Error(
-              `The signer with address ${
+              `Signer with address ${
                 signerAddress
               } was not a member of multisig wallet ${
                 senderAccount.address
@@ -666,12 +777,17 @@ module.exports = class LDPoSChainModule {
             );
           }
           let memberAccount = multisigMemberAccounts[signerAddress];
+          if (!memberAccount.multisigPublicKey) {
+            throw new Error(
+              `Multisig member account ${memberAccount.address} was not initialized so their signature could not be verified`
+            );
+          }
           if (
             multisigPublicKey !== memberAccount.multisigPublicKey &&
             multisigPublicKey !== memberAccount.nextMultisigPublicKey
           ) {
             throw new Error(
-              `Transaction multisigPublicKey did not match the multisigPublicKey or nextMultisigPublicKey of account ${
+              `Transaction multisigPublicKey did not match the multisigPublicKey or nextMultisigPublicKey of member ${
                 memberAccount.address
               }`
             );
@@ -694,8 +810,19 @@ module.exports = class LDPoSChainModule {
     } else {
       verifySigTransactionSchema(transaction, fullCheck);
 
+      let senderSigPublicKey;
+      if (senderAccount.sigPublicKey) {
+        senderSigPublicKey = senderAccount.sigPublicKey;
+      } else {
+        // If the account does not yet have a sigPublicKey, derive it from the address.
+        senderSigPublicKey = Buffer.from(
+          senderAccount.address.slice(0, ADDRESS_BASE_LENGTH),
+          'hex'
+        ).toString('base64');
+      }
+
       if (
-        transaction.sigPublicKey !== senderAccount.sigPublicKey &&
+        transaction.sigPublicKey !== senderSigPublicKey &&
         transaction.sigPublicKey !== senderAccount.nextSigPublicKey
       ) {
         throw new Error(
