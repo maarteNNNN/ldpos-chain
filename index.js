@@ -623,7 +623,12 @@ module.exports = class LDPoSChainModule {
     );
 
     await Promise.all(
-      transactions.map(async (txn) => this.dal.upsertTransaction(txn))
+      transactions.map(async (txn) => {
+        return this.dal.upsertTransaction({
+          ...txn,
+          blockId: block.id
+        });
+      })
     );
 
     await this.dal.setLatestBlockSignatures(signatures);
@@ -691,21 +696,22 @@ module.exports = class LDPoSChainModule {
       );
     }
 
-    // TODO 2222: What if the last block processing failed part-way through and some transactions were processed but not others?
-    let wasTransactionAlreadyProcessed;
-    try {
-      wasTransactionAlreadyProcessed = await this.dal.hasTransaction(id);
-    } catch (error) {
-      throw new Error(
-        `Failed to check if transaction has already been processed because of error: ${
-          error.message
-        }`
-      );
-    }
-    if (wasTransactionAlreadyProcessed) {
-      throw new Error(
-        `Transaction ${id} has already been processed`
-      );
+    if (fullCheck) {
+      let wasTransactionAlreadyProcessed;
+      try {
+        wasTransactionAlreadyProcessed = await this.dal.hasTransaction(id);
+      } catch (error) {
+        throw new Error(
+          `Failed to check if transaction has already been processed because of error: ${
+            error.message
+          }`
+        );
+      }
+      if (wasTransactionAlreadyProcessed) {
+        throw new Error(
+          `Transaction ${id} has already been processed`
+        );
+      }
     }
 
     if (timestamp < senderAccount.lastTransactionTimestamp) {
@@ -892,18 +898,34 @@ module.exports = class LDPoSChainModule {
       );
     }
     if (!this.ldposClient.verifyBlock(block, lastBlock.id)) {
-      throw new Error(`Block ${block.id || 'without ID'} was invalid`);
+      throw new Error(`Block was invalid`);
     }
 
     try {
       for (let transaction of block.transactions) {
-        await this.verifyTransaction(transaction, false);
+        let existingTransaction;
+        try {
+          existingTransaction = await this.dal.getTransaction(transaction.id);
+        } catch (error) {
+          if (error.type !== 'InvalidActionError') {
+            throw new Error(
+              `Failed to check if a previous transaction already exited`
+            );
+          }
+        }
+        if (existingTransaction) {
+          if (existingTransaction.blockId !== block.id) {
+            throw new Error(
+              `Block contained a transaction which was already processed as part of an earlier block`
+            );
+          }
+        } else {
+          await this.verifyTransaction(transaction, false);
+        }
       }
     } catch (error) {
       throw new Error(
-        `Failed to validate transactions in block ${
-          block.id || 'without ID'
-        } because of error: ${
+        `Failed to validate transactions in block because of error: ${
           error.message
         }`
       );

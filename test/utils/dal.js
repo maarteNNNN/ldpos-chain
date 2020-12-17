@@ -70,9 +70,18 @@ class DAL {
   }
 
   async upsertVote(voterAddress, delegateAddress) {
-    if (!this.accounts[delegateAddress]) {
+    let delegateAccount = this.accounts[delegateAddress];
+    if (!delegateAccount) {
       let error = new Error(`Delegate ${delegateAddress} did not exist`);
       error.name = 'DelegateAccountDidNotExistError';
+      error.type = 'InvalidActionError';
+      throw error;
+    }
+    if (!delegateAccount.forgingPublicKey) {
+      let error = new Error(
+        `Delegate account ${delegateAddress} was not initialized and so it cannot receive votes`
+      );
+      error.name = 'DelegateAccountWasNotInitializedError';
       error.type = 'InvalidActionError';
       throw error;
     }
@@ -212,7 +221,6 @@ class DAL {
   }
 
   async getTopActiveDelegates(delegateCount) {
-    // TODO 222: Exclude all delegates who have not yet been initialized (no multisigPublicKey on account).
     let delegateList = [];
     let delegateAddressList = Object.keys(this.votes);
     for (let delegateAddress of delegateAddressList) {
