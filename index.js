@@ -37,6 +37,7 @@ const DEFAULT_MAX_MULTISIG_MEMBERS = 20;
 const DEFAULT_PENDING_TRANSACTION_EXPIRY = 604800000; // 1 week
 const DEFAULT_PENDING_TRANSACTION_EXPIRY_CHECK_INTERVAL = 3600000; // 1 hour
 const DEFAULT_MAX_SPENDABLE_DIGITS = 25;
+const DEFAULT_MAX_VOTES_PER_ACCOUNT = 21;
 
 const DEFAULT_MIN_TRANSACTION_FEES = {
   transfer: '1000000',
@@ -768,7 +769,9 @@ module.exports = class LDPoSChainModule {
         let memberAccount = multisigMemberAccounts[signerAddress];
         if (!memberAccount.multisigPublicKey) {
           throw new Error(
-            `Multisig member account ${memberAccount.address} was not initialized so they cannot be part of a multisig account`
+            `Multisig member account ${
+              memberAccount.address
+            } was not initialized so they cannot sign multisig transactions`
           );
         }
         if (
@@ -820,7 +823,7 @@ module.exports = class LDPoSChainModule {
   }
 
   async verifyVoteTransaction(transaction) {
-    let { delegateAddress } = transaction;
+    let { senderAddress, delegateAddress } = transaction;
     let delegateAccount;
     try {
       delegateAccount = await this.dal.getAccount(delegateAddress);
@@ -838,6 +841,28 @@ module.exports = class LDPoSChainModule {
     if (!delegateAccount.forgingPublicKey) {
       throw new Error(
         `Delegate account was not initialized so it could not be voted for`
+      );
+    }
+
+    let votes = await this.dal.getAccountVotes(senderAddress);
+    let voteSet = new Set(votes);
+
+    if (voteSet.size > this.maxVotesPerAccount) {
+      throw new Error(
+        `Voter account ${
+          senderAddress
+        } has already voted for ${
+          voteSet.size
+        } delegates so it cannot vote for any more`
+      );
+    }
+    if (voteSet.has(delegateAddress)) {
+      throw new Error(
+        `Voter account ${
+          senderAddress
+        } has already voted for the delegate ${
+          delegateAddress
+        }`
       );
     }
   }
@@ -877,6 +902,41 @@ module.exports = class LDPoSChainModule {
     }
   }
 
+  async verifyRegisterMultisigTransaction(transaction) {
+    let { memberAddresses } = transaction;
+    await Promise.all(
+      memberAddresses.map(
+        async (memberAddress) => {
+          let memberAccount;
+          try {
+            memberAccount = await this.dal.getAccount(memberAddress);
+          } catch (error) {
+            if (error.name === 'AccountDidNotExistError') {
+              throw new Error(
+                `Account ${
+                  memberAddress
+                } did not exist so it could not be a member of a multisig account`
+              );
+            } else {
+              throw new Error(
+                `Failed to fetch account ${
+                  memberAddress
+                } to verify that it qualified to be a member of a multisig account`
+              );
+            }
+          }
+          if (!memberAccount.multisigPublicKey) {
+            throw new Error(
+              `Account ${
+                memberAddress
+              } has not been initialized so it could not be a member of a multisig account`
+            );
+          }
+        }
+      )
+    );
+  }
+
   async verifyAccountCanMakeTransaction(transaction, fullCheck) {
     let { type, senderAddress } = transaction;
 
@@ -901,6 +961,8 @@ module.exports = class LDPoSChainModule {
       await this.verifyVoteTransaction(transaction);
     } else if (type === 'unvote') {
       await this.verifyUnvoteTransaction(transaction);
+    } else if (type === 'registerMultisig') {
+      await this.verifyRegisterMultisigTransaction(transaction);
     }
 
     if (senderAccount.type === ACCOUNT_TYPE_MULTISIG) {
@@ -1546,7 +1608,8 @@ module.exports = class LDPoSChainModule {
       maxMultisigMembers: DEFAULT_MAX_MULTISIG_MEMBERS,
       pendingTransactionExpiry: DEFAULT_PENDING_TRANSACTION_EXPIRY,
       pendingTransactionExpiryCheckInterval: DEFAULT_PENDING_TRANSACTION_EXPIRY_CHECK_INTERVAL,
-      maxSpendableDigits: DEFAULT_MAX_SPENDABLE_DIGITS
+      maxSpendableDigits: DEFAULT_MAX_SPENDABLE_DIGITS,
+      maxVotesPerAccount: DEFAULT_MAX_VOTES_PER_ACCOUNT
     };
     this.options = {...defaultOptions, ...options};
 
@@ -1565,6 +1628,7 @@ module.exports = class LDPoSChainModule {
     this.pendingTransactionExpiry = this.options.pendingTransactionExpiry;
     this.pendingTransactionExpiryCheckInterval = this.options.pendingTransactionExpiryCheckInterval;
     this.maxSpendableDigits = this.options.maxSpendableDigits;
+    this.maxVotesPerAccount = this.options.maxVotesPerAccount;
 
     this.genesis = require(options.genesisPath || DEFAULT_GENESIS_PATH);
     await this.dal.init({
