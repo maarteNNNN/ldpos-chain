@@ -73,55 +73,58 @@ describe('DEX API tests', async () => {
   describe('module actions', async () => {
 
     let memberAddessList;
-    let memberAccounts = [
-      // Passphrase: birth select quiz process bid raccoon memory village snow cable agent bean
-      {
-        address: '69876bf9db624560b40c40368d762ad0b35d010820e0edfe40d0380ead464d5aldpos',
-        forgingKeyIndex: 0,
-        forgingPublicKey: 'B8qadp7ACj2vjlkgHPxdZokgRGhQgOBiBbw3PixiDG4=',
-        multisigKeyIndex: 0,
-        multisigPublicKey: '8Qmoim5x5GiLDeNNjX48bId/NSgUz0WIt5cf+DeMBJ0=',
-        sigKeyIndex: 0,
-        sigPublicKey: 'aYdr+dtiRWC0DEA2jXYq0LNdAQgg4O3+QNA4Dq1GTVo=',
-        balance: 10000000000n
-      },
-      // Passphrase: genius shoulder into daring armor proof cycle bench patrol paper grant picture
-      {
-        address: '1072f65df680b2767f55a6bcd505b68d90d227d6d8b2d340fe97aaa016ab6dd7ldpos',
-        forgingKeyIndex: 0,
-        forgingPublicKey: 'BD849jw/q+a4iNCx/9S/dcTFwzCd8M6bGxGqzSvydKU=',
-        multisigKeyIndex: 0,
-        multisigPublicKey: 'fcPqQCjP5JiErw49QKWWRXtXDKgVRUIJzQgqC3n2co4=',
-        sigKeyIndex: 0,
-        sigPublicKey: 'EHL2XfaAsnZ/Vaa81QW2jZDSJ9bYstNA/peqoBarbdc=',
-        balance: 20000000000n
-      },
-      // Passphrase: emotion belt burden flash vital neglect old census dress kid ocean warfare
-      {
-        address: '484a487b1c12b8f46dfe9f15e7fe79ceb88d2c3f76ba39680ae5279a04e7e842ldpos',
-        forgingKeyIndex: 0,
-        forgingPublicKey: 'hkMI/VZcN7e5zGDRgXiJFdUEXVmaNAv9DMXUXzusc7Q=',
-        multisigKeyIndex: 0,
-        multisigPublicKey: 'Vfh2TLCRB0ZngEDTVgfU0/FJ5+4BiR36M+uk47IO+oE=',
-        sigKeyIndex: 0,
-        sigPublicKey: 'SEpIexwSuPRt/p8V5/55zriNLD92ujloCuUnmgTn6EI=',
-        balance: 30000000000n
-      }
-    ];
-
-    // Passphrase: panic test motion image soldier cloth script spice trigger magnet accident add
-    let multisigAccount = {
-      address: 'f1515e20713e5eb02dcfac71a1b5f6b426ffd9c080097c9d9ac6bbcc392c4fbfldpos',
-      forgingKeyIndex: 0,
-      forgingPublicKey: 'yEEktni3Otjqo0CRZ190fPTQvPZ7ad7aa2H2bPI6viM=',
-      multisigKeyIndex: 0,
-      multisigPublicKey: 'Ciq+Jx/kCYjxKvGcqiJPuBDFQpbkuqcplszbdOUkXNk=',
-      sigKeyIndex: 0,
-      sigPublicKey: '8VFeIHE+XrAtz6xxobX2tCb/2cCACXydmsa7zDksT78=',
-      balance: 100000000000n
-    };
+    let memberAccounts = [];
+    let multisigAccount;
 
     beforeEach(async () => {
+      // Passphrase: panic test motion image soldier cloth script spice trigger magnet accident add
+      multisigAccount = {
+        address: 'f1515e20713e5eb02dcfac71a1b5f6b426ffd9c080097c9d9ac6bbcc392c4fbfldpos',
+        forgingKeyIndex: 0,
+        forgingPublicKey: 'yEEktni3Otjqo0CRZ190fPTQvPZ7ad7aa2H2bPI6viM=',
+        multisigKeyIndex: 0,
+        multisigPublicKey: 'Ciq+Jx/kCYjxKvGcqiJPuBDFQpbkuqcplszbdOUkXNk=',
+        sigKeyIndex: 0,
+        sigPublicKey: '8VFeIHE+XrAtz6xxobX2tCb/2cCACXydmsa7zDksT78=',
+        balance: 100000000000n
+      };
+
+      memberAccounts = [
+        // Passphrase: birth select quiz process bid raccoon memory village snow cable agent bean
+        {
+          address: '69876bf9db624560b40c40368d762ad0b35d010820e0edfe40d0380ead464d5aldpos',
+          forgingKeyIndex: 0,
+          forgingPublicKey: 'B8qadp7ACj2vjlkgHPxdZokgRGhQgOBiBbw3PixiDG4=',
+          multisigKeyIndex: 0,
+          multisigPublicKey: '8Qmoim5x5GiLDeNNjX48bId/NSgUz0WIt5cf+DeMBJ0=',
+          sigKeyIndex: 0,
+          sigPublicKey: 'aYdr+dtiRWC0DEA2jXYq0LNdAQgg4O3+QNA4Dq1GTVo=',
+          balance: 10000000000n
+        },
+        // Passphrase: genius shoulder into daring armor proof cycle bench patrol paper grant picture
+        {
+          address: '1072f65df680b2767f55a6bcd505b68d90d227d6d8b2d340fe97aaa016ab6dd7ldpos',
+          forgingKeyIndex: 0,
+          forgingPublicKey: 'BD849jw/q+a4iNCx/9S/dcTFwzCd8M6bGxGqzSvydKU=',
+          multisigKeyIndex: 0,
+          multisigPublicKey: 'fcPqQCjP5JiErw49QKWWRXtXDKgVRUIJzQgqC3n2co4=',
+          sigKeyIndex: 0,
+          sigPublicKey: 'EHL2XfaAsnZ/Vaa81QW2jZDSJ9bYstNA/peqoBarbdc=',
+          balance: 20000000000n
+        },
+        // Passphrase: emotion belt burden flash vital neglect old census dress kid ocean warfare
+        {
+          address: '484a487b1c12b8f46dfe9f15e7fe79ceb88d2c3f76ba39680ae5279a04e7e842ldpos',
+          forgingKeyIndex: 0,
+          forgingPublicKey: 'hkMI/VZcN7e5zGDRgXiJFdUEXVmaNAv9DMXUXzusc7Q=',
+          multisigKeyIndex: 0,
+          multisigPublicKey: 'Vfh2TLCRB0ZngEDTVgfU0/FJ5+4BiR36M+uk47IO+oE=',
+          sigKeyIndex: 0,
+          sigPublicKey: 'SEpIexwSuPRt/p8V5/55zriNLD92ujloCuUnmgTn6EI=',
+          balance: 30000000000n
+        }
+      ];
+
       memberAddessList = memberAccounts.map(account => account.address);
       for (let account of memberAccounts) {
         await dal.upsertAccount(account);

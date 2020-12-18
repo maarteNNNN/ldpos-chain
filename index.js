@@ -801,7 +801,7 @@ module.exports = class LDPoSChainModule {
     }
   }
 
-  async verifyAccountCanMakeGeneralTransaction(senderAccount, transaction) {
+  async verifyAccountCanMakeGenericTransaction(senderAccount, transaction) {
     let { senderAddress, amount, fee, timestamp } = transaction;
 
     if (timestamp < senderAccount.lastTransactionTimestamp) {
@@ -955,7 +955,7 @@ module.exports = class LDPoSChainModule {
       }
     }
 
-    await this.verifyAccountCanMakeGeneralTransaction(senderAccount, transaction);
+    await this.verifyAccountCanMakeGenericTransaction(senderAccount, transaction);
 
     if (type === 'vote') {
       await this.verifyVoteTransaction(transaction);
