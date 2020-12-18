@@ -48,7 +48,6 @@ const DEFAULT_MIN_TRANSACTION_FEES = {
 
 const NO_PEER_LIMIT = -1;
 const ACCOUNT_TYPE_MULTISIG = 'multisig';
-const ADDRESS_BASE_LENGTH = 64;
 
 module.exports = class LDPoSChainModule {
   constructor(options) {
@@ -641,10 +640,280 @@ module.exports = class LDPoSChainModule {
     this.latestProcessedBlock = block;
   }
 
+  async verifyTransactionDoesNotAlreadyExist(transaction) {
+    let { id } = transaction;
+    let wasTransactionAlreadyProcessed;
+    try {
+      wasTransactionAlreadyProcessed = await this.dal.hasTransaction(id);
+    } catch (error) {
+      throw new Error(
+        `Failed to check if transaction has already been processed because of error: ${
+          error.message
+        }`
+      );
+    }
+    if (wasTransactionAlreadyProcessed) {
+      throw new Error(
+        `Transaction ${id} has already been processed`
+      );
+    }
+  }
+
+  verifyTransactionOffersMinFee(transaction) {
+    let { type, fee } = transaction;
+    let txnFee = BigInt(fee);
+    let minFee = this.minTransactionFees[type] || 0n;
+
+    if (txnFee < minFee) {
+      throw new Error(
+        `Transaction fee ${
+          txnFee
+        } was below the minimum fee of ${
+          minFee
+        } for transactions of type ${
+          type
+        }`
+      );
+    }
+  }
+
+  async verifySigAccountCanMakeTransaction(senderAccount, transaction, fullCheck) {
+    verifySigTransactionSchema(transaction, fullCheck);
+
+    let senderSigPublicKey;
+    if (senderAccount.sigPublicKey) {
+      senderSigPublicKey = senderAccount.sigPublicKey;
+    } else {
+      // If the account does not yet have a sigPublicKey, derive it from the address.
+      senderSigPublicKey = Buffer.from(
+        senderAccount.address.slice(0, 64),
+        'hex'
+      ).toString('base64');
+    }
+
+    if (
+      transaction.sigPublicKey !== senderSigPublicKey &&
+      transaction.sigPublicKey !== senderAccount.nextSigPublicKey
+    ) {
+      throw new Error(
+        `Transaction sigPublicKey did not match the sigPublicKey or nextSigPublicKey of account ${
+          senderAccount.address
+        }`
+      );
+    }
+    if (fullCheck) {
+      if (!this.ldposClient.verifyTransaction(transaction)) {
+        throw new Error('Transaction signature was invalid');
+      }
+    } else {
+      if (!this.ldposClient.verifyTransactionId(transaction)) {
+        throw new Error(
+          `Transaction id ${transaction.id} was invalid`
+        );
+      }
+    }
+  }
+
+  async verifyMultisigAccountCanMakeTransaction(senderAccount, transaction, fullCheck) {
+    let { senderAddress } = transaction;
+    verifyMultisigTransactionSchema(
+      transaction,
+      fullCheck,
+      senderAccount.multisigRequiredSignatureCount,
+      this.networkSymbol
+    );
+
+    let multisigMemberAddresses;
+    try {
+      multisigMemberAddresses = await this.dal.getMultisigMembers(senderAddress);
+    } catch (error) {
+      throw new Error(
+        `Failed to fetch member addresses for multisig wallet ${
+          senderAddress
+        } because of error: ${error.message}`
+      );
+    }
+
+    let multisigMemberAccounts = {};
+    try {
+      let multisigMemberAccountList = await Promise.all(
+        multisigMemberAddresses.map(memberAddress => this.dal.getAccount(memberAddress))
+      );
+      for (let memberAccount of multisigMemberAccountList) {
+        multisigMemberAccounts[memberAccount.address] = memberAccount;
+      }
+    } catch (error) {
+      throw new Error(
+        `Failed to fetch member accounts for multisig wallet ${
+          senderAddress
+        } because of error: ${error.message}`
+      );
+    }
+    if (fullCheck) {
+      for (let signaturePacket of transaction.signatures) {
+        let {
+          signerAddress,
+          multisigPublicKey
+        } = signaturePacket;
+
+        if (!multisigMemberAccounts[signerAddress]) {
+          throw new Error(
+            `Signer with address ${
+              signerAddress
+            } was not a member of multisig wallet ${
+              senderAccount.address
+            }`
+          );
+        }
+        let memberAccount = multisigMemberAccounts[signerAddress];
+        if (!memberAccount.multisigPublicKey) {
+          throw new Error(
+            `Multisig member account ${memberAccount.address} was not initialized so they cannot be part of a multisig account`
+          );
+        }
+        if (
+          multisigPublicKey !== memberAccount.multisigPublicKey &&
+          multisigPublicKey !== memberAccount.nextMultisigPublicKey
+        ) {
+          throw new Error(
+            `Transaction multisigPublicKey did not match the multisigPublicKey or nextMultisigPublicKey of member ${
+              memberAccount.address
+            }`
+          );
+        }
+        if (!this.ldposClient.verifyMultisigTransactionSignature(transaction, signaturePacket)) {
+          throw new Error(
+            `Multisig transaction signature of member ${
+              memberAccount.address
+            } was invalid`
+          );
+        }
+      }
+    } else {
+      if (!this.ldposClient.verifyTransactionId(transaction)) {
+        throw new Error(
+          `Multisig transaction id ${transaction.id} was invalid`
+        );
+      }
+    }
+  }
+
+  async verifyAccountCanMakeGeneralTransaction(senderAccount, transaction) {
+    let { senderAddress, amount, fee, timestamp } = transaction;
+
+    if (timestamp < senderAccount.lastTransactionTimestamp) {
+      throw new Error(
+        `Transaction was older than the last transaction processed from the sender ${
+          senderAddress
+        }`
+      );
+    }
+
+    let txnTotal = BigInt(amount || 0) + BigInt(fee || 0);
+    if (txnTotal > senderAccount.balance) {
+      throw new Error(
+        `Transaction amount plus fee was greater than the balance of sender ${
+          senderAddress
+        }`
+      );
+    }
+  }
+
+  async verifyVoteTransaction(transaction) {
+    let { delegateAddress } = transaction;
+    let delegateAccount;
+    try {
+      delegateAccount = await this.dal.getAccount(delegateAddress);
+    } catch (error) {
+      if (error.name === 'AccountDidNotExistError') {
+        throw new Error(
+          `Delegate account ${delegateAddress} did not exist to vote for`
+        );
+      } else {
+        throw new Error(
+          `Failed to fetch delegate account ${delegateAddress} for voting because of error: ${error.message}`
+        );
+      }
+    }
+    if (!delegateAccount.forgingPublicKey) {
+      throw new Error(
+        `Delegate account was not initialized so it could not be voted for`
+      );
+    }
+  }
+
+  async verifyUnvoteTransaction(transaction) {
+    let { senderAddress, delegateAddress } = transaction;
+    let delegateAccount;
+    try {
+      delegateAccount = await this.dal.getAccount(delegateAddress);
+    } catch (error) {
+      if (error.name === 'AccountDidNotExistError') {
+        throw new Error(
+          `Delegate account ${delegateAddress} did not exist to unvote`
+        );
+      } else {
+        throw new Error(
+          `Failed to fetch delegate account ${delegateAddress} for unvoting because of error: ${error.message}`
+        );
+      }
+    }
+    let voteExists;
+    try {
+      voteExists = await this.dal.hasVote(senderAddress, delegateAddress);
+    } catch (error) {
+      throw new Error(
+        `Failed to fetch vote from ${senderAddress} for unvoting because of error: ${error.message}`
+      );
+    }
+    if (!voteExists) {
+      throw new Error(
+        `Unvote transaction cannot remove vote which does not exist from voter ${
+          senderAddress
+        } to delegate ${
+          delegateAddress
+        }`
+      );
+    }
+  }
+
+  async verifyAccountCanMakeTransaction(transaction, fullCheck) {
+    let { type, senderAddress } = transaction;
+
+    let senderAccount;
+    try {
+      senderAccount = await this.dal.getAccount(senderAddress);
+    } catch (error) {
+      if (error.name === 'AccountDidNotExistError') {
+        throw new Error(
+          `Sender account ${senderAddress} did not exist`
+        );
+      } else {
+        throw new Error(
+          `Failed to fetch sender account ${senderAddress} because of error: ${error.message}`
+        );
+      }
+    }
+
+    await this.verifyAccountCanMakeGeneralTransaction(senderAccount, transaction);
+
+    if (type === 'vote') {
+      await this.verifyVoteTransaction(transaction);
+    } else if (type === 'unvote') {
+      await this.verifyUnvoteTransaction(transaction);
+    }
+
+    if (senderAccount.type === ACCOUNT_TYPE_MULTISIG) {
+      await this.verifyMultisigAccountCanMakeTransaction(senderAccount, transaction, fullCheck);
+    } else {
+      await this.verifySigAccountCanMakeTransaction(senderAccount, transaction, fullCheck);
+    }
+  }
+
   async verifyTransaction(transaction, fullCheck) {
     verifyTransactionSchema(transaction, this.maxSpendableDigits, this.networkSymbol);
 
-    let { id, type, senderAddress, amount, fee, timestamp } = transaction;
+    let { type } = transaction;
 
     if (type === 'transfer') {
       verifyTransferTransactionSchema(transaction, this.maxSpendableDigits, this.networkSymbol);
@@ -667,188 +936,12 @@ module.exports = class LDPoSChainModule {
       );
     }
 
-    let txnAmount = amount || 0n;
-    let txnFee = fee || 0n;
-    let txnTotal = txnAmount + txnFee;
-
     if (fullCheck) {
-      let minFee = this.minTransactionFees[type] || 0n;
-
-      if (txnFee < minFee) {
-        throw new Error(
-          `Transaction fee ${
-            txnFee
-          } was below the minimum fee of ${
-            minFee
-          } for transactions of type ${
-            type
-          }`
-        );
-      }
+      this.verifyTransactionOffersMinFee(transaction);
+      await this.verifyTransactionDoesNotAlreadyExist(transaction);
     }
 
-    let senderAccount;
-    try {
-      senderAccount = await this.dal.getAccount(senderAddress);
-    } catch (error) {
-      throw new Error(
-        `Failed to fetch account ${senderAddress} because of error: ${error.message}`
-      );
-    }
-
-    if (fullCheck) {
-      let wasTransactionAlreadyProcessed;
-      try {
-        wasTransactionAlreadyProcessed = await this.dal.hasTransaction(id);
-      } catch (error) {
-        throw new Error(
-          `Failed to check if transaction has already been processed because of error: ${
-            error.message
-          }`
-        );
-      }
-      if (wasTransactionAlreadyProcessed) {
-        throw new Error(
-          `Transaction ${id} has already been processed`
-        );
-      }
-    }
-
-    if (timestamp < senderAccount.lastTransactionTimestamp) {
-      throw new Error(
-        `Transaction was older than the last transaction processed from the sender ${
-          senderAddress
-        }`
-      );
-    }
-
-    if (txnTotal > senderAccount.balance) {
-      throw new Error(
-        `Transaction amount plus fee was greater than the balance of sender ${
-          senderAddress
-        }`
-      );
-    }
-
-    let { senderAddress } = transaction;
-
-    if (senderAccount.type === ACCOUNT_TYPE_MULTISIG) {
-      verifyMultisigTransactionSchema(
-        transaction,
-        fullCheck,
-        senderAccount.multisigRequiredSignatureCount,
-        this.networkSymbol
-      );
-
-      let multisigMemberAddresses;
-      try {
-        multisigMemberAddresses = await this.dal.getMultisigMembers(senderAddress);
-      } catch (error) {
-        throw new Error(
-          `Failed to fetch member addresses for multisig wallet ${
-            senderAddress
-          } because of error: ${error.message}`
-        );
-      }
-
-      let multisigMemberAccounts = {};
-      try {
-        let multisigMemberAccountList = await Promise.all(
-          multisigMemberAddresses.map(memberAddress => this.dal.getAccount(memberAddress))
-        );
-        for (let memberAccount of multisigMemberAccountList) {
-          multisigMemberAccounts[memberAccount.address] = memberAccount;
-        }
-      } catch (error) {
-        throw new Error(
-          `Failed to fetch member accounts for multisig wallet ${
-            senderAddress
-          } because of error: ${error.message}`
-        );
-      }
-      if (fullCheck) {
-        for (let signaturePacket of transaction.signatures) {
-          let {
-            signerAddress,
-            multisigPublicKey
-          } = signaturePacket;
-
-          if (!multisigMemberAccounts[signerAddress]) {
-            throw new Error(
-              `Signer with address ${
-                signerAddress
-              } was not a member of multisig wallet ${
-                senderAccount.address
-              }`
-            );
-          }
-          let memberAccount = multisigMemberAccounts[signerAddress];
-          if (!memberAccount.multisigPublicKey) {
-            throw new Error(
-              `Multisig member account ${memberAccount.address} was not initialized so their signature could not be verified`
-            );
-          }
-          if (
-            multisigPublicKey !== memberAccount.multisigPublicKey &&
-            multisigPublicKey !== memberAccount.nextMultisigPublicKey
-          ) {
-            throw new Error(
-              `Transaction multisigPublicKey did not match the multisigPublicKey or nextMultisigPublicKey of member ${
-                memberAccount.address
-              }`
-            );
-          }
-          if (!this.ldposClient.verifyMultisigTransactionSignature(transaction, signaturePacket)) {
-            throw new Error(
-              `Multisig transaction signature of member ${
-                memberAccount.address
-              } was invalid`
-            );
-          }
-        }
-      } else {
-        if (!this.ldposClient.verifyTransactionId(transaction)) {
-          throw new Error(
-            `Multisig transaction id ${id} was invalid`
-          );
-        }
-      }
-    } else {
-      verifySigTransactionSchema(transaction, fullCheck);
-
-      let senderSigPublicKey;
-      if (senderAccount.sigPublicKey) {
-        senderSigPublicKey = senderAccount.sigPublicKey;
-      } else {
-        // If the account does not yet have a sigPublicKey, derive it from the address.
-        senderSigPublicKey = Buffer.from(
-          senderAccount.address.slice(0, ADDRESS_BASE_LENGTH),
-          'hex'
-        ).toString('base64');
-      }
-
-      if (
-        transaction.sigPublicKey !== senderSigPublicKey &&
-        transaction.sigPublicKey !== senderAccount.nextSigPublicKey
-      ) {
-        throw new Error(
-          `Transaction sigPublicKey did not match the sigPublicKey or nextSigPublicKey of account ${
-            senderAccount.address
-          }`
-        );
-      }
-      if (fullCheck) {
-        if (!this.ldposClient.verifyTransaction(transaction)) {
-          throw new Error('Transaction signature was invalid');
-        }
-      } else {
-        if (!this.ldposClient.verifyTransactionId(transaction)) {
-          throw new Error(
-            `Transaction id ${id} was invalid`
-          );
-        }
-      }
-    }
+    await this.verifyAccountCanMakeTransaction(transaction, fullCheck);
   }
 
   async verifyBlock(block, lastBlock) {

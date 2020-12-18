@@ -69,6 +69,29 @@ class DAL {
     account.updateHeight = updateHeight;
   }
 
+  async getAccountVotes(voterAddress) {
+    let voterAccount = this.accounts[voterAddress];
+    if (!voterAccount) {
+      let error = new Error(`Voter ${voterAddress} did not exist`);
+      error.name = 'VoterAccountDidNotExistError';
+      error.type = 'InvalidActionError';
+      throw error;
+    }
+    let voteSet = new Set();
+    let delegateAddressList = Object.keys(this.votes);
+    for (let delegateAddress of delegateAddressList) {
+      let delegateVoters = this.votes[delegateAddress];
+      if (delegateVoters.has(voterAddress)) {
+        voteSet.add(delegateAddress);
+      }
+    }
+    return [...voteSet];
+  }
+
+  async hasVote(voterAddress, delegateAddress) {
+    return this.votes[delegateAddress] && this.votes[delegateAddress].has(voterAddress);
+  }
+
   async upsertVote(voterAddress, delegateAddress) {
     let delegateAccount = this.accounts[delegateAddress];
     if (!delegateAccount) {
@@ -110,7 +133,7 @@ class DAL {
       error.type = 'InvalidActionError';
       throw error;
     }
-    if (!this.votes[delegateAddress] || !this.votes[delegateAddress].has(voterAddress)) {
+    if (!this.hasVote(voterAddress, delegateAddress)) {
       let error = new Error(
         `Account ${voterAddress} was not voting for delegate ${delegateAddress}`
       );
