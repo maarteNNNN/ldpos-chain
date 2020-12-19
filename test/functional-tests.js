@@ -45,7 +45,23 @@ describe('Functional tests', async () => {
     await chainModule.unload();
   });
 
-  describe('transfer transactions', async () => {
+  describe('block forging', async () => {
+
+    beforeEach(async () => {
+
+    });
+
+    describe('blocks are forged correctly', async () => {
+
+      it('should forge blocks', async () => {
+
+      });
+
+    });
+
+  });
+
+  describe('transfer transaction', async () => {
 
     beforeEach(async () => {
 
@@ -60,6 +76,118 @@ describe('Functional tests', async () => {
     });
 
     describe('invalid transfer', async () => {
+
+      it('should send back an error', async () => {
+
+      });
+
+    });
+
+  });
+
+  describe('vote transaction', async () => {
+
+    beforeEach(async () => {
+
+    });
+
+    describe('valid vote', async () => {
+
+      it('should update the top delegate list', async () => {
+
+      });
+
+    });
+
+    describe('invalid vote', async () => {
+
+      it('should send back an error', async () => {
+
+      });
+
+    });
+
+  });
+
+  describe('unvote transaction', async () => {
+
+    beforeEach(async () => {
+
+    });
+
+    describe('valid unvote', async () => {
+
+      it('should update the top delegate list', async () => {
+
+      });
+
+    });
+
+    describe('invalid unvote', async () => {
+
+      it('should send back an error', async () => {
+
+      });
+
+    });
+
+  });
+
+  describe('registerMultisig transaction', async () => {
+
+    beforeEach(async () => {
+
+    });
+
+    describe('valid registerMultisig', async () => {
+
+      it('should convert sig account into multisig account', async () => {
+
+      });
+
+    });
+
+    describe('multiple valid registerMultisig', async () => {
+
+      it('should support re-registering an existing multisig wallet with a different set of member addresses', async () => {
+
+      });
+
+    });
+
+    describe('invalid registerMultisig', async () => {
+
+      it('should send back an error', async () => {
+
+      });
+
+    });
+
+  });
+
+  describe('init transaction', async () => {
+
+    beforeEach(async () => {
+
+    });
+
+    describe('valid init', async () => {
+
+      it('should add all the necessary keys on the account', async () => {
+
+      });
+
+    });
+
+    describe('multiple valid init', async () => {
+
+      it('should support re-initializing a wallet with a different set of public keys', async () => {
+
+      });
+
+    });
+
+    describe('invalid init', async () => {
 
       it('should send back an error', async () => {
 
