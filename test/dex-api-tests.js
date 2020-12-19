@@ -258,14 +258,6 @@ describe('DEX API tests', async () => {
 
     });
 
-    describe('postSignature action', async () => {
-
-      it('should expose a postSignature action', async () => {
-
-      });
-
-    });
-
   });
 
   describe('module events', async () => {

@@ -121,19 +121,33 @@ module.exports = class LDPoSChainModule {
         }
       },
       getOutboundTransactions: {
-        handler: async action => {}
+        handler: async action => {
+          let { walletAddress, fromTimestamp, limit } = action;
+          return this.dal.getOutboundTransactions(walletAddress, fromTimestamp, limit);
+        }
       },
       getInboundTransactionsFromBlock: {
-        handler: async action => {}
+        handler: async action => {
+          let { walletAddress, blockId } = action;
+          return this.dal.getInboundTransactionsFromBlock(walletAddress, blockId);
+        }
       },
       getOutboundTransactionsFromBlock: {
-        handler: async action => {}
+        handler: async action => {
+          let { walletAddress, blockId } = action;
+          return this.dal.getOutboundTransactionsFromBlock(walletAddress, blockId);
+        }
       },
       getLastBlockAtTimestamp: {
-        handler: async action => {}
+        handler: async action => {
+          let { timestamp } = action;
+          return this.dal.getLastBlockAtTimestamp(timestamp);
+        }
       },
       getMaxBlockHeight: {
-        handler: async action => {}
+        handler: async action => {
+          return this.dal.getMaxBlockHeight();
+        }
       },
       getBlocksFromHeight: {
         handler: async action => {
@@ -161,13 +175,19 @@ module.exports = class LDPoSChainModule {
         isPublic: true
       },
       getBlocksBetweenHeights: {
-        handler: async action => {}
+        handler: async action => {
+          let { fromHeight, toHeight, limit } = action;
+          return this.dal.getBlocksBetweenHeights(fromHeight, toHeight, limit);
+        }
       },
       getBlockAtHeight: {
-        handler: async action => {}
+        handler: async action => {
+          let { height } = action;
+          return this.dal.getBlockAtHeight(height);
+        }
       },
       getModuleOptions: {
-        handler: async action => {}
+        handler: async action => this.options
       }
     };
   }
@@ -222,7 +242,7 @@ module.exports = class LDPoSChainModule {
         }
       } catch (error) {
         this.logger.warn(
-          `Received invalid block while catching up with the network - ${error.message}`
+          new Error(`Received invalid block while catching up with the network - ${error.message}`)
         );
         pendingBlocks = [];
         latestGoodBlock = this.latestProcessedBlock;
@@ -257,7 +277,7 @@ module.exports = class LDPoSChainModule {
           safeBlockCount = pendingBlocks.length;
         } catch (error) {
           this.logger.warn(
-            `Failed to fetch latest block signatures because of error: ${error.message}`
+            new Error(`Failed to fetch latest block signatures because of error: ${error.message}`)
           );
           // This is to cover the case where our node has received some bad blocks in the past.
           pendingBlocks = [];
@@ -1277,8 +1297,18 @@ module.exports = class LDPoSChainModule {
     }
 
     this.ldposClient = ldposClient;
-    this.nodeHeight = await this.dal.getLatestHeight();
-    this.latestProcessedBlock = await this.dal.getBlockAtHeight(this.nodeHeight);
+    this.nodeHeight = await this.dal.getMaxBlockHeight();
+    try {
+      this.latestProcessedBlock = await this.dal.getBlockAtHeight(this.nodeHeight);
+    } catch (error) {
+      if (error.name === 'BlockDidNotExistError') {
+        this.latestProcessedBlock = null;
+      } else {
+        throw new Error(
+          `Failed to load last processed block because of error: ${error.message}`
+        );
+      }
+    }
     if (this.latestProcessedBlock == null) {
       this.latestProcessedBlock = {
         height: 1,

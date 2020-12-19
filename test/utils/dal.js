@@ -191,20 +191,69 @@ class DAL {
     return [...memberAddresses];
   }
 
-  async getBlockAtHeight(height) {
-    return this.blocks[height];
-  }
-
   async getLatestBlock() {
     return this.blocks[this.blocks.length - 1];
   }
 
-  async getLatestHeight() {
+  async getMaxBlockHeight() {
     return this.blocks.length;
   }
 
   async getBlocksFromHeight(height, limit) {
     return this.blocks.slice(height, height + limit);
+  }
+
+  async getLastBlockAtTimestamp(timestamp) {
+    let blockList = Object.values(this.blocks);
+    blockList.sort((blockA, blockB) => {
+      if (blockA.timestamp > blockB.timestamp) {
+        return -1;
+      }
+      if (blockA.timestamp < blockB.timestamp) {
+        return 1;
+      }
+      return 0;
+    });
+    let block = blockList.find(block => block.timestamp <= timestamp);
+    if (!block) {
+      let error = new Error(
+        `No block existed with timestamp less than or equal to ${timestamp}`
+      );
+      error.name = 'BlockDidNotExistError';
+      error.type = 'InvalidActionError';
+      throw error;
+    }
+    return block;
+  }
+
+  async getBlocksBetweenHeights(fromHeight, toHeight, limit) {
+    let selectedBlocks = [];
+    for (let block of this.blocks) {
+      if (block.height > fromHeight && block.height <= toHeight) {
+        selectedBlocks.push(block);
+        if (selectedBlocks.length >= limit) {
+          break;
+        }
+      }
+    }
+    return selectedBlocks;
+  }
+
+  async getBlockAtHeight(height) {
+    let block = this.blocks[height];
+    if (!block) {
+      let error = new Error(
+        `No block existed at height ${height}`
+      );
+      error.name = 'BlockDidNotExistError';
+      error.type = 'InvalidActionError';
+      throw error;
+    }
+    return block;
+  }
+
+  async upsertBlock(block) {
+    this.blocks[block.height] = block;
   }
 
   async setLatestBlockSignatures(signatures) {
@@ -239,8 +288,32 @@ class DAL {
     return transaction;
   }
 
-  async upsertBlock(block) {
-    this.blocks[block.height] = block;
+  async getOutboundTransactions(walletAddress, fromTimestamp, limit) {
+    let transactionList = Object.values(this.transactions);
+    let outboundTransactions = [];
+    for (let transaction of transactionList) {
+      if (transaction.senderAddress === walletAddress && transaction.timestamp >= fromTimestamp) {
+        outboundTransactions.push(transaction);
+        if (outboundTransactions.length >= limit) {
+          break;
+        }
+      }
+    }
+    return outboundTransactions;
+  }
+
+  async getInboundTransactionsFromBlock(walletAddress, blockId) {
+    let transactionList = Object.values(this.transactions);
+    return transactionList.filter(
+      transaction => transaction.blockId === blockId && transaction.recipientAddress === walletAddress
+    );
+  }
+
+  async getOutboundTransactionsFromBlock(walletAddress, blockId) {
+    let transactionList = Object.values(this.transactions);
+    return transactionList.filter(
+      transaction => transaction.blockId === blockId && transaction.senderAddress === walletAddress
+    );
   }
 
   async getTopActiveDelegates(delegateCount) {
