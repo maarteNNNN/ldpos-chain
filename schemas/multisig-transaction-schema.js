@@ -1,6 +1,7 @@
 const {
   validateWalletAddress,
   validateSignature,
+  validateMultisigKeyIndex,
   validateMultisigPublicKey,
   validateNextMultisigPublicKey
 } = require('./primitives');
@@ -22,12 +23,14 @@ function verifyMultisigTransactionSchema(multisigTransaction, fullCheck, minRequ
     }
     let {
       signerAddress,
+      multisigKeyIndex,
       multisigPublicKey,
       nextMultisigPublicKey,
       signature,
       signatureHash
     } = signaturePacket;
 
+    validateMultisigKeyIndex(multisigKeyIndex);
     validateMultisigPublicKey(multisigPublicKey);
     validateNextMultisigPublicKey(nextMultisigPublicKey);
 

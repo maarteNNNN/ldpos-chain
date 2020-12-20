@@ -1,6 +1,7 @@
 const {
   validateWalletAddress,
   validateBlockId,
+  validateForgingKeyIndex,
   validatePreviousBlockId,
   validateForgingPublicKey,
   validateNextForgingPublicKey,
@@ -27,6 +28,7 @@ function verifyBlockSchema(block, maxTransactionsPerBlock, networkSymbol) {
   if (block.previousBlockId != null) {
     validatePreviousBlockId(block.previousBlockId);
   }
+  validateForgingKeyIndex(block.forgingKeyIndex);
   validateForgingPublicKey(block.forgingPublicKey);
   validateNextForgingPublicKey(block.nextForgingPublicKey);
 }

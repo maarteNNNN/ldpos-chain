@@ -1,4 +1,5 @@
 const {
+  validateSigKeyIndex,
   validateSigPublicKey,
   validateNextSigPublicKey,
   validateSignature,
@@ -9,6 +10,7 @@ function verifySigTransactionSchema(sigTransaction, fullCheck) {
   if (!sigTransaction) {
     throw new Error('Multisig transaction was not specified');
   }
+  validateSigKeyIndex(sigTransaction.sigKeyIndex);
   validateSigPublicKey(sigTransaction.sigPublicKey);
   validateNextSigPublicKey(sigTransaction.nextSigPublicKey);
   if (fullCheck) {

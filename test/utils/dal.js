@@ -31,10 +31,9 @@ class DAL {
     return 'ldpos';
   }
 
-  async upsertAccount(account, updateHeight) {
+  async upsertAccount(account) {
     this.accounts[account.address] = {
-      ...account,
-      updateHeight
+      ...account
     };
   }
 
@@ -53,7 +52,7 @@ class DAL {
     return account;
   }
 
-  async updateAccount(accountAddress, changePacket, updateHeight) {
+  async updateAccount(accountAddress, changePacket) {
     let account = this.accounts[accountAddress];
     if (!account) {
       let error = new Error(`Account ${accountAddress} did not exist`);
@@ -65,7 +64,6 @@ class DAL {
     for (let key of changedKeys) {
       account[key] = changePacket[key];
     }
-    account.updateHeight = updateHeight;
   }
 
   async getAccountVotes(voterAddress) {

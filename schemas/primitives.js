@@ -18,6 +18,12 @@ function validatePublicKey(publicKey) {
   }
 }
 
+function validateForgingKeyIndex(keyIndex) {
+  if (!Number.isInteger(keyIndex) || keyIndex < 0) {
+    throw new Error('Forging key index must be an integer number greater than or equal to 0');
+  }
+}
+
 function validateForgingPublicKey(publicKey) {
   try {
     validatePublicKey(publicKey);
@@ -34,6 +40,12 @@ function validateNextForgingPublicKey(publicKey) {
   }
 }
 
+function validateMultisigKeyIndex(keyIndex) {
+  if (!Number.isInteger(keyIndex) || keyIndex < 0) {
+    throw new Error('Multisig key index must be an integer number greater than or equal to 0');
+  }
+}
+
 function validateMultisigPublicKey(publicKey) {
   try {
     validatePublicKey(publicKey);
@@ -47,6 +59,12 @@ function validateNextMultisigPublicKey(publicKey) {
     validatePublicKey(publicKey);
   } catch (error) {
     throw new Error(`Invalid next multisig public key: ${error.message}`);
+  }
+}
+
+function validateSigKeyIndex(keyIndex) {
+  if (!Number.isInteger(keyIndex) || keyIndex < 0) {
+    throw new Error('Sig key index must be an integer number greater than or equal to 0');
   }
 }
 
@@ -143,10 +161,13 @@ function validateTimestamp(timestamp) {
 module.exports = {
   validateWalletAddress,
   validatePublicKey,
+  validateForgingKeyIndex,
   validateForgingPublicKey,
   validateNextForgingPublicKey,
+  validateMultisigKeyIndex,
   validateMultisigPublicKey,
   validateNextMultisigPublicKey,
+  validateSigKeyIndex,
   validateSigPublicKey,
   validateNextSigPublicKey,
   validateSignature,

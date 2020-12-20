@@ -61,6 +61,22 @@ describe('Functional tests', async () => {
 
   });
 
+  describe('block processing', async () => {
+
+    beforeEach(async () => {
+
+    });
+
+    describe('when processing a block multiple times', async () => {
+
+      it('should only apply changes to the affected accounts once', async () => {
+
+      });
+
+    });
+
+  });
+
   describe('transfer transaction', async () => {
 
     beforeEach(async () => {

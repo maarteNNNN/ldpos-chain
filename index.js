@@ -17,8 +17,8 @@ const { verifyBlocksResponse } = require('./schemas/blocks-response-schema');
 const { verifyBlockInfoSchema } = require('./schemas/block-info-schema');
 
 // TODO 222: Should multisig members sign the initial registerMultisig transaction or is the signature from the multisig wallet itself the only requirement?
-// TODO 222: Upsert account if it doesn't already exist
-// TODO 222: For init transaction, reset the key indexes to 0
+// TODO 222: What happens if many transactions are broadcasted at the same time which together exceed the balance limit but individually are less than balance?
+// TODO 222: Multisig wallet should not be allowed to be a member of another multisig wallet.
 
 const DEFAULT_MODULE_ALIAS = 'ldpos_chain';
 const DEFAULT_GENESIS_PATH = './genesis/mainnet/genesis.json';
@@ -425,10 +425,11 @@ module.exports = class LDPoSChainModule {
   }
 
   async processBlock(block) {
-    let { transactions, height } = block;
-    let isFullBlock = !!(block.signatures && block.signatures[0] && block.signatures[0].signature);
+    let { transactions, height, signatures: blockSignatureList } = block;
+    let isFullBlock = !!(blockSignatureList && blockSignatureList[0] && blockSignatureList[0].signature);
     let senderAddressSet = new Set();
     let recipientAddressSet = new Set();
+    let multisigMemberAddressSet = new Set();
 
     for (let txn of transactions) {
       senderAddressSet.add(txn.senderAddress);
@@ -438,18 +439,22 @@ module.exports = class LDPoSChainModule {
       // For multisig transaction, add all signer accounts.
       if (txn.signatures) {
         for (let signaturePacket of txn.signatures) {
-          senderAddressSet.add(signaturePacket.signerAddress);
+          multisigMemberAddressSet.add(signaturePacket.signerAddress);
         }
       }
     }
-    let forgerAccount = await this.getSanitizedAccount(block.forgerAddress);
+    let blockSignerAddressSet = new Set(blockSignatureList.map(blockSignature => blockSignature.signerAddress));
 
-    let senderAccountList = await Promise.all(
-      [...senderAddressSet].map(async (address) => this.getSanitizedAccount(address))
-    );
+    let affectedAddressSet = new Set([
+      ...senderAddressSet,
+      ...recipientAddressSet,
+      ...multisigMemberAddressSet,
+      ...blockSignerAddressSet,
+      block.forgerAddress
+    ]);
 
-    let recipientAccountList = await Promise.all(
-      [...senderAddressSet].map(async (address) => {
+    let affectedAccountList = await Promise.all(
+      [...affectedAddressSet].map(async (address) => {
         let account;
         try {
           account = await this.getSanitizedAccount(address);
@@ -458,11 +463,11 @@ module.exports = class LDPoSChainModule {
             return {
               address,
               type: 'sig',
-              balance: '0'
+              balance: 0n
             };
           } else {
             throw new Error(
-              `Failed to fetch recipient account during block processing because of error: ${
+              `Failed to fetch account during block processing because of error: ${
                 error.message
               }`
             );
@@ -472,14 +477,21 @@ module.exports = class LDPoSChainModule {
       })
     );
 
-    let senderAccounts = {};
-    for (account of senderAccountList) {
-      senderAccounts[account.address] = account;
+    let affectedAccounts = {};
+    for (account of affectedAccountList) {
+      affectedAccounts[account.address] = account;
     }
 
-    let recipientAccounts = {};
-    for (account of recipientAccountList) {
-      recipientAccounts[account.address] = account;
+    let forgerAccount = affectedAccounts[block.forgerAddress];
+    forgerAccount.forgingKeyIndex = block.forgingKeyIndex + 1;
+    forgerAccount.forgingPublicKey = block.forgingPublicKey;
+    forgerAccount.nextForgingPublicKey = block.nextForgingPublicKey;
+
+    for (let blockSignature of blockSignatureList) {
+      let blockSignerAccount = affectedAccounts[blockSignature.signerAddress];
+      blockSignerAccount.forgingKeyIndex = blockSignerAccount.forgingKeyIndex + 1;
+      blockSignerAccount.forgingPublicKey = blockSignerAccount.forgingPublicKey;
+      blockSignerAccount.nextForgingPublicKey = blockSignerAccount.nextForgingPublicKey;
     }
 
     let voteChangeList = [];
@@ -493,38 +505,41 @@ module.exports = class LDPoSChainModule {
         fee,
         timestamp,
         signatures,
+        sigKeyIndex,
         sigPublicKey,
         nextSigPublicKey
       } = txn;
-      let senderAccount = senderAccounts[senderAddress];
+      let senderAccount = affectedAccounts[senderAddress];
 
       if (signatures) {
         for (let signaturePacket of signatures) {
-          let memberAccount = senderAccounts[signaturePacket.signerAddress];
+          let memberAccount = affectedAccounts[signaturePacket.signerAddress];
+          memberAccount.multisigKeyIndex = signaturePacket.multisigKeyIndex + 1;
           memberAccount.multisigPublicKey = signaturePacket.multisigPublicKey;
           memberAccount.nextMultisigPublicKey = signaturePacket.nextMultisigPublicKey;
         }
       } else {
         // If regular transaction (not multisig), update the account sig public keys.
+        senderAccount.sigKeyIndex = sigKeyIndex + 1;
         senderAccount.sigPublicKey = sigPublicKey;
         senderAccount.nextSigPublicKey = nextSigPublicKey;
       }
 
+      let txnFee = BigInt(fee);
+
       if (type === 'transfer') {
         let { recipientAddress, amount } = txn;
         let txnAmount = BigInt(amount);
-        let txnFee = BigInt(fee);
-        let recipientAccount = recipientAccounts[recipientAddress];
+
+        let recipientAccount = affectedAccounts[recipientAddress];
         if (!senderAccount.updateHeight || senderAccount.updateHeight < height) {
           senderAccount.balance = senderAccount.balance - txnAmount - txnFee;
           senderAccount.lastTransactionTimestamp = timestamp;
         }
         if (!recipientAccount.updateHeight || recipientAccount.updateHeight < height) {
           recipientAccount.balance = recipientAccount.balance + txnAmount;
-          recipientAccount.lastTransactionTimestamp = timestamp;
         }
       } else {
-        let txnFee = BigInt(fee);
         if (!senderAccount.updateHeight || senderAccount.updateHeight < height) {
           senderAccount.balance = senderAccount.balance - txnFee;
           senderAccount.lastTransactionTimestamp = timestamp;
@@ -538,11 +553,14 @@ module.exports = class LDPoSChainModule {
         } else if (type === 'init') {
           initList.push({
             accountAddress: senderAddress,
-            keys: {
+            change: {
+              sigKeyIndex: 0,
               sigPublicKey: txn.sigPublicKey,
               nextSigPublicKey: txn.nextSigPublicKey,
+              multisigKeyIndex: 0,
               multisigPublicKey: txn.multisigPublicKey,
               nextMultisigPublicKey: txn.nextMultisigPublicKey,
+              forgingKeyIndex: 0,
               forgingPublicKey: txn.forgingPublicKey,
               nextForgingPublicKey: txn.nextForgingPublicKey
             }
@@ -558,59 +576,47 @@ module.exports = class LDPoSChainModule {
     }
 
     await Promise.all(
-      senderAccountList.map(async (account) => {
-        if (!account.updateHeight || account.updateHeight < height) {
-          let accountUpdatePacket;
-          if (account.type === ACCOUNT_TYPE_MULTISIG) {
-            accountUpdatePacket = {
-              balance: account.balance,
-              multisigPublicKey: account.multisigPublicKey,
-              nextMultisigPublicKey: account.nextMultisigPublicKey,
-              lastTransactionTimestamp: account.lastTransactionTimestamp
-            };
-          } else {
-            accountUpdatePacket = {
-              balance: account.balance,
-              sigPublicKey: account.sigPublicKey,
-              nextSigPublicKey: account.nextSigPublicKey,
-              lastTransactionTimestamp: account.lastTransactionTimestamp
-            };
-          }
-          try {
-            await this.dal.updateAccount(
-              account.address,
-              accountUpdatePacket,
-              height
-            );
-          } catch (error) {
-            if (error.type === 'InvalidActionError') {
-              this.logger.warn(error);
-            } else {
-              throw error;
-            }
+      [...affectedAddressSet].map(async (affectedAddress) => {
+        let account = affectedAccounts[affectedAddress];
+        let accountUpdatePacket = {
+          balance: account.balance.toString(),
+          updateHeight: height
+        };
+        if (senderAddressSet.has(affectedAddress)) {
+          accountUpdatePacket.lastTransactionTimestamp = account.lastTransactionTimestamp;
+          if (account.type !== ACCOUNT_TYPE_MULTISIG) {
+            accountUpdatePacket.sigKeyIndex = account.sigKeyIndex;
+            accountUpdatePacket.sigPublicKey = account.sigPublicKey;
+            accountUpdatePacket.nextSigPublicKey = account.nextSigPublicKey;
           }
         }
-      })
-    );
-
-    await Promise.all(
-      recipientAccountList.map(async (account) => {
-        if (!account.updateHeight || account.updateHeight < height) {
-          let accountUpdatePacket = {
-            balance: account.balance
-          };
-          try {
+        if (multisigMemberAddressSet.has(affectedAddress)) {
+          accountUpdatePacket.multisigKeyIndex = account.multisigKeyIndex;
+          accountUpdatePacket.multisigPublicKey = account.multisigPublicKey;
+          accountUpdatePacket.nextMultisigPublicKey = account.nextMultisigPublicKey;
+        }
+        if (affectedAddress === block.forgerAddress || blockSignerAddressSet.has(affectedAddress)) {
+          accountUpdatePacket.forgingKeyIndex = account.forgingKeyIndex;
+          accountUpdatePacket.forgingPublicKey = account.forgingPublicKey;
+          accountUpdatePacket.nextForgingPublicKey = account.nextForgingPublicKey;
+        }
+        try {
+          if (account.updateHeight == null) {
+            await this.dal.upsertAccount({
+              ...account,
+              updateHeight: height
+            });
+          } else {
             await this.dal.updateAccount(
               account.address,
-              accountUpdatePacket,
-              height
+              accountUpdatePacket
             );
-          } catch (error) {
-            if (error.type === 'InvalidActionError') {
-              this.logger.warn(error);
-            } else {
-              throw error;
-            }
+          }
+        } catch (error) {
+          if (error.type === 'InvalidActionError') {
+            this.logger.warn(error);
+          } else {
+            throw error;
           }
         }
       })
@@ -645,66 +651,24 @@ module.exports = class LDPoSChainModule {
       }
     }
 
+    // TODO 222: Should it be possible to re-initialize an account with new keys and perform transactions using the new keys as part of the same block?
     for (let init of initList) {
       try {
         await this.dal.updateAccount(
           init.accountAddress,
           {
-            ...init.keys
-          },
-          height
-        );
-      } catch (error) {
-        if (error.type === 'InvalidActionError') {
-          this.logger.warn(error);
-        } else {
-          throw error;
-        }
-      }
-    }
-
-    let { signatures } = block;
-    let simplifiedBlock = this.simplifyBlock(block);
-
-    if (block.forgingPublicKey === forgerAccount.nextForgingPublicKey) {
-      try {
-        await this.dal.updateAccount(
-          forgerAccount.address,
-          {
-            forgingPublicKey: block.forgingPublicKey,
-            nextForgingPublicKey: block.nextForgingPublicKey
-          },
-          height
-        );
-      } catch (error) {
-        if (error.type === 'InvalidActionError') {
-          this.logger.warn(error);
-        } else {
-          throw error;
-        }
-      }
-    }
-
-    await Promise.all(
-      signatures.map(async (blockSignature) => {
-        try {
-          await this.dal.updateAccount(
-            blockSignature.signerAddress,
-            {
-              forgingPublicKey: blockSignature.forgingPublicKey,
-              nextForgingPublicKey: blockSignature.nextForgingPublicKey
-            },
-            height
-          );
-        } catch (error) {
-          if (error.type === 'InvalidActionError') {
-            this.logger.warn(error);
-          } else {
-            throw error;
+            ...init.change,
+            updateHeight: height
           }
+        );
+      } catch (error) {
+        if (error.type === 'InvalidActionError') {
+          this.logger.warn(error);
+        } else {
+          throw error;
         }
-      })
-    );
+      }
+    }
 
     await Promise.all(
       transactions.map(async (txn) => {
@@ -715,13 +679,14 @@ module.exports = class LDPoSChainModule {
       })
     );
 
+    let simplifiedBlock = this.simplifyBlock(block);
     await this.dal.upsertBlock(simplifiedBlock);
 
     if (isFullBlock) {
       await this.dal.setLatestBlockInfo({
         blockId: block.id,
         blockHeight: height,
-        signatures
+        signatures: blockSignatureList
       });
     }
 
