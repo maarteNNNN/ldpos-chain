@@ -169,6 +169,16 @@ class DAL {
         error.type = 'InvalidActionError';
         throw error;
       }
+      if (memberAccount.type === 'multisig') {
+        let error = new Error(
+          `Account ${
+            memberAddress
+          } was a multisig account so it could not be registered as a member of another multisig account`
+        );
+        error.name = 'MemberAccountWasMultisigAccountError';
+        error.type = 'InvalidActionError';
+        throw error;
+      }
     }
     multisigAccount.type = 'multisig';
     multisigAccount.multisigRequiredSignatureCount = requiredSignatureCount;

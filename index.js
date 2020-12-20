@@ -18,7 +18,6 @@ const { verifyBlockInfoSchema } = require('./schemas/block-info-schema');
 
 // TODO 222: Should multisig members sign the initial registerMultisig transaction or is the signature from the multisig wallet itself the only requirement?
 // TODO 222: What happens if many transactions are broadcasted at the same time which together exceed the balance limit but individually are less than balance?
-// TODO 222: Multisig wallet should not be allowed to be a member of another multisig wallet.
 
 const DEFAULT_MODULE_ALIAS = 'ldpos_chain';
 const DEFAULT_GENESIS_PATH = './genesis/mainnet/genesis.json';
@@ -651,7 +650,6 @@ module.exports = class LDPoSChainModule {
       }
     }
 
-    // TODO 222: Should it be possible to re-initialize an account with new keys and perform transactions using the new keys as part of the same block?
     for (let init of initList) {
       try {
         await this.dal.updateAccount(
@@ -986,6 +984,13 @@ module.exports = class LDPoSChainModule {
               `Account ${
                 memberAddress
               } has not been initialized so it could not be a member of a multisig account`
+            );
+          }
+          if (memberAccount.type === 'multisig') {
+            throw new Error(
+              `Account ${
+                memberAddress
+              } was a multisig account so it could not be a member of another multisig account`
             );
           }
         }
