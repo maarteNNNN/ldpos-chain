@@ -1,11 +1,23 @@
 const { verifyBlockSignatureSchema } = require('./block-signature-schema');
+const {
+  validateBlockId,
+  validateBlockHeight
+} = require('./primitives');
 
-function verifyBlockSignaturesResponseSchema(blockSignatures, minRequiredSignatures, networkSymbol) {
-  if (!Array.isArray(blockSignatures)) {
+function verifyBlockInfoSchema(blockInfo, minRequiredSignatures, networkSymbol) {
+  if (!blockInfo) {
+    throw new Error('Block info was not specified');
+  }
+  let { blockId, blockHeight, signatures } = blockInfo;
+
+  validateBlockId(blockId);
+  validateBlockHeight(blockHeight);
+
+  if (!Array.isArray(signatures)) {
     throw new Error('Block signatures must be an array');
   }
   let signerSet = new Set();
-  for (let blockSignature of blockSignatures) {
+  for (let blockSignature of signatures) {
     verifyBlockSignatureSchema(blockSignature, networkSymbol);
     signerSet.add(blockSignature.signerAddress);
   }
@@ -19,5 +31,5 @@ function verifyBlockSignaturesResponseSchema(blockSignatures, minRequiredSignatu
 }
 
 module.exports = {
-  verifyBlockSignaturesResponseSchema
+  verifyBlockInfoSchema
 };

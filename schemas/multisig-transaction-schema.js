@@ -2,7 +2,7 @@ const {
   validateWalletAddress,
   validateSignature,
   validateMultisigPublicKey,
-  validateNextMultisigPublicKey,
+  validateNextMultisigPublicKey
 } = require('./primitives');
 
 function verifyMultisigTransactionSchema(multisigTransaction, fullCheck, minRequiredSignatures, networkSymbol) {

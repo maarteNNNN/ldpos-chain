@@ -29,7 +29,7 @@ class LDPoSChainModule {
       getBlocksFromHeight: async ({ height, limit }) => {
         return [];
       },
-      getLatestBlockSignatures: async ({ blockId }) => {
+      getLatestBlockInfo: async ({ blockId }) => {
         return [];
       }
     };

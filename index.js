@@ -14,9 +14,11 @@ const { verifyBlockSignatureSchema } = require('./schemas/block-signature-schema
 const { verifyMultisigTransactionSchema } = require('./schemas/multisig-transaction-schema');
 const { verifySigTransactionSchema } = require('./schemas/sig-transaction-schema');
 const { verifyBlocksResponse } = require('./schemas/blocks-response-schema');
-const { verifyBlockSignaturesResponseSchema } = require('./schemas/block-signatures-response-schema');
+const { verifyBlockInfoSchema } = require('./schemas/block-info-schema');
 
 // TODO 222: Should multisig members sign the initial registerMultisig transaction or is the signature from the multisig wallet itself the only requirement?
+// TODO 222: Upsert account if it doesn't already exist
+// TODO 222: For init transaction, reset the key indexes to 0
 
 const DEFAULT_MODULE_ALIAS = 'ldpos_chain';
 const DEFAULT_GENESIS_PATH = './genesis/mainnet/genesis.json';
@@ -102,13 +104,13 @@ module.exports = class LDPoSChainModule {
       getMultisigWalletMembers: {
         handler: async action => {
           let { walletAddress } = action;
-          return this.dal.getMultisigMembers(walletAddress);
+          return this.dal.getMultisigWalletMembers(walletAddress);
         }
       },
       getMinMultisigRequiredSignatures: {
         handler: async action => {
           let { walletAddress } = action;
-          let account = await this.dal.getAccount(walletAddress);
+          let account = await this.getSanitizedAccount(walletAddress);
           if (account.type !== 'multisig') {
             let error = new Error(
               `Account ${walletAddress} was not a multisig account`
@@ -146,7 +148,10 @@ module.exports = class LDPoSChainModule {
       },
       getMaxBlockHeight: {
         handler: async action => {
-          return this.dal.getMaxBlockHeight();
+          if (!this.latestFullySignedBlock) {
+            throw new Error('Node does not have the latest block info');
+          }
+          return this.latestFullySignedBlock.height;
         }
       },
       getBlocksFromHeight: {
@@ -156,10 +161,10 @@ module.exports = class LDPoSChainModule {
         },
         isPublic: true
       },
-      getLatestBlockSignatures: {
+      getLatestBlockInfo: {
         handler: async action => {
           if (!this.latestFullySignedBlock) {
-            throw new Error('Node does not have the latest block signatures');
+            throw new Error('Node does not have the latest block info');
           }
           if (action.blockId && action.blockId !== this.latestFullySignedBlock.id) {
             throw new Error(
@@ -170,7 +175,11 @@ module.exports = class LDPoSChainModule {
               } on this node`
             );
           }
-          return this.latestFullySignedBlock.signatures;
+          return {
+            blockId: this.latestFullySignedBlock.id,
+            blockHeight: this.latestFullySignedBlock.height,
+            signatures: this.latestFullySignedBlock.signatures
+          };
         },
         isPublic: true
       },
@@ -261,16 +270,16 @@ module.exports = class LDPoSChainModule {
           break;
         }
         try {
-          let latestBlockSignatures = await this.channel.invoke('network:request', {
-            procedure: `${this.alias}:getLatestBlockSignatures`,
+          let latestBlockInfo = await this.channel.invoke('network:request', {
+            procedure: `${this.alias}:getLatestBlockInfo`,
             data: {
               blockId: latestGoodBlock.id
             }
           });
-          verifyBlockSignaturesResponseSchema(latestBlockSignatures, delegateMajorityCount, this.networkSymbol);
+          verifyBlockInfoSchema(latestBlockInfo, delegateMajorityCount, this.networkSymbol);
 
           await Promise.all(
-            latestBlockSignatures.map(blockSignature => this.verifyBlockSignature(this.latestProcessedBlock, blockSignature))
+            latestBlockInfo.signatures.map(blockSignature => this.verifyBlockSignature(this.latestProcessedBlock, blockSignature))
           );
 
           // If we have the latest block with all necessary signatures, then we can have instant finality.
@@ -361,8 +370,63 @@ module.exports = class LDPoSChainModule {
     return this.ldposClient.prepareBlock(block);
   }
 
+  async getSanitizedAccount(accountAddress) {
+    let account = await this.dal.getAccount(accountAddress);
+    return {
+      ...account,
+      balance: BigInt(account.balance)
+    };
+  }
+
+  async getSanitizedTransaction(transactionId) {
+    let transaction = await this.dal.getTransaction(transactionId);
+    return {
+      ...transaction,
+      amount: BigInt(transaction.amount),
+      fee: BigInt(transaction.fee)
+    };
+  }
+
+  simplifyTransaction(transaction) {
+    let { signature, signatures, ...txnWithoutSignatures} = transaction;
+    if (signatures) {
+      // If multisig transaction
+      return {
+        ...txnWithoutSignatures,
+        signatures: signatures.map(signaturePacket => {
+          let { signature, ...signaturePacketWithoutSignature } = signaturePacket;
+          return {
+            ...signaturePacketWithoutSignature,
+            signatureHash: this.sha256(signature)
+          };
+        })
+      };
+    }
+    // If regular sig transaction
+    return {
+      ...txnWithoutSignatures,
+      signatureHash: this.sha256(signature)
+    };
+  }
+
+  simplifyBlock(block) {
+    let { signatures, ...blockWithoutSignatures } = block;
+
+    return {
+      ...blockWithoutSignatures,
+      signatures: signatures.map(signaturePacket => {
+        let { signature, ...signaturePacketWithoutSignature } = signaturePacket;
+        return {
+          ...signaturePacketWithoutSignature,
+          signatureHash: this.sha256(signature)
+        };
+      })
+    };
+  }
+
   async processBlock(block) {
     let { transactions, height } = block;
+    let isFullBlock = !!(block.signatures && block.signatures[0] && block.signatures[0].signature);
     let senderAddressSet = new Set();
     let recipientAddressSet = new Set();
 
@@ -378,23 +442,23 @@ module.exports = class LDPoSChainModule {
         }
       }
     }
-    let forgerAccount = await this.dal.getAccount(block.forgerAddress);
+    let forgerAccount = await this.getSanitizedAccount(block.forgerAddress);
 
     let senderAccountList = await Promise.all(
-      [...senderAddressSet].map(async (address) => this.dal.getAccount(address))
+      [...senderAddressSet].map(async (address) => this.getSanitizedAccount(address))
     );
 
     let recipientAccountList = await Promise.all(
       [...senderAddressSet].map(async (address) => {
         let account;
         try {
-          account = await this.dal.getAccount(address);
+          account = await this.getSanitizedAccount(address);
         } catch (error) {
           if (error.name === 'AccountDidNotExistError') {
             return {
               address,
               type: 'sig',
-              balance: 0n
+              balance: '0'
             };
           } else {
             throw new Error(
@@ -571,7 +635,7 @@ module.exports = class LDPoSChainModule {
     for (let multisigRegistration of multisigRegistrationList) {
       let { multisigAddress, memberAddresses, requiredSignatureCount } = multisigRegistration;
       try {
-        await this.dal.registerMultisig(multisigAddress, memberAddresses, requiredSignatureCount);
+        await this.dal.registerMultisigWallet(multisigAddress, memberAddresses, requiredSignatureCount);
       } catch (error) {
         if (error.type === 'InvalidActionError') {
           this.logger.warn(error);
@@ -599,8 +663,8 @@ module.exports = class LDPoSChainModule {
       }
     }
 
-    let { signature, signatures, ...sanitizedBlock } = block;
-    sanitizedBlock.signatureHash = this.sha256(signature);
+    let { signatures } = block;
+    let simplifiedBlock = this.simplifyBlock(block);
 
     if (block.forgingPublicKey === forgerAccount.nextForgingPublicKey) {
       try {
@@ -651,8 +715,15 @@ module.exports = class LDPoSChainModule {
       })
     );
 
-    await this.dal.setLatestBlockSignatures(signatures);
-    await this.dal.upsertBlock(sanitizedBlock);
+    await this.dal.upsertBlock(simplifiedBlock);
+
+    if (isFullBlock) {
+      await this.dal.setLatestBlockInfo({
+        blockId: block.id,
+        blockHeight: height,
+        signatures
+      });
+    }
 
     for (let txn of transactions) {
       this.pendingTransactionMap.delete(txn.id);
@@ -746,7 +817,7 @@ module.exports = class LDPoSChainModule {
 
     let multisigMemberAddresses;
     try {
-      multisigMemberAddresses = await this.dal.getMultisigMembers(senderAddress);
+      multisigMemberAddresses = await this.dal.getMultisigWalletMembers(senderAddress);
     } catch (error) {
       throw new Error(
         `Failed to fetch member addresses for multisig wallet ${
@@ -758,7 +829,7 @@ module.exports = class LDPoSChainModule {
     let multisigMemberAccounts = {};
     try {
       let multisigMemberAccountList = await Promise.all(
-        multisigMemberAddresses.map(memberAddress => this.dal.getAccount(memberAddress))
+        multisigMemberAddresses.map(memberAddress => this.getSanitizedAccount(memberAddress))
       );
       for (let memberAccount of multisigMemberAccountList) {
         multisigMemberAccounts[memberAccount.address] = memberAccount;
@@ -846,7 +917,7 @@ module.exports = class LDPoSChainModule {
     let { senderAddress, delegateAddress } = transaction;
     let delegateAccount;
     try {
-      delegateAccount = await this.dal.getAccount(delegateAddress);
+      delegateAccount = await this.getSanitizedAccount(delegateAddress);
     } catch (error) {
       if (error.name === 'AccountDidNotExistError') {
         throw new Error(
@@ -891,7 +962,7 @@ module.exports = class LDPoSChainModule {
     let { senderAddress, delegateAddress } = transaction;
     let delegateAccount;
     try {
-      delegateAccount = await this.dal.getAccount(delegateAddress);
+      delegateAccount = await this.getSanitizedAccount(delegateAddress);
     } catch (error) {
       if (error.name === 'AccountDidNotExistError') {
         throw new Error(
@@ -929,7 +1000,7 @@ module.exports = class LDPoSChainModule {
         async (memberAddress) => {
           let memberAccount;
           try {
-            memberAccount = await this.dal.getAccount(memberAddress);
+            memberAccount = await this.getSanitizedAccount(memberAddress);
           } catch (error) {
             if (error.name === 'AccountDidNotExistError') {
               throw new Error(
@@ -962,7 +1033,7 @@ module.exports = class LDPoSChainModule {
 
     let senderAccount;
     try {
-      senderAccount = await this.dal.getAccount(senderAddress);
+      senderAccount = await this.getSanitizedAccount(senderAddress);
     } catch (error) {
       if (error.name === 'AccountDidNotExistError') {
         throw new Error(
@@ -1052,7 +1123,7 @@ module.exports = class LDPoSChainModule {
     }
     let targetDelegateAccount;
     try {
-      targetDelegateAccount = await this.dal.getAccount(targetDelegateAddress);
+      targetDelegateAccount = await this.getSanitizedAccount(targetDelegateAddress);
     } catch (error) {
       throw new Error(
         `Failed to fetch delegate account ${
@@ -1080,7 +1151,7 @@ module.exports = class LDPoSChainModule {
       for (let transaction of block.transactions) {
         let existingTransaction;
         try {
-          existingTransaction = await this.dal.getTransaction(transaction.id);
+          existingTransaction = await this.getSanitizedTransaction(transaction.id);
         } catch (error) {
           if (error.type !== 'InvalidActionError') {
             throw new Error(
@@ -1127,7 +1198,7 @@ module.exports = class LDPoSChainModule {
     }
     let signerAccount;
     try {
-      signerAccount = await this.dal.getAccount(signerAddress);
+      signerAccount = await this.getSanitizedAccount(signerAddress);
     } catch (error) {
       throw new Error(
         `Failed to fetch signer account ${signerAddress} because of error: ${error.message}`
@@ -1297,19 +1368,18 @@ module.exports = class LDPoSChainModule {
     }
 
     this.ldposClient = ldposClient;
-    this.nodeHeight = await this.dal.getMaxBlockHeight();
     try {
-      this.latestProcessedBlock = await this.dal.getBlockAtHeight(this.nodeHeight);
+      let latestBlockInfo = await this.dal.getLatestBlockInfo();
+      this.latestProcessedBlock = await this.dal.getBlockAtHeight(latestBlockInfo.blockHeight);
+      this.latestProcessedBlock.signatures = latestBlockInfo.signatures;
     } catch (error) {
-      if (error.name === 'BlockDidNotExistError') {
-        this.latestProcessedBlock = null;
-      } else {
+      if (error.name !== 'BlockDidNotExistError') {
         throw new Error(
-          `Failed to load last processed block because of error: ${error.message}`
+          `Failed to load last processed block data because of error: ${error.message}`
         );
       }
     }
-    if (this.latestProcessedBlock == null) {
+    if (!this.latestProcessedBlock) {
       this.latestProcessedBlock = {
         height: 1,
         timestamp: 0,
@@ -1318,10 +1388,11 @@ module.exports = class LDPoSChainModule {
         forgerAddress: null,
         forgingPublicKey: null,
         nextForgingPublicKey: null,
-        id: null
+        id: null,
+        signatures: []
       };
     }
-    this.latestProcessedBlock.signatures = await this.dal.getLatestBlockSignatures();
+    this.nodeHeight = this.latestProcessedBlock.height;
     this.latestReceivedBlock = this.latestProcessedBlock;
     this.latestFullySignedBlock = this.latestProcessedBlock;
 
@@ -1376,14 +1447,7 @@ module.exports = class LDPoSChainModule {
           ).filter(pendingTxn => pendingTxn);
 
           let pendingTransactions = this.sortPendingTransactions(validTransactions);
-          let blockTransactions = pendingTransactions.slice(0, maxTransactionsPerBlock).map((txn) => {
-            let { signature, ...simplifiedTxn } = txn;
-            let signatureHash = this.sha256(signature);
-            return {
-              ...simplifiedTxn,
-              signatureHash
-            };
-          });
+          let blockTransactions = pendingTransactions.slice(0, maxTransactionsPerBlock).map(txn => this.simplifyTransaction(txn));
           let blockTimestamp = this.getCurrentBlockTimeSlot(forgingInterval);
           let forgedBlock = this.forgeBlock(nextHeight, blockTimestamp, blockTransactions);
           await this.wait(forgingBlockBroadcastDelay);

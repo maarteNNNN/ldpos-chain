@@ -5,7 +5,7 @@ class DAL {
     this.blocks = [null];
     this.transactions = {};
     this.multisigMembers = {};
-    this.latestBlockSignatures = [];
+    this.latestBlockInfo = null;
   }
 
   async init(options) {
@@ -16,7 +16,6 @@ class DAL {
       let { votes, ...accountWithoutVotes } = account;
       this.accounts[account.address] = {
         ...accountWithoutVotes,
-        balance: BigInt(account.balance),
         updateHeight: 1
       };
       for (let delegate of votes) {
@@ -144,7 +143,7 @@ class DAL {
     this.votes[delegateAddress].delete(voterAddress);
   }
 
-  async registerMultisig(multisigAddress, memberAddresses, requiredSignatureCount) {
+  async registerMultisigWallet(multisigAddress, memberAddresses, requiredSignatureCount) {
     let multisigAccount = this.accounts[multisigAddress];
     if (!multisigAccount) {
       let error = new Error(
@@ -178,7 +177,7 @@ class DAL {
     this.multisigMembers[multisigAddress] = new Set(memberAddresses);
   }
 
-  async getMultisigMembers(multisigAddress) {
+  async getMultisigWalletMembers(multisigAddress) {
     let memberAddresses = this.multisigMembers[multisigAddress];
     if (!memberAddresses) {
       let error = new Error(
@@ -193,10 +192,6 @@ class DAL {
 
   async getLatestBlock() {
     return this.blocks[this.blocks.length - 1];
-  }
-
-  async getMaxBlockHeight() {
-    return this.blocks.length;
   }
 
   async getBlocksFromHeight(height, limit) {
@@ -256,14 +251,22 @@ class DAL {
     this.blocks[block.height] = block;
   }
 
-  async setLatestBlockSignatures(signatures) {
-    this.latestBlockSignatures = signatures.map((blockSignature) => {
-      return {...blockSignature};
-    });
+  async setLatestBlockInfo(blockInfo) {
+    this.latestBlockInfo = {
+      ...blockInfo
+    }
   }
 
-  async getLatestBlockSignatures() {
-    return this.latestBlockSignatures;
+  async getLatestBlockInfo() {
+    if (!this.latestBlockInfo) {
+      let error = new Error(
+        `Latest block did not exist`
+      );
+      error.name = 'BlockDidNotExistError';
+      error.type = 'InvalidActionError';
+      throw error;
+    }
+    return this.latestBlockInfo;
   }
 
   async upsertTransaction(transaction) {
@@ -324,7 +327,7 @@ class DAL {
       let voteWeight = 0n;
       for (let voterAddress of voterAddressList) {
         let voter = this.accounts[voterAddress] || {};
-        voteWeight += voter.balance || 0n;
+        voteWeight += BigInt(voter.balance || 0);
       }
       delegateList.push({
         address: delegateAddress,

@@ -3,7 +3,9 @@ const DAL = require('./utils/dal');
 const Channel = require('./utils/channel');
 const NetworkModule = require('./utils/network');
 const MockLDPoSChainModule = require('./utils/chain');
+const { sha256 } = require('./utils/hash');
 const wait = require('./utils/wait');
+const { createClient } = require('ldpos-client');
 
 const LDPoSChainModule = require('../index');
 
@@ -17,6 +19,7 @@ describe('DEX API tests', async () => {
   let channel;
   let options;
   let bootstrapEventTriggered;
+  let client;
 
   beforeEach(async () => {
     dal = new DAL();
@@ -43,6 +46,10 @@ describe('DEX API tests', async () => {
       bootstrapEventTriggered = true;
     });
     await chainModule.load(channel, options);
+    client = await createClient({
+      passphrase: options.forgingPassphrase,
+      adapter: dal
+    });
   });
 
   afterEach(async () => {
@@ -75,6 +82,7 @@ describe('DEX API tests', async () => {
     let memberAddessList;
     let memberAccounts = [];
     let multisigAccount;
+    let transactionList = [];
 
     beforeEach(async () => {
       // Passphrase: panic test motion image soldier cloth script spice trigger magnet accident add
@@ -86,7 +94,7 @@ describe('DEX API tests', async () => {
         multisigPublicKey: 'Ciq+Jx/kCYjxKvGcqiJPuBDFQpbkuqcplszbdOUkXNk=',
         sigKeyIndex: 0,
         sigPublicKey: '8VFeIHE+XrAtz6xxobX2tCb/2cCACXydmsa7zDksT78=',
-        balance: 100000000000n
+        balance: '100000000000'
       };
 
       memberAccounts = [
@@ -99,7 +107,7 @@ describe('DEX API tests', async () => {
           multisigPublicKey: '8Qmoim5x5GiLDeNNjX48bId/NSgUz0WIt5cf+DeMBJ0=',
           sigKeyIndex: 0,
           sigPublicKey: 'aYdr+dtiRWC0DEA2jXYq0LNdAQgg4O3+QNA4Dq1GTVo=',
-          balance: 10000000000n
+          balance: '10000000000'
         },
         // Passphrase: genius shoulder into daring armor proof cycle bench patrol paper grant picture
         {
@@ -110,7 +118,7 @@ describe('DEX API tests', async () => {
           multisigPublicKey: 'fcPqQCjP5JiErw49QKWWRXtXDKgVRUIJzQgqC3n2co4=',
           sigKeyIndex: 0,
           sigPublicKey: 'EHL2XfaAsnZ/Vaa81QW2jZDSJ9bYstNA/peqoBarbdc=',
-          balance: 20000000000n
+          balance: '20000000000'
         },
         // Passphrase: emotion belt burden flash vital neglect old census dress kid ocean warfare
         {
@@ -121,16 +129,30 @@ describe('DEX API tests', async () => {
           multisigPublicKey: 'Vfh2TLCRB0ZngEDTVgfU0/FJ5+4BiR36M+uk47IO+oE=',
           sigKeyIndex: 0,
           sigPublicKey: 'SEpIexwSuPRt/p8V5/55zriNLD92ujloCuUnmgTn6EI=',
-          balance: 30000000000n
+          balance: '30000000000'
         }
       ];
+
+      transactionList = [
+        {
+          type: 'transfer',
+          recipientAddress: '1072f65df680b2767f55a6bcd505b68d90d227d6d8b2d340fe97aaa016ab6dd7ldpos',
+          amount: '1100000000',
+          fee: '100000000',
+          timestamp: 1608470523757
+        }
+      ].map(txn => client.prepareTransaction(txn));
 
       memberAddessList = memberAccounts.map(account => account.address);
       for (let account of memberAccounts) {
         await dal.upsertAccount(account);
       }
       await dal.upsertAccount(multisigAccount);
-      await dal.registerMultisig(multisigAccount.address, memberAddessList, 2);
+      await dal.registerMultisigWallet(multisigAccount.address, memberAddessList, 2);
+      for (let transaction of transactionList) {
+        let simplifiedTxn = chainModule.simplifyTransaction(transaction);
+        await dal.upsertTransaction(simplifiedTxn);
+      }
     });
 
     describe('getMultisigWalletMembers action', async () => {
@@ -142,7 +164,7 @@ describe('DEX API tests', async () => {
         assert.equal(JSON.stringify(walletMembers), JSON.stringify(memberAddessList));
       });
 
-      it('should throw an InvalidActionError if the multisig wallet address does not exist', async () => {
+      it('should throw a MultisigAccountDidNotExistError if the multisig wallet address does not exist', async () => {
         let caughtError = null;
         try {
           await chainModule.actions.getMultisigWalletMembers.handler({
@@ -153,6 +175,7 @@ describe('DEX API tests', async () => {
         }
         assert.notEqual(caughtError, null);
         assert.equal(caughtError.type, 'InvalidActionError');
+        assert.equal(caughtError.name, 'MultisigAccountDidNotExistError');
       });
 
     });
@@ -166,7 +189,7 @@ describe('DEX API tests', async () => {
         assert.equal(requiredSignatureCount, 2);
       });
 
-      it('should throw an InvalidActionError if the multisig wallet address does not exist', async () => {
+      it('should throw an AccountDidNotExistError if the wallet address does not exist', async () => {
         let caughtError = null;
         try {
           await chainModule.actions.getMinMultisigRequiredSignatures.handler({
@@ -177,9 +200,10 @@ describe('DEX API tests', async () => {
         }
         assert.notEqual(caughtError, null);
         assert.equal(caughtError.type, 'InvalidActionError');
+        assert.equal(caughtError.name, 'AccountDidNotExistError');
       });
 
-      it('should throw an InvalidActionError if the account is not a multisig account', async () => {
+      it('should throw an AccountWasNotMultisigError if the account is not a multisig account', async () => {
         let caughtError = null;
         try {
           await chainModule.actions.getMinMultisigRequiredSignatures.handler({
@@ -190,6 +214,7 @@ describe('DEX API tests', async () => {
         }
         assert.notEqual(caughtError, null);
         assert.equal(caughtError.type, 'InvalidActionError');
+        assert.equal(caughtError.name, 'AccountWasNotMultisigError');
       });
 
     });
@@ -197,7 +222,13 @@ describe('DEX API tests', async () => {
     describe('getOutboundTransactions action', async () => {
 
       it('should expose a getOutboundTransactions action', async () => {
-
+        let transactions = await chainModule.actions.getOutboundTransactions.handler({
+          walletAddress: client.accountAddress,
+          fromTimestamp: 0,
+          limit: 100
+        });
+        console.log(222, transactions);
+        // assert.equal(transactions.length, 2); // TODO 222
       });
 
     });
