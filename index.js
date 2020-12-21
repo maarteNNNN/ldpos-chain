@@ -1691,10 +1691,11 @@ module.exports = class LDPoSChainModule {
             this.propagateTransaction(accountTxn);
 
           } catch (error) {
-            if (!accountStream.pendingTransactionMap.size) {
-              delete this.pendingTransactionStreams[senderAddress];
-              break;
-            }
+            this.logger.warn(
+              new Error(
+                `Received invalid transaction from network - ${error.message}`
+              )
+            );
           }
         }
       }
