@@ -1624,13 +1624,12 @@ module.exports = class LDPoSChainModule {
       try {
         this.verifyGenericTransactionSchema(transaction, true);
       } catch (error) {
-        this.logger.error(
+        this.logger.warn(
           new Error(`Received invalid transaction ${transaction.id} - ${error.message}`)
         );
         return;
       }
 
-      // TODO 222: Better use of logger.warn versus logger.error
       let { senderAddress } = transaction;
 
       // This ensures that transactions sent from the same account are processed serially but
@@ -1663,6 +1662,7 @@ module.exports = class LDPoSChainModule {
 
         let accountStreamConsumer = accountStream.createConsumer();
 
+        // TODO 222: Think about how often this account data should be re-fetched fresh from the DAL.
         let { senderAccount, multisigMemberAccounts } = await this.getTransactionSenderAccount(senderAddress);
 
         for await (let accountTxn of accountStreamConsumer) {
@@ -1714,7 +1714,7 @@ module.exports = class LDPoSChainModule {
           );
         }
       } catch (error) {
-        this.logger.error(
+        this.logger.warn(
           new Error(
             `Received invalid block ${block && block.id} - ${error.message}`
           )
@@ -1731,14 +1731,14 @@ module.exports = class LDPoSChainModule {
       // If double-forged block was received.
       if (block.timestamp === this.latestReceivedBlock.timestamp) {
         this.latestDoubleForgedBlockTimestamp = this.latestReceivedBlock.timestamp;
-        this.logger.error(
+        this.logger.warn(
           new Error(`Block ${block.id} was forged with the same timestamp as the last block ${this.latestReceivedBlock.id}`)
         );
         return;
       }
       if (block.height === this.latestReceivedBlock.height) {
         this.latestDoubleForgedBlockTimestamp = this.latestReceivedBlock.timestamp;
-        this.logger.error(
+        this.logger.warn(
           new Error(`Block ${block.id} was forged at the same height as the last block ${this.latestReceivedBlock.id}`)
         );
         return;
@@ -1748,7 +1748,7 @@ module.exports = class LDPoSChainModule {
       for (let txn of transactions) {
         let pendingTxnStream = this.pendingTransactionStreams[txn.senderAddress];
         if (!pendingTxnStream || !pendingTxnStream.pendingTransactionMap.has(txn.id)) {
-          this.logger.error(
+          this.logger.warn(
             new Error(`Block ${block.id} contained an unrecognized transaction ${txn.id}`)
           );
           return;
@@ -1757,7 +1757,7 @@ module.exports = class LDPoSChainModule {
         let pendingTxn = pendingTxnStream.pendingTransactionMap.get(txn.id).transaction;
         let pendingTxnSignatureHash = this.sha256(pendingTxn.signature);
         if (txn.signatureHash !== pendingTxnSignatureHash) {
-          this.logger.error(
+          this.logger.warn(
             new Error(`Block ${block.id} contained a transaction ${txn.id} with an invalid signature hash`)
           );
           return;
@@ -1792,7 +1792,7 @@ module.exports = class LDPoSChainModule {
       try {
         await this.verifyBlockSignature(this.latestReceivedBlock, blockSignature);
       } catch (error) {
-        this.logger.error(
+        this.logger.warn(
           new Error(`Received invalid block signature - ${error.message}`)
         );
         return;
@@ -1801,7 +1801,7 @@ module.exports = class LDPoSChainModule {
       let { signatures } = this.latestReceivedBlock;
 
       if (signatures[blockSignature.signerAddress]) {
-        this.logger.error(
+        this.logger.warn(
           new Error(`Block signature of signer ${blockSignature.signerAddress} has already been received before`)
         );
         return;
