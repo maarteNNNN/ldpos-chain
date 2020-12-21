@@ -38,6 +38,7 @@ const DEFAULT_PENDING_TRANSACTION_EXPIRY = 604800000; // 1 week
 const DEFAULT_PENDING_TRANSACTION_EXPIRY_CHECK_INTERVAL = 3600000; // 1 hour
 const DEFAULT_MAX_SPENDABLE_DIGITS = 25;
 const DEFAULT_MAX_VOTES_PER_ACCOUNT = 21;
+const DEFAULT_MAX_PENDING_TRANSACTIONS_PER_ACCOUNT = 50;
 
 const DEFAULT_MIN_TRANSACTION_FEES = {
   transfer: '1000000',
@@ -737,7 +738,7 @@ module.exports = class LDPoSChainModule {
     }
   }
 
-  async verifySigAccountCanMakeTransaction(senderAccount, transaction, fullCheck) {
+  verifyTransactionCorrespondsToSigAccount(senderAccount, transaction, fullCheck) {
     verifySigTransactionSchema(transaction, fullCheck);
 
     let senderSigPublicKey;
@@ -774,7 +775,7 @@ module.exports = class LDPoSChainModule {
     }
   }
 
-  async verifyMultisigAccountCanMakeTransaction(senderAccount, transaction, fullCheck) {
+  verifyTransactionCorrespondsToMultisigAccount(senderAccount, multisigMemberAccounts, transaction, fullCheck) {
     let { senderAddress } = transaction;
     verifyMultisigTransactionSchema(
       transaction,
@@ -783,32 +784,6 @@ module.exports = class LDPoSChainModule {
       this.networkSymbol
     );
 
-    let multisigMemberAddresses;
-    try {
-      multisigMemberAddresses = await this.dal.getMultisigWalletMembers(senderAddress);
-    } catch (error) {
-      throw new Error(
-        `Failed to fetch member addresses for multisig wallet ${
-          senderAddress
-        } because of error: ${error.message}`
-      );
-    }
-
-    let multisigMemberAccounts = {};
-    try {
-      let multisigMemberAccountList = await Promise.all(
-        multisigMemberAddresses.map(memberAddress => this.getSanitizedAccount(memberAddress))
-      );
-      for (let memberAccount of multisigMemberAccountList) {
-        multisigMemberAccounts[memberAccount.address] = memberAccount;
-      }
-    } catch (error) {
-      throw new Error(
-        `Failed to fetch member accounts for multisig wallet ${
-          senderAddress
-        } because of error: ${error.message}`
-      );
-    }
     if (fullCheck) {
       for (let signaturePacket of transaction.signatures) {
         let {
@@ -982,9 +957,7 @@ module.exports = class LDPoSChainModule {
     );
   }
 
-  async verifyAccountCanMakeTransaction(senderAccount, transaction, fullCheck) {
-    let { type } = transaction;
-
+  async verifyAccountMeetsRequirements(senderAccount, transaction) {
     let { senderAddress, amount, fee, timestamp } = transaction;
 
     if (timestamp < senderAccount.lastTransactionTimestamp) {
@@ -1004,24 +977,10 @@ module.exports = class LDPoSChainModule {
       );
     }
 
-    if (type === 'vote') {
-      await this.verifyVoteTransaction(transaction);
-    } else if (type === 'unvote') {
-      await this.verifyUnvoteTransaction(transaction);
-    } else if (type === 'registerMultisig') {
-      await this.verifyRegisterMultisigTransaction(transaction);
-    }
-
-    if (senderAccount.type === ACCOUNT_TYPE_MULTISIG) {
-      await this.verifyMultisigAccountCanMakeTransaction(senderAccount, transaction, fullCheck);
-    } else {
-      await this.verifySigAccountCanMakeTransaction(senderAccount, transaction, fullCheck);
-    }
-
     return txnTotal;
   }
 
-   verifyGenericTransactionSchema(transaction, fullCheck) {
+  verifyGenericTransactionSchema(transaction, fullCheck) {
     verifyTransactionSchema(transaction, this.maxSpendableDigits, this.networkSymbol);
 
     let { type } = transaction;
@@ -1048,13 +1007,48 @@ module.exports = class LDPoSChainModule {
     }
   }
 
-  async verifyTransactionContext(senderAccount, transaction, fullCheck) {
+  async verifySigTransaction(senderAccount, transaction, fullCheck) {
+    this.verifyTransactionCorrespondsToSigAccount(senderAccount, transaction, fullCheck);
+    let txnTotal = this.verifyAccountMeetsRequirements(senderAccount, transaction);
+
     if (fullCheck) {
       this.verifyTransactionOffersMinFee(transaction);
       await this.verifyTransactionDoesNotAlreadyExist(transaction);
     }
 
-    return this.verifyAccountCanMakeTransaction(senderAccount, transaction, fullCheck);
+    let { type } = transaction;
+
+    if (type === 'vote') {
+      await this.verifyVoteTransaction(transaction);
+    } else if (type === 'unvote') {
+      await this.verifyUnvoteTransaction(transaction);
+    } else if (type === 'registerMultisig') {
+      await this.verifyRegisterMultisigTransaction(transaction);
+    }
+
+    return txnTotal;
+  }
+
+  async verifyMultisigTransaction(senderAccount, multisigMemberAccounts, transaction, fullCheck) {
+    this.verifyTransactionCorrespondsToMultisigAccount(senderAccount, multisigMemberAccounts, transaction, fullCheck);
+    let txnTotal = this.verifyAccountMeetsRequirements(senderAccount, transaction);
+
+    if (fullCheck) {
+      this.verifyTransactionOffersMinFee(transaction);
+      await this.verifyTransactionDoesNotAlreadyExist(transaction);
+    }
+
+    let { type } = transaction;
+
+    if (type === 'vote') {
+      await this.verifyVoteTransaction(transaction);
+    } else if (type === 'unvote') {
+      await this.verifyUnvoteTransaction(transaction);
+    } else if (type === 'registerMultisig') {
+      await this.verifyRegisterMultisigTransaction(transaction);
+    }
+
+    return txnTotal;
   }
 
   async verifyBlock(block, lastBlock) {
@@ -1152,8 +1146,11 @@ module.exports = class LDPoSChainModule {
     await Promise.all(
       senderAddressList.map(async (senderAddress) => {
         let senderAccount;
+        let multisigMemberAccounts;
         try {
-          senderAccount = await this.getTransactionSenderAccount(senderAddress);
+          let result = await this.getTransactionSenderAccount(senderAddress);
+          senderAccount = result.senderAccount;
+          multisigMemberAccounts = result.multisigMemberAccounts;
         } catch (error) {
           throw new Error(
             `Failed to fetch sender account ${
@@ -1166,7 +1163,12 @@ module.exports = class LDPoSChainModule {
         let senderTxnList = senderTxns[senderAddress];
         for (let senderTxn of senderTxnList) {
           try {
-            let txnTotal = await this.verifyTransactionContext(senderAccount, senderTxn, false);
+            let txnTotal;
+            if (multisigMemberAccounts) {
+              txnTotal = await this.verifyMultisigTransaction(senderAccount, multisigMemberAccounts, senderTxn, false);
+            } else {
+              txnTotal = await this.verifySigTransaction(senderAccount, senderTxn, false);
+            }
 
             // Subtract valid transaction total from the in-memory senderAccount balance since it
             // may affect the verification of the next transaction in the stream.
@@ -1434,8 +1436,11 @@ module.exports = class LDPoSChainModule {
           await Promise.all(
             senderAddressList.map(async (senderAddress) => {
               let senderAccount;
+              let multisigMemberAccounts;
               try {
-                senderAccount = await this.getTransactionSenderAccount(senderAddress);
+                let result = await this.getTransactionSenderAccount(senderAddress);
+                senderAccount = result.senderAccount;
+                multisigMemberAccounts = result.multisigMemberAccounts;
               } catch (err) {
                 let error = new Error(
                   `Failed to fetch sender account ${
@@ -1454,7 +1459,12 @@ module.exports = class LDPoSChainModule {
 
               for (let pendingTxn of pendingTxnList) {
                 try {
-                  let txnTotal = await this.verifyTransactionContext(senderAccount, pendingTxn, true);
+                  let txnTotal;
+                  if (multisigMemberAccounts) {
+                    txnTotal = await this.verifyMultisigTransaction(senderAccount, multisigMemberAccounts, pendingTxn, false);
+                  } else {
+                    txnTotal = await this.verifySigTransaction(senderAccount, pendingTxn, false);
+                  }
 
                   // Subtract valid transaction total from the in-memory senderAccount balance since it
                   // may affect the verification of the next transaction in the stream.
@@ -1552,6 +1562,35 @@ module.exports = class LDPoSChainModule {
     }
   }
 
+  async getTransactionMultisigMemberAccounts(senderAddress) {
+    let multisigMemberAddresses;
+    try {
+      multisigMemberAddresses = await this.dal.getMultisigWalletMembers(senderAddress);
+    } catch (error) {
+      throw new Error(
+        `Failed to fetch member addresses for multisig wallet ${
+          senderAddress
+        } because of error: ${error.message}`
+      );
+    }
+    let multisigMemberAccounts = {};
+    try {
+      let multisigMemberAccountList = await Promise.all(
+        multisigMemberAddresses.map(memberAddress => this.getSanitizedAccount(memberAddress))
+      );
+      for (let memberAccount of multisigMemberAccountList) {
+        multisigMemberAccounts[memberAccount.address] = memberAccount;
+      }
+    } catch (error) {
+      throw new Error(
+        `Failed to fetch member accounts for multisig wallet ${
+          senderAddress
+        } because of error: ${error.message}`
+      );
+    }
+    return multisigMemberAccounts;
+  }
+
   async getTransactionSenderAccount(senderAddress) {
     let senderAccount;
     try {
@@ -1561,13 +1600,21 @@ module.exports = class LDPoSChainModule {
         throw new Error(
           `Sender account ${senderAddress} did not exist`
         );
-      } else {
-        throw new Error(
-          `Failed to fetch sender account ${senderAddress} because of error: ${error.message}`
-        );
       }
+      throw new Error(
+        `Failed to fetch sender account ${senderAddress} because of error: ${error.message}`
+      );
     }
-    return senderAccount;
+    let multisigMemberAccounts;
+    if (senderAccount.type === ACCOUNT_TYPE_MULTISIG) {
+      multisigMemberAccounts = await this.getTransactionMultisigMemberAccounts(senderAddress);
+    } else {
+      multisigMemberAccounts = null;
+    }
+    return {
+      senderAccount,
+      multisigMemberAccounts
+    };
   }
 
   async startTransactionPropagationLoop() {
@@ -1583,25 +1630,49 @@ module.exports = class LDPoSChainModule {
         return;
       }
 
+      // TODO 222: Better use of logger.warn versus logger.error
       let { senderAddress } = transaction;
 
       // This ensures that transactions sent from the same account are processed serially but
       // transactions sent from different accounts can be verified in parallel.
 
       if (this.pendingTransactionStreams[senderAddress]) {
-        // TODO 222: If a stream's backpressure exceeds a certain threshold, kill and delete the stream.
-        this.pendingTransactionStreams[senderAddress].write(transaction);
+        let accountStream = this.pendingTransactionStreams[senderAddress];
+
+        let backpressure = accountStream.getBackpressure();
+        if (backpressure < this.maxPendingTransactionsPerAccount) {
+          // TODO 222: Try to filter out transactions with invalid signatures earlier to not build up backpressure.
+          accountStream.write(transaction);
+        } else {
+          this.logger.warn(
+            new Error(
+              `Transaction ${
+                transaction.id
+              } was rejected because account ${
+                senderAddress
+              } has exceeded the maximum allowed pending transaction backpressure of ${
+                this.maxPendingTransactionsPerAccount
+              }`
+            )
+          );
+        }
       } else {
         let accountStream = new WritableConsumableStream();
         accountStream.pendingTransactionMap = new Map();
         this.pendingTransactionStreams[senderAddress] = accountStream;
 
         let accountStreamConsumer = accountStream.createConsumer();
-        let senderAccount = await this.getTransactionSenderAccount(senderAddress);
+
+        let { senderAccount, multisigMemberAccounts } = await this.getTransactionSenderAccount(senderAddress);
 
         for await (let accountTxn of accountStreamConsumer) {
           try {
-            let txnTotal = await this.verifyTransactionContext(senderAccount, accountTxn, true);
+            let txnTotal;
+            if (multisigMemberAccounts) {
+              txnTotal = await this.verifyMultisigTransaction(senderAccount, multisigMemberAccounts, accountTxn, true);
+            } else {
+              txnTotal = await this.verifySigTransaction(senderAccount, accountTxn, true);
+            }
 
             // Subtract valid transaction total from the in-memory senderAccount balance since it
             // may affect the verification of the next transaction in the stream.
@@ -1798,7 +1869,8 @@ module.exports = class LDPoSChainModule {
       pendingTransactionExpiry: DEFAULT_PENDING_TRANSACTION_EXPIRY,
       pendingTransactionExpiryCheckInterval: DEFAULT_PENDING_TRANSACTION_EXPIRY_CHECK_INTERVAL,
       maxSpendableDigits: DEFAULT_MAX_SPENDABLE_DIGITS,
-      maxVotesPerAccount: DEFAULT_MAX_VOTES_PER_ACCOUNT
+      maxVotesPerAccount: DEFAULT_MAX_VOTES_PER_ACCOUNT,
+      maxPendingTransactionsPerAccount: DEFAULT_MAX_PENDING_TRANSACTIONS_PER_ACCOUNT
     };
     this.options = {...defaultOptions, ...options};
 
@@ -1818,6 +1890,7 @@ module.exports = class LDPoSChainModule {
     this.pendingTransactionExpiryCheckInterval = this.options.pendingTransactionExpiryCheckInterval;
     this.maxSpendableDigits = this.options.maxSpendableDigits;
     this.maxVotesPerAccount = this.options.maxVotesPerAccount;
+    this.maxPendingTransactionsPerAccount = this.options.maxPendingTransactionsPerAccount;
 
     this.genesis = require(options.genesisPath || DEFAULT_GENESIS_PATH);
     await this.dal.init({
