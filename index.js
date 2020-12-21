@@ -17,7 +17,6 @@ const { verifyBlocksResponse } = require('./schemas/blocks-response-schema');
 const { verifyBlockInfoSchema } = require('./schemas/block-info-schema');
 
 // TODO 222: Should multisig members sign the initial registerMultisig transaction or is the signature from the multisig wallet itself the only requirement?
-// TODO 222: What happens if many transactions are broadcasted at the same time which together exceed the balance limit but individually are less than balance?
 
 const DEFAULT_MODULE_ALIAS = 'ldpos_chain';
 const DEFAULT_GENESIS_PATH = './genesis/mainnet/genesis.json';
@@ -861,29 +860,6 @@ module.exports = class LDPoSChainModule {
     }
   }
 
-  async verifyAccountCanMakeGenericTransaction(senderAccount, transaction) {
-    let { senderAddress, amount, fee, timestamp } = transaction;
-
-    if (timestamp < senderAccount.lastTransactionTimestamp) {
-      throw new Error(
-        `Transaction was older than the last transaction processed from the sender ${
-          senderAddress
-        }`
-      );
-    }
-
-    let txnTotal = BigInt(amount || 0) + BigInt(fee || 0);
-    if (txnTotal > senderAccount.balance) {
-      throw new Error(
-        `Transaction amount plus fee was greater than the balance of sender ${
-          senderAddress
-        }`
-      );
-    }
-
-    return txnTotal;
-  }
-
   async verifyVoteTransaction(transaction) {
     let { senderAddress, delegateAddress } = transaction;
     let delegateAccount;
@@ -1009,7 +985,24 @@ module.exports = class LDPoSChainModule {
   async verifyAccountCanMakeTransaction(senderAccount, transaction, fullCheck) {
     let { type } = transaction;
 
-    let txnTotal = await this.verifyAccountCanMakeGenericTransaction(senderAccount, transaction);
+    let { senderAddress, amount, fee, timestamp } = transaction;
+
+    if (timestamp < senderAccount.lastTransactionTimestamp) {
+      throw new Error(
+        `Transaction was older than the last transaction processed from the sender ${
+          senderAddress
+        }`
+      );
+    }
+
+    let txnTotal = BigInt(amount || 0) + BigInt(fee || 0);
+    if (txnTotal > senderAccount.balance) {
+      throw new Error(
+        `Transaction amount plus fee was greater than the balance of sender ${
+          senderAddress
+        }`
+      );
+    }
 
     if (type === 'vote') {
       await this.verifyVoteTransaction(transaction);
@@ -1028,7 +1021,7 @@ module.exports = class LDPoSChainModule {
     return txnTotal;
   }
 
-   verifyFullTransactionSchema(transaction, fullCheck) {
+   verifyGenericTransactionSchema(transaction, fullCheck) {
     verifyTransactionSchema(transaction, this.maxSpendableDigits, this.networkSymbol);
 
     let { type } = transaction;
@@ -1062,30 +1055,6 @@ module.exports = class LDPoSChainModule {
     }
 
     return this.verifyAccountCanMakeTransaction(senderAccount, transaction, fullCheck);
-  }
-
-  async verifyTransaction(transaction, fullCheck) {
-    this.verifyFullTransactionSchema(transaction, fullCheck);
-
-    // TODO 2222
-    let { senderAddress } = transaction;
-
-    let senderAccount;
-    try {
-      senderAccount = await this.getSanitizedAccount(senderAddress);
-    } catch (error) {
-      if (error.name === 'AccountDidNotExistError') {
-        throw new Error(
-          `Sender account ${senderAddress} did not exist`
-        );
-      } else {
-        throw new Error(
-          `Failed to fetch sender account ${senderAddress} because of error: ${error.message}`
-        );
-      }
-    }
-
-    await this.verifyTransactionContext(senderAccount, transaction, fullCheck);
   }
 
   async verifyBlock(block, lastBlock) {
@@ -1141,35 +1110,77 @@ module.exports = class LDPoSChainModule {
       throw new Error(`Block was invalid`);
     }
 
-    try {
-      for (let transaction of block.transactions) {
+    for (let transaction of block.transactions) {
+      this.verifyGenericTransactionSchema(transaction, false);
+    }
+
+    await Promise.all(
+      block.transactions.map(async (transaction) => {
         let existingTransaction;
         try {
           existingTransaction = await this.getSanitizedTransaction(transaction.id);
         } catch (error) {
           if (error.type !== 'InvalidActionError') {
             throw new Error(
-              `Failed to check if a previous transaction already exited`
+              `Failed to check if transaction ${
+                transaction.id
+              } already exited during block processing`
             );
           }
         }
-        if (existingTransaction) {
-          if (existingTransaction.blockId !== block.id) {
-            throw new Error(
-              `Block contained a transaction which was already processed as part of an earlier block`
-            );
-          }
-        } else {
-          await this.verifyTransaction(transaction, false);
+        if (existingTransaction && existingTransaction.blockId !== block.id) {
+          throw new Error(
+            `Block contained transaction ${
+              existingTransaction.id
+            } which was already processed as part of an earlier block`
+          );
         }
+      })
+    );
+
+    let senderTxns = {};
+    for (let transaction of block.transactions) {
+      let { senderAddress } = transaction;
+      if (!senderTxns[senderAddress]) {
+        senderTxns[senderAddress] = [];
       }
-    } catch (error) {
-      throw new Error(
-        `Failed to validate transactions in block because of error: ${
-          error.message
-        }`
-      );
+      senderTxns[senderAddress].push(transaction);
     }
+
+    let senderAddressList = Object.keys(senderTxns);
+
+    await Promise.all(
+      senderAddressList.map(async (senderAddress) => {
+        let senderAccount;
+        try {
+          senderAccount = await this.getTransactionSenderAccount(senderAddress);
+        } catch (error) {
+          throw new Error(
+            `Failed to fetch sender account ${
+              senderAddress
+            } for transaction verification as part of block verification because of error: ${
+              error.message
+            }`
+          );
+        }
+        let senderTxnList = senderTxns[senderAddress];
+        for (let senderTxn of senderTxnList) {
+          try {
+            let txnTotal = await this.verifyTransactionContext(senderAccount, senderTxn, false);
+
+            // Subtract valid transaction total from the in-memory senderAccount balance since it
+            // may affect the verification of the next transaction in the stream.
+            senderAccount.balance -= txnTotal;
+          } catch (error) {
+            throw new Error(
+              `Failed to validate transactions during block verification because of error: ${
+                error.message
+              }`
+            );
+          }
+        }
+      })
+    );
   }
 
   async verifyBlockSignature(latestBlock, blockSignature) {
@@ -1416,30 +1427,55 @@ module.exports = class LDPoSChainModule {
 
       if (isCurrentForgingDelegate) {
         (async () => {
-          // TODO 222: It's not possible to verify all transactions in parallel like this; they need to be verified serially (at least with respect to each sender account).
-          let validTransactions = (
-            await Promise.all(
-              [...this.pendingTransactionMapTODO222.values()].map(
-                async (pendingTxnPacket) => {
-                  let pendingTxn = pendingTxnPacket.transaction;
-                  try {
-                    await this.verifyTransaction(pendingTxn, true);
-                  } catch (error) {
-                    this.logger.debug(
-                      `Excluded transaction ${
-                        pendingTxn.id
-                      } from block because of error: ${
-                        error.message
-                      }`
-                    );
-                    this.pendingTransactionMapTODO222.delete(pendingTxn.id);
-                    return null;
+          let validTransactions = [];
+
+          let senderAddressList = Object.keys(this.pendingTransactionStreams);
+
+          await Promise.all(
+            senderAddressList.map(async (senderAddress) => {
+              let senderAccount;
+              try {
+                senderAccount = await this.getTransactionSenderAccount(senderAddress);
+              } catch (err) {
+                let error = new Error(
+                  `Failed to fetch sender account ${
+                    senderAddress
+                  } for transaction verification as part of block forging because of error: ${
+                    err.message
+                  }`
+                );
+                this.logger.error(error);
+                return;
+              }
+
+              let senderTxnStream = this.pendingTransactionStreams[senderAddress];
+              let pendingTxnMap = senderTxnStream.pendingTransactionMap;
+              let pendingTxnList = Object.values(pendingTxnMap);
+
+              for (let pendingTxn of pendingTxnList) {
+                try {
+                  let txnTotal = await this.verifyTransactionContext(senderAccount, pendingTxn, true);
+
+                  // Subtract valid transaction total from the in-memory senderAccount balance since it
+                  // may affect the verification of the next transaction in the stream.
+                  senderAccount.balance -= txnTotal;
+                  validTransactions.push(pendingTxn);
+                } catch (error) {
+                  this.logger.debug(
+                    `Excluded transaction ${
+                      pendingTxn.id
+                    } from block because of error: ${
+                      error.message
+                    }`
+                  );
+                  pendingTxnMap.delete(pendingTxn.id);
+                  if (!pendingTxnMap.size) {
+                    delete this.pendingTransactionStreams[senderAddress];
                   }
-                  return pendingTxn;
                 }
-              )
-            )
-          ).filter(pendingTxn => pendingTxn);
+              }
+            })
+          );
 
           let pendingTransactions = this.sortPendingTransactions(validTransactions);
           let blockTransactions = pendingTransactions.slice(0, maxTransactionsPerBlock).map(txn => this.simplifyTransaction(txn));
@@ -1516,9 +1552,7 @@ module.exports = class LDPoSChainModule {
     }
   }
 
-  async getTransactionSenderAccount(transaction) {
-    let { senderAddress } = transaction;
-
+  async getTransactionSenderAccount(senderAddress) {
     let senderAccount;
     try {
       senderAccount = await this.getSanitizedAccount(senderAddress);
@@ -1541,7 +1575,7 @@ module.exports = class LDPoSChainModule {
       let transaction = event.data;
 
       try {
-        this.verifyFullTransactionSchema(transaction, true);
+        this.verifyGenericTransactionSchema(transaction, true);
       } catch (error) {
         this.logger.error(
           new Error(`Received invalid transaction ${transaction.id} - ${error.message}`)
@@ -1562,7 +1596,7 @@ module.exports = class LDPoSChainModule {
         this.pendingTransactionStreams[senderAddress] = accountStream;
 
         let accountStreamConsumer = accountStream.createConsumer();
-        let senderAccount = await this.getTransactionSenderAccount(transaction);
+        let senderAccount = await this.getTransactionSenderAccount(senderAddress);
 
         for await (let accountTxn of accountStreamConsumer) {
           try {
@@ -1580,7 +1614,7 @@ module.exports = class LDPoSChainModule {
               receivedTimestamp: Date.now()
             });
 
-            this.propagateTransaction();
+            this.propagateTransaction(accountTxn);
 
           } catch (error) {
             if (!accountStream.pendingTransactionMap.size) {
