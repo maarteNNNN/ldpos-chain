@@ -4,7 +4,7 @@
   "description": "LDPoS chain module",
   "main": "index.js",
   "scripts": {
-    "test": "mocha --reporter spec --timeout 3000 --slow 3000"
+    "test": "mocha --reporter spec --timeout 10000 --slow 10000"
   },
   "keywords": [
     "blockchain",

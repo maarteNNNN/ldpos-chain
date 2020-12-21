@@ -1589,6 +1589,7 @@ module.exports = class LDPoSChainModule {
       // transactions sent from different accounts can be verified in parallel.
 
       if (this.pendingTransactionStreams[senderAddress]) {
+        // TODO 222: If a stream's backpressure exceeds a certain threshold, kill and delete the stream.
         this.pendingTransactionStreams[senderAddress].write(transaction);
       } else {
         let accountStream = new WritableConsumableStream();
