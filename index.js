@@ -693,6 +693,7 @@ module.exports = class LDPoSChainModule {
       if (senderTxnStream) {
         senderTxnStream.pendingTransactionMap.delete(txn.id);
         if (!senderTxnStream.pendingTransactionMap.size) {
+          senderTxnStream.close();
           delete this.pendingTransactionStreams[txn.senderAddress];
         }
       }
@@ -1480,6 +1481,7 @@ module.exports = class LDPoSChainModule {
                   );
                   pendingTxnMap.delete(pendingTxn.id);
                   if (!pendingTxnMap.size) {
+                    senderTxnStream.close();
                     delete this.pendingTransactionStreams[senderAddress];
                   }
                 }
@@ -1827,12 +1829,13 @@ module.exports = class LDPoSChainModule {
 
     let pendingSenderList = Object.keys(this.pendingTransactionStreams);
     for (let senderAddress of pendingSenderList) {
-      let txnStream = this.pendingTransactionStreams[senderAddress];
-      let pendingTxnMap = txnStream.pendingTransactionMap;
+      let senderTxnStream = this.pendingTransactionStreams[senderAddress];
+      let pendingTxnMap = senderTxnStream.pendingTransactionMap;
       for (let { transaction, receivedTimestamp } of pendingTxnMap) {
         if (now - receivedTimestamp >= expiry) {
           pendingTxnMap.delete(transaction.id);
           if (!pendingTxnMap.size) {
+            senderTxnStream.close();
             delete this.pendingTransactionStreams[senderAddress];
           }
         }
