@@ -227,8 +227,9 @@ describe('DEX API tests', async () => {
           fromTimestamp: 0,
           limit: 100
         });
-        console.log(222, transactions);
-        // assert.equal(transactions.length, 2); // TODO 222
+        assert.equal(transactions.length, 1);
+        assert.equal(transactions[0].senderAddress, client.accountAddress);
+        assert.equal(transactions[0].id, 'c0MEriIBdQhrc8mxU1ZGVUCHlmXhc9L+4Jzy1fo9ij0=');
       });
 
     });
