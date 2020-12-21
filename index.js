@@ -60,7 +60,7 @@ module.exports = class LDPoSChainModule {
     } else {
       // TODO 222: Default to postgres adapter as Data Access Layer
     }
-    this.pendingTransactionMap = new Map();
+    this.pendingTransactionStreams = {};
     this.pendingBlocks = [];
     this.latestFullySignedBlock = null;
     this.latestProcessedBlock = null;
@@ -689,7 +689,13 @@ module.exports = class LDPoSChainModule {
     }
 
     for (let txn of transactions) {
-      this.pendingTransactionMap.delete(txn.id);
+      let senderTxnStream = this.pendingTransactionStreams[txn.senderAddress];
+      if (senderTxnStream) {
+        senderTxnStream.pendingTransactionMap.delete(txn.id);
+        if (!senderTxnStream.pendingTransactionMap.size) {
+          delete this.pendingTransactionStreams[txn.senderAddress];
+        }
+      }
     }
 
     this.latestProcessedBlock = block;
@@ -874,6 +880,8 @@ module.exports = class LDPoSChainModule {
         }`
       );
     }
+
+    return txnTotal;
   }
 
   async verifyVoteTransaction(transaction) {
@@ -998,25 +1006,10 @@ module.exports = class LDPoSChainModule {
     );
   }
 
-  async verifyAccountCanMakeTransaction(transaction, fullCheck) {
-    let { type, senderAddress } = transaction;
+  async verifyAccountCanMakeTransaction(senderAccount, transaction, fullCheck) {
+    let { type } = transaction;
 
-    let senderAccount;
-    try {
-      senderAccount = await this.getSanitizedAccount(senderAddress);
-    } catch (error) {
-      if (error.name === 'AccountDidNotExistError') {
-        throw new Error(
-          `Sender account ${senderAddress} did not exist`
-        );
-      } else {
-        throw new Error(
-          `Failed to fetch sender account ${senderAddress} because of error: ${error.message}`
-        );
-      }
-    }
-
-    await this.verifyAccountCanMakeGenericTransaction(senderAccount, transaction);
+    let txnTotal = await this.verifyAccountCanMakeGenericTransaction(senderAccount, transaction);
 
     if (type === 'vote') {
       await this.verifyVoteTransaction(transaction);
@@ -1031,9 +1024,11 @@ module.exports = class LDPoSChainModule {
     } else {
       await this.verifySigAccountCanMakeTransaction(senderAccount, transaction, fullCheck);
     }
+
+    return txnTotal;
   }
 
-  async verifyTransaction(transaction, fullCheck) {
+   verifyFullTransactionSchema(transaction, fullCheck) {
     verifyTransactionSchema(transaction, this.maxSpendableDigits, this.networkSymbol);
 
     let { type } = transaction;
@@ -1058,13 +1053,39 @@ module.exports = class LDPoSChainModule {
         `Transaction type ${type} was invalid`
       );
     }
+  }
 
+  async verifyTransactionContext(senderAccount, transaction, fullCheck) {
     if (fullCheck) {
       this.verifyTransactionOffersMinFee(transaction);
       await this.verifyTransactionDoesNotAlreadyExist(transaction);
     }
 
-    await this.verifyAccountCanMakeTransaction(transaction, fullCheck);
+    return this.verifyAccountCanMakeTransaction(senderAccount, transaction, fullCheck);
+  }
+
+  async verifyTransaction(transaction, fullCheck) {
+    this.verifyFullTransactionSchema(transaction, fullCheck);
+
+    // TODO 2222
+    let { senderAddress } = transaction;
+
+    let senderAccount;
+    try {
+      senderAccount = await this.getSanitizedAccount(senderAddress);
+    } catch (error) {
+      if (error.name === 'AccountDidNotExistError') {
+        throw new Error(
+          `Sender account ${senderAddress} did not exist`
+        );
+      } else {
+        throw new Error(
+          `Failed to fetch sender account ${senderAddress} because of error: ${error.message}`
+        );
+      }
+    }
+
+    await this.verifyTransactionContext(senderAccount, transaction, fullCheck);
   }
 
   async verifyBlock(block, lastBlock) {
@@ -1076,7 +1097,10 @@ module.exports = class LDPoSChainModule {
         `Block height was invalid - Was ${block.height} but expected ${expectedBlockHeight}`
       );
     }
-    if (block.timestamp % this.forgingInterval !== 0 || block.timestamp - lastBlock.timestamp < this.forgingInterval) {
+    if (
+      block.timestamp % this.forgingInterval !== 0 ||
+      block.timestamp - lastBlock.timestamp < this.forgingInterval
+    ) {
       throw new Error(
         `Block timestamp ${block.timestamp} was invalid`
       );
@@ -1392,9 +1416,10 @@ module.exports = class LDPoSChainModule {
 
       if (isCurrentForgingDelegate) {
         (async () => {
+          // TODO 222: It's not possible to verify all transactions in parallel like this; they need to be verified serially (at least with respect to each sender account).
           let validTransactions = (
             await Promise.all(
-              [...this.pendingTransactionMap.values()].map(
+              [...this.pendingTransactionMapTODO222.values()].map(
                 async (pendingTxnPacket) => {
                   let pendingTxn = pendingTxnPacket.transaction;
                   try {
@@ -1407,7 +1432,7 @@ module.exports = class LDPoSChainModule {
                         error.message
                       }`
                     );
-                    this.pendingTransactionMap.delete(pendingTxn.id);
+                    this.pendingTransactionMapTODO222.delete(pendingTxn.id);
                     return null;
                   }
                   return pendingTxn;
@@ -1478,12 +1503,45 @@ module.exports = class LDPoSChainModule {
     });
   }
 
+  async propagateTransaction(transaction) {
+    // This is a performance optimization to ensure that peers
+    // will not receive multiple instances of the same transaction at the same time.
+    let randomPropagationDelay = Math.round(Math.random() * this.propagationRandomness);
+    await this.wait(randomPropagationDelay);
+
+    try {
+      await this.broadcastTransaction(transaction);
+    } catch (error) {
+      this.logger.error(error);
+    }
+  }
+
+  async getTransactionSenderAccount(transaction) {
+    let { senderAddress } = transaction;
+
+    let senderAccount;
+    try {
+      senderAccount = await this.getSanitizedAccount(senderAddress);
+    } catch (error) {
+      if (error.name === 'AccountDidNotExistError') {
+        throw new Error(
+          `Sender account ${senderAddress} did not exist`
+        );
+      } else {
+        throw new Error(
+          `Failed to fetch sender account ${senderAddress} because of error: ${error.message}`
+        );
+      }
+    }
+    return senderAccount;
+  }
+
   async startTransactionPropagationLoop() {
     this.channel.subscribe(`network:event:${this.alias}:transaction`, async (event) => {
       let transaction = event.data;
 
       try {
-        await this.verifyTransaction(transaction, true);
+        this.verifyFullTransactionSchema(transaction, true);
       } catch (error) {
         this.logger.error(
           new Error(`Received invalid transaction ${transaction.id} - ${error.message}`)
@@ -1491,24 +1549,48 @@ module.exports = class LDPoSChainModule {
         return;
       }
 
-      if (this.pendingTransactionMap.has(transaction.id)) {
-        this.logger.error(
-          new Error(`Transaction ${transaction.id} has already been received before`)
-        );
-        return;
-      }
-      this.pendingTransactionMap.set(transaction.id, { transaction, receivedTimestamp: Date.now() });
+      let { senderAddress } = transaction;
 
-      // This is a performance optimization to ensure that peers
-      // will not receive multiple instances of the same transaction at the same time.
-      let randomPropagationDelay = Math.round(Math.random() * this.propagationRandomness);
-      await this.wait(randomPropagationDelay);
+      // This ensures that transactions sent from the same account are processed serially but
+      // transactions sent from different accounts can be verified in parallel.
 
-      try {
-        await this.broadcastTransaction(transaction);
-      } catch (error) {
-        this.logger.error(error);
+      if (this.pendingTransactionStreams[senderAddress]) {
+        this.pendingTransactionStreams[senderAddress].write(transaction);
+      } else {
+        let accountStream = new WritableConsumableStream();
+        accountStream.pendingTransactionMap = new Map();
+        this.pendingTransactionStreams[senderAddress] = accountStream;
+
+        let accountStreamConsumer = accountStream.createConsumer();
+        let senderAccount = await this.getTransactionSenderAccount(transaction);
+
+        for await (let accountTxn of accountStreamConsumer) {
+          try {
+            let txnTotal = await this.verifyTransactionContext(senderAccount, accountTxn, true);
+
+            // Subtract valid transaction total from the in-memory senderAccount balance since it
+            // may affect the verification of the next transaction in the stream.
+            senderAccount.balance -= txnTotal;
+
+            if (accountStream.pendingTransactionMap.has(accountTxn.id)) {
+              throw new Error(`Transaction ${accountTxn.id} has already been received before`);
+            }
+            accountStream.pendingTransactionMap.set(accountTxn.id, {
+              transaction: accountTxn,
+              receivedTimestamp: Date.now()
+            });
+
+            this.propagateTransaction();
+
+          } catch (error) {
+            if (!accountStream.pendingTransactionMap.size) {
+              delete this.pendingTransactionStreams[senderAddress];
+              break;
+            }
+          }
+        }
       }
+
     });
   }
 
@@ -1558,13 +1640,15 @@ module.exports = class LDPoSChainModule {
 
       let { transactions } = block;
       for (let txn of transactions) {
-        if (!this.pendingTransactionMap.has(txn.id)) {
+        let pendingTxnStream = this.pendingTransactionStreams[txn.senderAddress];
+        if (!pendingTxnStream || !pendingTxnStream.pendingTransactionMap.has(txn.id)) {
           this.logger.error(
             new Error(`Block ${block.id} contained an unrecognized transaction ${txn.id}`)
           );
           return;
         }
-        let pendingTxn = this.pendingTransactionMap.get(txn.id).transaction;
+
+        let pendingTxn = pendingTxnStream.pendingTransactionMap.get(txn.id).transaction;
         let pendingTxnSignatureHash = this.sha256(pendingTxn.signature);
         if (txn.signatureHash !== pendingTxnSignatureHash) {
           this.logger.error(
@@ -1635,12 +1719,19 @@ module.exports = class LDPoSChainModule {
   cleanupPendingTransactionMap(expiry) {
     let now = Date.now();
 
-    let expiredTransactionList = [...this.pendingTransactionMap.values()]
-      .filter(pendingTxn => now - pendingTxn.receivedTimestamp >= expiry)
-      .map(pendingTxn => pendingTxn.transaction);
-
-    for (let txn of expiredTransactionList) {
-      this.pendingTransactionMap.delete(txn.id);
+    let pendingSenderList = Object.keys(this.pendingTransactionStreams);
+    for (let senderAddress of pendingSenderList) {
+      let txnStream = this.pendingTransactionStreams[senderAddress];
+      let pendingTxnMap = txnStream.pendingTransactionMap;
+      for (let { transaction, receivedTimestamp } of pendingTxnMap) {
+        if (now - receivedTimestamp >= expiry) {
+          expiredTransactionList.push(transaction);
+          pendingTxnMap.delete(transaction.id);
+          if (!pendingTxnMap.size) {
+            delete this.pendingTransactionStreams[senderAddress];
+          }
+        }
+      }
     }
   }
 
