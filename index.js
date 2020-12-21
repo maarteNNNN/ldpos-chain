@@ -1759,7 +1759,6 @@ module.exports = class LDPoSChainModule {
       let pendingTxnMap = txnStream.pendingTransactionMap;
       for (let { transaction, receivedTimestamp } of pendingTxnMap) {
         if (now - receivedTimestamp >= expiry) {
-          expiredTransactionList.push(transaction);
           pendingTxnMap.delete(transaction.id);
           if (!pendingTxnMap.size) {
             delete this.pendingTransactionStreams[senderAddress];
