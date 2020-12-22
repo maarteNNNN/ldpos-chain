@@ -692,7 +692,7 @@ module.exports = class LDPoSChainModule {
       let senderTxnStream = this.pendingTransactionStreams[txn.senderAddress];
       if (senderTxnStream) {
         senderTxnStream.pendingTransactionMap.delete(txn.id);
-        if (!senderTxnStream.pendingTransactionMap.size) {
+        if (!this.isAccountStreamBusy(senderTxnStream)) {
           senderTxnStream.close();
           delete this.pendingTransactionStreams[txn.senderAddress];
         }
@@ -1008,8 +1008,33 @@ module.exports = class LDPoSChainModule {
     }
   }
 
+  async verifySigTransactionWithoutSignatureCheck(senderAccount, transaction, fullCheck) {
+    let txnTotal = this.verifyAccountMeetsRequirements(senderAccount, transaction);
+
+    if (fullCheck) {
+      this.verifyTransactionOffersMinFee(transaction);
+      await this.verifyTransactionDoesNotAlreadyExist(transaction);
+    }
+
+    let { type } = transaction;
+
+    if (type === 'vote') {
+      await this.verifyVoteTransaction(transaction);
+    } else if (type === 'unvote') {
+      await this.verifyUnvoteTransaction(transaction);
+    } else if (type === 'registerMultisig') {
+      await this.verifyRegisterMultisigTransaction(transaction);
+    }
+
+    return txnTotal;
+  }
+
   async verifySigTransaction(senderAccount, transaction, fullCheck) {
     this.verifyTransactionCorrespondsToSigAccount(senderAccount, transaction, fullCheck);
+    return this.verifySigTransactionWithoutSignatureCheck(senderAccount, transaction, fullCheck);
+  }
+
+  async verifyMultisigTransactionWithoutSignatureCheck(senderAccount, multisigMemberAccounts, transaction, fullCheck) {
     let txnTotal = this.verifyAccountMeetsRequirements(senderAccount, transaction);
 
     if (fullCheck) {
@@ -1032,24 +1057,7 @@ module.exports = class LDPoSChainModule {
 
   async verifyMultisigTransaction(senderAccount, multisigMemberAccounts, transaction, fullCheck) {
     this.verifyTransactionCorrespondsToMultisigAccount(senderAccount, multisigMemberAccounts, transaction, fullCheck);
-    let txnTotal = this.verifyAccountMeetsRequirements(senderAccount, transaction);
-
-    if (fullCheck) {
-      this.verifyTransactionOffersMinFee(transaction);
-      await this.verifyTransactionDoesNotAlreadyExist(transaction);
-    }
-
-    let { type } = transaction;
-
-    if (type === 'vote') {
-      await this.verifyVoteTransaction(transaction);
-    } else if (type === 'unvote') {
-      await this.verifyUnvoteTransaction(transaction);
-    } else if (type === 'registerMultisig') {
-      await this.verifyRegisterMultisigTransaction(transaction);
-    }
-
-    return txnTotal;
+    return this.verifyMultisigTransactionWithoutSignatureCheck(senderAccount, multisigMemberAccounts, transaction, fullCheck);
   }
 
   async verifyBlock(block, lastBlock) {
@@ -1619,6 +1627,10 @@ module.exports = class LDPoSChainModule {
     };
   }
 
+  isAccountStreamBusy(accountStream) {
+    return !accountStream.pendingTransactionVerificationCount && !accountStream.pendingTransactionMap.size;
+  }
+
   async startTransactionPropagationLoop() {
     this.channel.subscribe(`network:event:${this.alias}:transaction`, async (event) => {
       let transaction = event.data;
@@ -1641,10 +1653,8 @@ module.exports = class LDPoSChainModule {
         let accountStream = this.pendingTransactionStreams[senderAddress];
 
         let backpressure = accountStream.getBackpressure();
-        if (backpressure < this.maxPendingTransactionsPerAccount) {
-          // TODO 222: Try to filter out transactions with invalid signatures earlier to not build up backpressure.
-          accountStream.write(transaction);
-        } else {
+
+        if (backpressure >= this.maxPendingTransactionsPerAccount) {
           this.logger.warn(
             new Error(
               `Transaction ${
@@ -1656,51 +1666,104 @@ module.exports = class LDPoSChainModule {
               }`
             )
           );
+          return;
         }
-      } else {
-        let accountStream = new WritableConsumableStream();
-        accountStream.pendingTransactionMap = new Map();
-        this.pendingTransactionStreams[senderAddress] = accountStream;
 
-        let accountStreamConsumer = accountStream.createConsumer();
+        accountStream.pendingTransactionVerificationCount++;
 
-        // TODO 222: Think about how often this account data should be re-fetched fresh from the DAL.
-        let { senderAccount, multisigMemberAccounts } = await this.getTransactionSenderAccount(senderAddress);
-        accountStream.write(transaction);
-
-        for await (let accountTxn of accountStreamConsumer) {
-          try {
-            let txnTotal;
-            if (multisigMemberAccounts) {
-              txnTotal = await this.verifyMultisigTransaction(senderAccount, multisigMemberAccounts, accountTxn, true);
-            } else {
-              txnTotal = await this.verifySigTransaction(senderAccount, accountTxn, true);
-            }
-
-            // Subtract valid transaction total from the in-memory senderAccount balance since it
-            // may affect the verification of the next transaction in the stream.
-            senderAccount.balance -= txnTotal;
-
-            if (accountStream.pendingTransactionMap.has(accountTxn.id)) {
-              throw new Error(`Transaction ${accountTxn.id} has already been received before`);
-            }
-            accountStream.pendingTransactionMap.set(accountTxn.id, {
-              transaction: accountTxn,
-              receivedTimestamp: Date.now()
-            });
-
-            this.propagateTransaction(accountTxn);
-
-          } catch (error) {
-            this.logger.warn(
-              new Error(
-                `Received invalid transaction from network - ${error.message}`
-              )
-            );
+        let { senderAccount, multisigMemberAccounts } = await accountStream.senderAccountPromise;
+        try {
+          if (multisigMemberAccounts) {
+            this.verifyTransactionCorrespondsToMultisigAccount(senderAccount, multisigMemberAccounts, transaction, true);
+          } else {
+            this.verifyTransactionCorrespondsToSigAccount(senderAccount, transaction, true);
           }
+          accountStream.write(transaction);
+        } catch (error) {
+          this.logger.warn(
+            new Error(
+              `Received invalid transaction from network - ${error.message}`
+            )
+          );
+          accountStream.pendingTransactionVerificationCount--;
+          if (!this.isAccountStreamBusy(accountStream)) {
+            accountStream.close();
+            delete this.pendingTransactionStreams[senderAddress];
+          }
+        }
+
+        return;
+      }
+
+      let accountStream = new WritableConsumableStream();
+      accountStream.pendingTransactionMap = new Map();
+      accountStream.pendingTransactionVerificationCount = 1;
+      this.pendingTransactionStreams[senderAddress] = accountStream;
+
+      let accountStreamConsumer = accountStream.createConsumer();
+
+      accountStream.senderAccountPromise = this.getTransactionSenderAccount(senderAddress);
+
+      // TODO 222: Think about how often this account data should be re-fetched fresh from the DAL.
+      let { senderAccount, multisigMemberAccounts } = await accountStream.senderAccountPromise;
+      try {
+        if (multisigMemberAccounts) {
+          this.verifyTransactionCorrespondsToMultisigAccount(senderAccount, multisigMemberAccounts, transaction, true);
+        } else {
+          this.verifyTransactionCorrespondsToSigAccount(senderAccount, transaction, true);
+        }
+        accountStream.write(transaction);
+      } catch (error) {
+        this.logger.warn(
+          new Error(
+            `Received invalid transaction from network - ${error.message}`
+          )
+        );
+
+        accountStream.pendingTransactionVerificationCount--;
+        if (!this.isAccountStreamBusy(accountStream)) {
+          accountStream.close();
+          delete this.pendingTransactionStreams[senderAddress];
+          return;
         }
       }
 
+      for await (let accountTxn of accountStreamConsumer) {
+        try {
+          let txnTotal;
+          if (multisigMemberAccounts) {
+            txnTotal = await this.verifyMultisigTransactionWithoutSignatureCheck(senderAccount, multisigMemberAccounts, accountTxn, true);
+          } else {
+            txnTotal = await this.verifySigTransactionWithoutSignatureCheck(senderAccount, accountTxn, true);
+          }
+
+          // Subtract valid transaction total from the in-memory senderAccount balance since it
+          // may affect the verification of the next transaction in the stream.
+          senderAccount.balance -= txnTotal;
+
+          if (accountStream.pendingTransactionMap.has(accountTxn.id)) {
+            throw new Error(`Transaction ${accountTxn.id} has already been received before`);
+          }
+          accountStream.pendingTransactionMap.set(accountTxn.id, {
+            transaction: accountTxn,
+            receivedTimestamp: Date.now()
+          });
+
+          this.propagateTransaction(accountTxn);
+
+        } catch (error) {
+          this.logger.warn(
+            new Error(
+              `Received invalid transaction from network - ${error.message}`
+            )
+          );
+        }
+        accountStream.pendingTransactionVerificationCount--;
+        if (!this.isAccountStreamBusy(accountStream)) {
+          delete this.pendingTransactionStreams[senderAddress];
+          return;
+        }
+      }
     });
   }
 
