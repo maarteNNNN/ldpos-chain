@@ -150,7 +150,13 @@ describe('DEX API tests', async () => {
           timestamp: 1608470600000,
           data: ''
         }
-      ].map(txn => client.prepareTransaction(txn));
+      ].map(txn => {
+        let preparedTxn = client.prepareTransaction(txn);
+        return {
+          ...preparedTxn,
+          blockId: 2
+        };
+      });
 
       memberAddessList = memberAccounts.map(account => account.address);
       for (let account of memberAccounts) {
