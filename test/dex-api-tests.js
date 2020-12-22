@@ -318,6 +318,26 @@ describe('DEX API tests', async () => {
         assert.equal(transactions[0].id, 'QbGowi9nkwf5WUYR+6k4aP1NvA+12m8z+/NJvHve10A=');
       });
 
+      it('should return an empty array if not transactions match the specified blockId', async () => {
+        let recipientAddress = '484a487b1c12b8f46dfe9f15e7fe79ceb88d2c3f76ba39680ae5279a04e7e842ldpos';
+        let transactions = await chainModule.actions.getInboundTransactionsFromBlock.handler({
+          walletAddress: recipientAddress,
+          blockId: 'abc9f15e7de79cebc87d2c3f76ba39480ae5279a12e='
+        });
+        assert.equal(Array.isArray(transactions), true);
+        assert.equal(transactions.length, 0);
+      });
+
+      it('should return an empty array if not transactions match the specified walletAddress', async () => {
+        let recipientAddress = '484a487b1c12b8f46dfe9f15e7fe79ceb88d2c3f76ba39680ae5279a04e7e842ldpos';
+        let transactions = await chainModule.actions.getInboundTransactionsFromBlock.handler({
+          walletAddress: '1bbcb6922ca73d835a398fa09614054aecfaee465a31259bb6a845c9a37e2058ldpos',
+          blockId: 'dfa9f15e7fe79cebc88d2c3f76ba39680ae5279a14e='
+        });
+        assert.equal(Array.isArray(transactions), true);
+        assert.equal(transactions.length, 0);
+      });
+
     });
 
     describe('getOutboundTransactionsFromBlock action', async () => {
