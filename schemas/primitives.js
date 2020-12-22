@@ -134,6 +134,17 @@ function validateTransactionId(transactionId) {
   }
 }
 
+function validateTransactionData(data, maxTransactionDataLength) {
+  if (typeof data !== 'string') {
+    throw new Error('Transaction data must be a string');
+  }
+  if (data.length > maxTransactionDataLength) {
+    throw new Error(
+      `Transaction data must not exceed ${maxTransactionDataLength} characters`
+    );
+  }
+}
+
 function validateTransactionAmount(amount, maxSpendableDigits) {
   if (typeof amount !== 'string') {
     throw new Error('Transaction amount must be a string');
@@ -176,6 +187,7 @@ module.exports = {
   validateBlockHeight,
   validatePreviousBlockId,
   validateTransactionId,
+  validateTransactionData,
   validateTransactionAmount,
   validateTransactionFee,
   validateTimestamp

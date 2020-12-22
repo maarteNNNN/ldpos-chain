@@ -37,6 +37,7 @@ const DEFAULT_MAX_MULTISIG_MEMBERS = 20;
 const DEFAULT_PENDING_TRANSACTION_EXPIRY = 604800000; // 1 week
 const DEFAULT_PENDING_TRANSACTION_EXPIRY_CHECK_INTERVAL = 3600000; // 1 hour
 const DEFAULT_MAX_SPENDABLE_DIGITS = 25;
+const DEFAULT_MAX_TRANSACTION_DATA_LENGTH = 256;
 const DEFAULT_MAX_VOTES_PER_ACCOUNT = 21;
 const DEFAULT_MAX_PENDING_TRANSACTIONS_PER_ACCOUNT = 30;
 
@@ -982,7 +983,7 @@ module.exports = class LDPoSChainModule {
   }
 
   verifyGenericTransactionSchema(transaction, fullCheck) {
-    verifyTransactionSchema(transaction, this.maxSpendableDigits, this.networkSymbol);
+    verifyTransactionSchema(transaction, this.maxSpendableDigits, this.networkSymbol, this.maxTransactionDataLength);
 
     let { type } = transaction;
 
@@ -1937,6 +1938,7 @@ module.exports = class LDPoSChainModule {
       pendingTransactionExpiry: DEFAULT_PENDING_TRANSACTION_EXPIRY,
       pendingTransactionExpiryCheckInterval: DEFAULT_PENDING_TRANSACTION_EXPIRY_CHECK_INTERVAL,
       maxSpendableDigits: DEFAULT_MAX_SPENDABLE_DIGITS,
+      maxTransactionDataLength: DEFAULT_MAX_TRANSACTION_DATA_LENGTH,
       maxVotesPerAccount: DEFAULT_MAX_VOTES_PER_ACCOUNT,
       maxPendingTransactionsPerAccount: DEFAULT_MAX_PENDING_TRANSACTIONS_PER_ACCOUNT
     };
@@ -1957,6 +1959,7 @@ module.exports = class LDPoSChainModule {
     this.pendingTransactionExpiry = this.options.pendingTransactionExpiry;
     this.pendingTransactionExpiryCheckInterval = this.options.pendingTransactionExpiryCheckInterval;
     this.maxSpendableDigits = this.options.maxSpendableDigits;
+    this.maxTransactionDataLength = this.options.maxTransactionDataLength;
     this.maxVotesPerAccount = this.options.maxVotesPerAccount;
     this.maxPendingTransactionsPerAccount = this.options.maxPendingTransactionsPerAccount;
 

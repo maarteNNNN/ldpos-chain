@@ -139,7 +139,16 @@ describe('DEX API tests', async () => {
           recipientAddress: '1072f65df680b2767f55a6bcd505b68d90d227d6d8b2d340fe97aaa016ab6dd7ldpos',
           amount: '1100000000',
           fee: '100000000',
-          timestamp: 1608470523757
+          timestamp: 1608470523757,
+          data: ''
+        },
+        {
+          type: 'transfer',
+          recipientAddress: '484a487b1c12b8f46dfe9f15e7fe79ceb88d2c3f76ba39680ae5279a04e7e842ldpos',
+          amount: '1200000000',
+          fee: '100000000',
+          timestamp: 1608470600000,
+          data: ''
         }
       ].map(txn => client.prepareTransaction(txn));
 
@@ -221,15 +230,48 @@ describe('DEX API tests', async () => {
 
     describe('getOutboundTransactions action', async () => {
 
-      it('should expose a getOutboundTransactions action', async () => {
+      it('should return an array of transactions sent from the specified walletAddress', async () => {
         let transactions = await chainModule.actions.getOutboundTransactions.handler({
           walletAddress: client.accountAddress,
           fromTimestamp: 0,
           limit: 100
         });
+        assert.equal(transactions.length, 2);
+        assert.equal(transactions[0].senderAddress, client.accountAddress);
+        assert.equal(transactions[0].id, 'pBi4ac6v8RCaLL1vz2PpyjHwx8nyEhkp2YjAPBYJJLM=');
+        assert.equal(transactions[1].senderAddress, client.accountAddress);
+        assert.equal(transactions[1].id, '8FZkstZsspGrU+caJUIhuBVgpp9zAdU9wU/zngAZNr8=');
+      });
+
+      it('should only return transactions which are more recent than fromTimestamp', async () => {
+        let transactions = await chainModule.actions.getOutboundTransactions.handler({
+          walletAddress: client.accountAddress,
+          fromTimestamp: 1608470523800,
+          limit: 100
+        });
         assert.equal(transactions.length, 1);
         assert.equal(transactions[0].senderAddress, client.accountAddress);
-        assert.equal(transactions[0].id, 'c0MEriIBdQhrc8mxU1ZGVUCHlmXhc9L+4Jzy1fo9ij0=');
+        assert.equal(transactions[0].id, '8FZkstZsspGrU+caJUIhuBVgpp9zAdU9wU/zngAZNr8=');
+      });
+
+      it('should limit the number of transactions based on the specified limit', async () => {
+        let transactions = await chainModule.actions.getOutboundTransactions.handler({
+          walletAddress: client.accountAddress,
+          fromTimestamp: 0,
+          limit: 1
+        });
+        assert.equal(transactions.length, 1);
+        assert.equal(transactions[0].senderAddress, client.accountAddress);
+        assert.equal(transactions[0].id, 'pBi4ac6v8RCaLL1vz2PpyjHwx8nyEhkp2YjAPBYJJLM=');
+      });
+
+      it('should return an empty array if no transactions can be matched', async () => {
+        let transactions = await chainModule.actions.getOutboundTransactions.handler({
+          walletAddress: '1bbcb6922ca73d835a398fa09614054aecfaee465a31259bb6a845c9a37e2058ldpos',
+          fromTimestamp: 0,
+          limit: 100
+        });
+        assert.equal(transactions.length, 0);
       });
 
     });

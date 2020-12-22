@@ -1,10 +1,11 @@
 const {
   validateWalletAddress,
   validateTransactionFee,
-  validateTimestamp
+  validateTimestamp,
+  validateTransactionData
 } = require('./primitives');
 
-function verifyTransactionSchema(transaction, maxSpendableDigits, networkSymbol) {
+function verifyTransactionSchema(transaction, maxSpendableDigits, networkSymbol, maxTransactionDataLength) {
   if (!transaction) {
     throw new Error('Transaction was not specified');
   }
@@ -21,6 +22,7 @@ function verifyTransactionSchema(transaction, maxSpendableDigits, networkSymbol)
   validateWalletAddress(transaction.senderAddress, networkSymbol);
   validateTransactionFee(transaction.fee, maxSpendableDigits);
   validateTimestamp(transaction.timestamp);
+  validateTransactionData(transaction.data, maxTransactionDataLength);
 }
 
 module.exports = {
