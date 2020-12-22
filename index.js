@@ -1704,7 +1704,6 @@ module.exports = class LDPoSChainModule {
 
       accountStream.senderAccountPromise = this.getTransactionSenderAccount(senderAddress);
 
-      // TODO 222: Think about how often this account data should be re-fetched fresh from the DAL.
       let { senderAccount, multisigMemberAccounts } = await accountStream.senderAccountPromise;
       try {
         if (multisigMemberAccounts) {
