@@ -1737,13 +1737,14 @@ module.exports = class LDPoSChainModule {
             txnTotal = await this.verifySigTransactionWithoutSignatureCheck(senderAccount, accountTxn, true);
           }
 
+          if (accountStream.pendingTransactionMap.has(accountTxn.id)) {
+            throw new Error(`Transaction ${accountTxn.id} has already been received before`);
+          }
+
           // Subtract valid transaction total from the in-memory senderAccount balance since it
           // may affect the verification of the next transaction in the stream.
           senderAccount.balance -= txnTotal;
 
-          if (accountStream.pendingTransactionMap.has(accountTxn.id)) {
-            throw new Error(`Transaction ${accountTxn.id} has already been received before`);
-          }
           accountStream.pendingTransactionMap.set(accountTxn.id, {
             transaction: accountTxn,
             receivedTimestamp: Date.now()
