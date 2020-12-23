@@ -9,7 +9,7 @@ const {
   validateSignatureHash
 } = require('./primitives');
 
-function verifyInitTransactionSchema(initTransaction, fullCheck) {
+function validateInitTransactionSchema(initTransaction, fullCheck) {
   if (!initTransaction) {
     throw new Error('Init transaction was not specified');
   }
@@ -27,5 +27,5 @@ function verifyInitTransactionSchema(initTransaction, fullCheck) {
 }
 
 module.exports = {
-  verifyInitTransactionSchema
+  validateInitTransactionSchema
 };

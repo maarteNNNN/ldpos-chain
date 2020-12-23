@@ -3,18 +3,17 @@ const crypto = require('crypto');
 const genesisBlock = require('./genesis/testnet/genesis.json');
 const WritableConsumableStream = require('writable-consumable-stream');
 
-const { verifyBlockSchema } = require('./schemas/block-schema');
-const { verifyTransactionSchema } = require('./schemas/transaction-schema');
-const { verifyTransferTransactionSchema } = require('./schemas/transfer-transaction-schema');
-const { verifyVoteTransactionSchema } = require('./schemas/vote-transaction-schema');
-const { verifyUnvoteTransactionSchema } = require('./schemas/unvote-transaction-schema');
-const { verifyRegisterMultisigTransactionSchema } = require('./schemas/register-multisig-transaction-schema');
-const { verifyInitTransactionSchema } = require('./schemas/init-transaction-schema');
-const { verifyBlockSignatureSchema } = require('./schemas/block-signature-schema');
-const { verifyMultisigTransactionSchema } = require('./schemas/multisig-transaction-schema');
-const { verifySigTransactionSchema } = require('./schemas/sig-transaction-schema');
-const { verifyBlocksResponse } = require('./schemas/blocks-response-schema');
-const { verifyBlockInfoSchema } = require('./schemas/block-info-schema');
+const { validateForgedBlockSchema } = require('./schemas/forged-block-schema');
+const { validateFullySignedBlockSchema } = require('./schemas/fully-signed-block-schema');
+const { validateTransactionSchema } = require('./schemas/transaction-schema');
+const { validateTransferTransactionSchema } = require('./schemas/transfer-transaction-schema');
+const { validateVoteTransactionSchema } = require('./schemas/vote-transaction-schema');
+const { validateUnvoteTransactionSchema } = require('./schemas/unvote-transaction-schema');
+const { validateRegisterMultisigTransactionSchema } = require('./schemas/register-multisig-transaction-schema');
+const { validateInitTransactionSchema } = require('./schemas/init-transaction-schema');
+const { validateBlockSignatureSchema } = require('./schemas/block-signature-schema');
+const { validateMultisigTransactionSchema } = require('./schemas/multisig-transaction-schema');
+const { validateSigTransactionSchema } = require('./schemas/sig-transaction-schema');
 
 // TODO 222: Should multisig members sign the initial registerMultisig transaction or is the signature from the multisig wallet itself the only requirement?
 
@@ -31,6 +30,7 @@ const DEFAULT_FORGING_SIGNATURE_BROADCAST_DELAY = 5000;
 const DEFAULT_PROPAGATION_TIMEOUT = 5000;
 const DEFAULT_PROPAGATION_RANDOMNESS = 10000;
 const DEFAULT_TIME_POLL_INTERVAL = 200;
+const DEFAULT_MIN_TRANSACTIONS_PER_BLOCK = 1;
 const DEFAULT_MAX_TRANSACTIONS_PER_BLOCK = 300;
 const DEFAULT_MIN_MULTISIG_MEMBERS = 1;
 const DEFAULT_MAX_MULTISIG_MEMBERS = 20;
@@ -148,38 +148,13 @@ module.exports = class LDPoSChainModule {
       },
       getMaxBlockHeight: {
         handler: async action => {
-          if (!this.lastFullySignedBlock) {
-            throw new Error('Node does not have the last block info');
-          }
-          return this.lastFullySignedBlock.height;
+          return this.dal.getMaxBlockHeight();
         }
       },
       getBlocksFromHeight: {
         handler: async action => {
           let { height, limit } = action;
           return this.dal.getBlocksFromHeight(height, limit);
-        },
-        isPublic: true
-      },
-      getLastBlockInfo: {
-        handler: async action => {
-          if (!this.lastFullySignedBlock) {
-            throw new Error('Node does not have the last block info');
-          }
-          if (action.blockId && action.blockId !== this.lastFullySignedBlock.id) {
-            throw new Error(
-              `The specified blockId ${
-                action.blockId
-              } did not match the id of the last block ${
-                this.lastFullySignedBlock.id
-              } on this node`
-            );
-          }
-          return {
-            blockId: this.lastFullySignedBlock.id,
-            blockHeight: this.lastFullySignedBlock.height,
-            signatures: this.lastFullySignedBlock.signatures
-          };
         },
         isPublic: true
       },
@@ -217,9 +192,6 @@ module.exports = class LDPoSChainModule {
       return this.lastProcessedBlock.height;
     }
 
-    let pendingBlocks = [];
-    let lastGoodBlock = this.lastProcessedBlock;
-
     while (true) {
       if (!this.isActive) {
         break;
@@ -230,90 +202,39 @@ module.exports = class LDPoSChainModule {
         newBlocks = await this.channel.invoke('network:request', {
           procedure: `${this.alias}:getBlocksFromHeight`,
           data: {
-            height: lastGoodBlock.height + 1,
+            height: this.lastProcessedBlock.height + 1,
             limit: fetchBlockLimit
           }
         });
-        verifyBlocksResponse(newBlocks);
+        if (!Array.isArray(newBlocks)) {
+          throw new Error('Response to getBlocksFromHeight action must be an array');
+        }
       } catch (error) {
         this.logger.warn(error);
-        pendingBlocks = [];
-        lastGoodBlock = this.lastProcessedBlock;
         await this.wait(fetchBlockPause);
         continue;
       }
-
-      let lastVerifiedBlock = lastGoodBlock;
-      try {
-        for (let block of newBlocks) {
-          await this.verifyBlock(block, lastVerifiedBlock);
-          lastVerifiedBlock = block;
-        }
-      } catch (error) {
-        this.logger.warn(
-          new Error(`Received invalid block while catching up with the network - ${error.message}`)
-        );
-        pendingBlocks = [];
-        lastGoodBlock = this.lastProcessedBlock;
-        await this.wait(fetchBlockPause);
-        continue;
-      }
-
-      for (let block of newBlocks) {
-        pendingBlocks.push(block);
-      }
-
-      let safeBlockCount = pendingBlocks.length - delegateMajorityCount;
 
       if (!newBlocks.length) {
-        if (lastGoodBlock.height === 1) {
-          break;
-        }
-        try {
-          let lastBlockInfo = await this.channel.invoke('network:request', {
-            procedure: `${this.alias}:getLastBlockInfo`,
-            data: {
-              blockId: lastGoodBlock.id
-            }
-          });
-          verifyBlockInfoSchema(lastBlockInfo, delegateMajorityCount, this.networkSymbol);
-
-          await Promise.all(
-            lastBlockInfo.signatures.map(blockSignature => this.verifyBlockSignature(this.lastProcessedBlock, blockSignature))
-          );
-
-          // If we have the last block with all necessary signatures, then we can have instant finality.
-          safeBlockCount = pendingBlocks.length;
-        } catch (error) {
-          this.logger.warn(
-            new Error(`Failed to fetch last block signatures because of error: ${error.message}`)
-          );
-          // This is to cover the case where our node has received some bad blocks in the past.
-          pendingBlocks = [];
-          lastGoodBlock = this.lastProcessedBlock;
-          await this.wait(fetchBlockPause);
-          continue;
-        }
-      }
-
-      try {
-        for (let i = 0; i < safeBlockCount; i++) {
-          let block = pendingBlocks[i];
-          await this.processBlock(block);
-          pendingBlocks[i] = null;
-        }
-      } catch (error) {
-        this.logger.error(
-          `Failed to process block while catching up with the network - ${error.message}`
-        );
-      }
-      pendingBlocks = pendingBlocks.filter(block => block);
-
-      if (!pendingBlocks.length) {
+        // If there are no new blocks, assume that we've finished synching.
         break;
       }
 
-      lastGoodBlock = lastVerifiedBlock;
+      let delegateMajorityCount = Math.ceil(this.delegateCount / 2);
+
+      try {
+        for (let block of newBlocks) {
+          let block = newBlocks[i];
+          validateFullySignedBlockSchema(block, this.maxTransactionsPerBlock, delegateMajorityCount, this.networkSymbol);
+          await this.verifyFullySignedBlock(block, this.lastProcessedBlock);
+          await this.processBlock(block, false);
+        }
+      } catch (error) {
+        this.logger.warn(
+          `Failed to process block while catching up with the network - ${error.message}`
+        );
+      }
+
       await this.wait(fetchBlockPause);
     }
     return this.lastProcessedBlock.height;
@@ -364,8 +285,8 @@ module.exports = class LDPoSChainModule {
     let block = {
       height,
       timestamp,
-      transactions,
-      previousBlockId: this.lastProcessedBlock ? this.lastProcessedBlock.id : null
+      previousBlockId: this.lastProcessedBlock ? this.lastProcessedBlock.id : null,
+      transactions
     };
     return this.ldposClient.prepareBlock(block);
   }
@@ -409,24 +330,8 @@ module.exports = class LDPoSChainModule {
     };
   }
 
-  simplifyBlock(block) {
-    let { signatures, ...blockWithoutSignatures } = block;
-
-    return {
-      ...blockWithoutSignatures,
-      signatures: signatures.map(signaturePacket => {
-        let { signature, ...signaturePacketWithoutSignature } = signaturePacket;
-        return {
-          ...signaturePacketWithoutSignature,
-          signatureHash: this.sha256(signature)
-        };
-      })
-    };
-  }
-
   async processBlock(block) {
     let { transactions, height, signatures: blockSignatureList } = block;
-    let isFullBlock = !!(blockSignatureList && blockSignatureList[0] && blockSignatureList[0].signature);
     let senderAddressSet = new Set();
     let recipientAddressSet = new Set();
     let multisigMemberAddressSet = new Set();
@@ -669,25 +574,7 @@ module.exports = class LDPoSChainModule {
       }
     }
 
-    await Promise.all(
-      transactions.map(async (txn) => {
-        return this.dal.upsertTransaction({
-          ...txn,
-          blockId: block.id
-        });
-      })
-    );
-
-    let simplifiedBlock = this.simplifyBlock(block);
-    await this.dal.upsertBlock(simplifiedBlock);
-
-    if (isFullBlock) {
-      await this.dal.setLastBlockInfo({
-        blockId: block.id,
-        blockHeight: height,
-        signatures: blockSignatureList
-      });
-    }
+    await this.dal.upsertBlock(block);
 
     for (let txn of transactions) {
       let senderTxnStream = this.pendingTransactionStreams[txn.senderAddress];
@@ -741,7 +628,7 @@ module.exports = class LDPoSChainModule {
   }
 
   verifyTransactionCorrespondsToSigAccount(senderAccount, transaction, fullCheck) {
-    verifySigTransactionSchema(transaction, fullCheck);
+    validateSigTransactionSchema(transaction, fullCheck);
 
     let senderSigPublicKey;
     if (senderAccount.sigPublicKey) {
@@ -779,7 +666,7 @@ module.exports = class LDPoSChainModule {
 
   verifyTransactionCorrespondsToMultisigAccount(senderAccount, multisigMemberAccounts, transaction, fullCheck) {
     let { senderAddress } = transaction;
-    verifyMultisigTransactionSchema(
+    validateMultisigTransactionSchema(
       transaction,
       fullCheck,
       senderAccount.multisigRequiredSignatureCount,
@@ -982,26 +869,26 @@ module.exports = class LDPoSChainModule {
     return txnTotal;
   }
 
-  verifyGenericTransactionSchema(transaction, fullCheck) {
-    verifyTransactionSchema(transaction, this.maxSpendableDigits, this.networkSymbol, this.maxTransactionDataLength);
+  validateGenericTransactionSchema(transaction, fullCheck) {
+    validateTransactionSchema(transaction, this.maxSpendableDigits, this.networkSymbol, this.maxTransactionDataLength);
 
     let { type } = transaction;
 
     if (type === 'transfer') {
-      verifyTransferTransactionSchema(transaction, this.maxSpendableDigits, this.networkSymbol);
+      validateTransferTransactionSchema(transaction, this.maxSpendableDigits, this.networkSymbol);
     } else if (type === 'vote') {
-      verifyVoteTransactionSchema(transaction, this.networkSymbol);
+      validateVoteTransactionSchema(transaction, this.networkSymbol);
     } else if (type === 'unvote') {
-      verifyUnvoteTransactionSchema(transaction, this.networkSymbol);
+      validateUnvoteTransactionSchema(transaction, this.networkSymbol);
     } else if (type === 'registerMultisig') {
-      verifyRegisterMultisigTransactionSchema(
+      validateRegisterMultisigTransactionSchema(
         transaction,
         this.minMultisigMembers,
         this.maxMultisigMembers,
         this.networkSymbol
       );
     } else if (type === 'init') {
-      verifyInitTransactionSchema(transaction, fullCheck);
+      validateInitTransactionSchema(transaction, fullCheck);
     } else {
       throw new Error(
         `Transaction type ${type} was invalid`
@@ -1061,9 +948,15 @@ module.exports = class LDPoSChainModule {
     return this.verifyMultisigTransactionWithoutSignatureCheck(senderAccount, multisigMemberAccounts, transaction, fullCheck);
   }
 
-  async verifyBlock(block, lastBlock) {
-    verifyBlockSchema(block, this.maxTransactionsPerBlock, this.networkSymbol);
+  async verifyFullySignedBlock(block, lastBlock) {
+    await this.verifyForgedBlock(block, lastBlock);
 
+    await Promise.all(
+      block.signatures.map(blockSignature => this.verifyBlockSignature(block, blockSignature))
+    );
+  }
+
+  async verifyForgedBlock(block, lastBlock) {
     let expectedBlockHeight = lastBlock.height + 1;
     if (block.height !== expectedBlockHeight) {
       throw new Error(
@@ -1114,8 +1007,12 @@ module.exports = class LDPoSChainModule {
       throw new Error(`Block was invalid`);
     }
 
+    await this.verifyBlockTransactions(block);
+  }
+
+  async verifyBlockTransactions(block) {
     for (let transaction of block.transactions) {
-      this.verifyGenericTransactionSchema(transaction, false);
+      this.validateGenericTransactionSchema(transaction, false);
     }
 
     await Promise.all(
@@ -1195,23 +1092,14 @@ module.exports = class LDPoSChainModule {
     );
   }
 
-  async verifyBlockSignature(lastBlock, blockSignature) {
-    verifyBlockSignatureSchema(blockSignature, this.networkSymbol);
-
-    if (!lastBlock) {
+  async verifyBlockSignature(block, blockSignature) {
+    if (!block) {
       throw new Error('Cannot verify signature because there is no block pending');
     }
-    let { signatures } = lastBlock;
     let { signerAddress, blockId } = blockSignature;
 
-    if (signatures && signatures[signerAddress]) {
-      throw new Error(
-        `Signature of block signer ${signerAddress} for blockId ${blockId} has already been received`
-      );
-    }
-
-    if (lastBlock.id !== blockId) {
-      throw new Error(`Signature blockId ${blockId} did not match the last block id ${lastBlock.id}`);
+    if (block.id !== blockId) {
+      throw new Error(`Signature blockId ${blockId} did not match the last block id ${block.id}`);
     }
     let signerAccount;
     try {
@@ -1250,7 +1138,7 @@ module.exports = class LDPoSChainModule {
       );
     }
 
-    return this.ldposClient.verifyBlockSignature(lastBlock, blockSignature);
+    return this.ldposClient.verifyBlockSignature(block, blockSignature);
   }
 
   async broadcastBlock(block) {
@@ -1359,7 +1247,6 @@ module.exports = class LDPoSChainModule {
     this.delegateCount = delegateCount;
     this.forgingInterval = forgingInterval;
     this.propagationRandomness = propagationRandomness;
-    this.maxTransactionsPerBlock = maxTransactionsPerBlock;
     this.minMultisigMembers = minMultisigMembers;
     this.maxMultisigMembers = maxMultisigMembers;
 
@@ -1385,10 +1272,9 @@ module.exports = class LDPoSChainModule {
     }
 
     this.ldposClient = ldposClient;
+    this.nodeHeight = await this.dal.getMaxBlockHeight();
     try {
-      let lastBlockInfo = await this.dal.getLastBlockInfo();
-      this.lastProcessedBlock = await this.dal.getBlockAtHeight(lastBlockInfo.blockHeight);
-      this.lastProcessedBlock.signatures = lastBlockInfo.signatures;
+      this.lastProcessedBlock = await this.dal.getBlockAtHeight(this.nodeHeight);
     } catch (error) {
       if (error.name !== 'BlockDidNotExistError') {
         throw new Error(
@@ -1409,7 +1295,6 @@ module.exports = class LDPoSChainModule {
         signatures: []
       };
     }
-    this.nodeHeight = this.lastProcessedBlock.height;
     this.lastReceivedBlock = this.lastProcessedBlock;
     this.lastFullySignedBlock = this.lastProcessedBlock;
 
@@ -1498,6 +1383,15 @@ module.exports = class LDPoSChainModule {
             })
           );
 
+          if (validTransactions.length < this.minTransactionsPerBlock) {
+            this.logger.debug(
+              `Skipped forging block which contained less than the minimum amount of ${
+                this.minTransactionsPerBlock
+              } transactions`
+            );
+            return;
+          }
+
           let pendingTransactions = this.sortPendingTransactions(validTransactions);
           let blockTransactions = pendingTransactions.slice(0, maxTransactionsPerBlock).map(txn => this.simplifyTransaction(txn));
           let blockTimestamp = this.getCurrentBlockTimeSlot(forgingInterval);
@@ -1539,7 +1433,7 @@ module.exports = class LDPoSChainModule {
 
         // Will throw if the required number of valid signatures cannot be gathered in time.
         await this.receiveLastBlockSignatures(lastBlock, delegateMajorityCount, forgingSignatureBroadcastDelay + propagationTimeout);
-        await this.processBlock(lastBlock);
+        await this.processBlock(lastBlock, true);
         this.lastFullySignedBlock = lastBlock;
 
         this.nodeHeight = nextHeight;
@@ -1637,7 +1531,7 @@ module.exports = class LDPoSChainModule {
       let transaction = event.data;
 
       try {
-        this.verifyGenericTransactionSchema(transaction, true);
+        this.validateGenericTransactionSchema(transaction, true);
       } catch (error) {
         this.logger.warn(
           new Error(`Received invalid transaction ${transaction.id} - ${error.message}`)
@@ -1774,7 +1668,8 @@ module.exports = class LDPoSChainModule {
       let block = event.data;
 
       try {
-        await this.verifyBlock(block, this.lastProcessedBlock);
+        validateForgedBlockSchema(block, this.minTransactionsPerBlock, this.maxTransactionsPerBlock, this.networkSymbol);
+        await this.verifyForgedBlock(block, this.lastProcessedBlock);
         let currentBlockTimeSlot = this.getCurrentBlockTimeSlot(this.forgingInterval);
         if (block.timestamp !== currentBlockTimeSlot) {
           throw new Error(
@@ -1857,20 +1752,22 @@ module.exports = class LDPoSChainModule {
     channel.subscribe(`network:event:${this.alias}:blockSignature`, async (event) => {
       let blockSignature = event.data;
 
-      try {
-        await this.verifyBlockSignature(this.lastReceivedBlock, blockSignature);
-      } catch (error) {
-        this.logger.warn(
-          new Error(`Received invalid block signature - ${error.message}`)
-        );
-        return;
-      }
+      validateBlockSignatureSchema(blockSignature, this.networkSymbol);
 
       let { signatures } = this.lastReceivedBlock;
 
       if (signatures[blockSignature.signerAddress]) {
         this.logger.warn(
           new Error(`Block signature of signer ${blockSignature.signerAddress} has already been received before`)
+        );
+        return;
+      }
+
+      try {
+        await this.verifyBlockSignature(this.lastReceivedBlock, blockSignature);
+      } catch (error) {
+        this.logger.warn(
+          new Error(`Received invalid block signature - ${error.message}`)
         );
         return;
       }
@@ -1932,6 +1829,7 @@ module.exports = class LDPoSChainModule {
       propagationTimeout: DEFAULT_PROPAGATION_TIMEOUT,
       propagationRandomness: DEFAULT_PROPAGATION_RANDOMNESS,
       timePollInterval: DEFAULT_TIME_POLL_INTERVAL,
+      minTransactionsPerBlock: DEFAULT_MIN_TRANSACTIONS_PER_BLOCK,
       maxTransactionsPerBlock: DEFAULT_MAX_TRANSACTIONS_PER_BLOCK,
       minMultisigMembers: DEFAULT_MIN_MULTISIG_MEMBERS,
       maxMultisigMembers: DEFAULT_MAX_MULTISIG_MEMBERS,
@@ -1956,6 +1854,8 @@ module.exports = class LDPoSChainModule {
     this.options.minTransactionFees = minTransactionFees;
     this.minTransactionFees = minTransactionFees;
 
+    this.minTransactionsPerBlock = this.options.minTransactionsPerBlock;
+    this.maxTransactionsPerBlock = this.options.maxTransactionsPerBlock;
     this.pendingTransactionExpiry = this.options.pendingTransactionExpiry;
     this.pendingTransactionExpiryCheckInterval = this.options.pendingTransactionExpiryCheckInterval;
     this.maxSpendableDigits = this.options.maxSpendableDigits;

@@ -7,7 +7,7 @@ const {
   validateNextForgingPublicKey
 } = require('./primitives');
 
-function verifyBlockSignatureSchema(blockSignature, networkSymbol) {
+function validateBlockSignatureSchema(blockSignature, networkSymbol) {
   if (!blockSignature) {
     throw new Error(
       'Block signature was not specified'
@@ -22,5 +22,5 @@ function verifyBlockSignatureSchema(blockSignature, networkSymbol) {
 }
 
 module.exports = {
-  verifyBlockSignatureSchema
+  validateBlockSignatureSchema
 };

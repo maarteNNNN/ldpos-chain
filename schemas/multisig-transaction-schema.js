@@ -6,7 +6,7 @@ const {
   validateNextMultisigPublicKey
 } = require('./primitives');
 
-function verifyMultisigTransactionSchema(multisigTransaction, fullCheck, minRequiredSignatures, networkSymbol) {
+function validateMultisigTransactionSchema(multisigTransaction, fullCheck, minRequiredSignatures, networkSymbol) {
   if (!multisigTransaction) {
     throw new Error('Multisig transaction was not specified');
   }
@@ -21,6 +21,7 @@ function verifyMultisigTransactionSchema(multisigTransaction, fullCheck, minRequ
     if (!signaturePacket) {
       throw new Error('Some multisig transaction signatures were not specified');
     }
+    // TODO 222: The signature needs to include fields from the signature packet itself like nextMultisigPublicKey and multisigKeyIndex in order to guarantee their integrity.
     let {
       signerAddress,
       multisigKeyIndex,
@@ -60,5 +61,5 @@ function verifyMultisigTransactionSchema(multisigTransaction, fullCheck, minRequ
 }
 
 module.exports = {
-  verifyMultisigTransactionSchema
+  validateMultisigTransactionSchema
 };

@@ -82,7 +82,7 @@ describe('DEX API tests', async () => {
     let memberAddessList;
     let memberAccounts = [];
     let multisigAccount;
-    let transactionList = [];
+    let blockList = [];
 
     beforeEach(async () => {
       // Passphrase: panic test motion image soldier cloth script spice trigger magnet accident add
@@ -133,44 +133,62 @@ describe('DEX API tests', async () => {
         }
       ];
 
-      transactionList = [
+      let lastBlockId = null;
+
+      blockList = [
         {
-          type: 'transfer',
-          recipientAddress: '1072f65df680b2767f55a6bcd505b68d90d227d6d8b2d340fe97aaa016ab6dd7ldpos',
-          amount: '1100000000',
-          fee: '100000000',
-          timestamp: 1608470523757,
-          data: ''
+          height: 1,
+          timestamp: 1608470599980,
+          previousBlockId: null,
+          transactions: [
+            {
+              type: 'transfer',
+              recipientAddress: '1072f65df680b2767f55a6bcd505b68d90d227d6d8b2d340fe97aaa016ab6dd7ldpos',
+              amount: '1100000000',
+              fee: '100000000',
+              timestamp: 1608470523757,
+              data: ''
+            },
+            {
+              type: 'transfer',
+              recipientAddress: '484a487b1c12b8f46dfe9f15e7fe79ceb88d2c3f76ba39680ae5279a04e7e842ldpos',
+              amount: '1200000000',
+              fee: '100000000',
+              timestamp: 1608470600000, // TODO 22 adjust timestamp of transactions
+              data: ''
+            }
+          ]
         },
         {
-          type: 'transfer',
-          recipientAddress: '484a487b1c12b8f46dfe9f15e7fe79ceb88d2c3f76ba39680ae5279a04e7e842ldpos',
-          amount: '1200000000',
-          fee: '100000000',
-          timestamp: 1608470600000,
-          data: ''
-        },
-        {
-          type: 'transfer',
-          recipientAddress: '484a487b1c12b8f46dfe9f15e7fe79ceb88d2c3f76ba39680ae5279a04e7e842ldpos',
-          amount: '1300000000',
-          fee: '100000000',
-          timestamp: 1608470700000,
-          data: ''
+          height: 2,
+          timestamp: 1608470600010,
+          previousBlockId: null,
+          transactions: [
+            {
+              type: 'transfer',
+              recipientAddress: '484a487b1c12b8f46dfe9f15e7fe79ceb88d2c3f76ba39680ae5279a04e7e842ldpos',
+              amount: '1300000000',
+              fee: '100000000',
+              timestamp: 1608470700000,
+              data: ''
+            }
+          ]
         }
-      ].map(txn => {
-        let preparedTxn = client.prepareTransaction(txn);
-        let blockId;
-        if (txn.timestamp > 1608470600000) {
-          blockId = 'dfa9f15e7fe79cebc88d2c3f76ba39680ae5279a14e=';
-        } else {
-          blockId = 'cfa9f15e7ce79cebc88d2c3f76bd39680ae4279a14e=';
-        }
+      ].map(block => {
+        block.previousBlockId = lastBlockId;
+        let preparedBlock = client.prepareBlock(block);
+        lastBlockId = preparedBlock.id;
         return {
-          ...preparedTxn,
-          blockId
+          height: preparedBlock.height,
+          timestamp: preparedBlock.timestamp,
+          previousBlockId: preparedBlock.previousBlockId,
+          transactions: preparedBlock.transactions.map(
+            txn => chainModule.simplifyTransaction(client.prepareTransaction(txn))
+          ),
+          ...preparedBlock
         };
       });
+      console.log(9999, blockList);
 
       memberAddessList = memberAccounts.map(account => account.address);
       for (let account of memberAccounts) {
@@ -178,18 +196,19 @@ describe('DEX API tests', async () => {
       }
       await dal.upsertAccount(multisigAccount);
       await dal.registerMultisigWallet(multisigAccount.address, memberAddessList, 2);
-      for (let transaction of transactionList) {
-        let simplifiedTxn = chainModule.simplifyTransaction(transaction);
-        await dal.upsertTransaction(simplifiedTxn);
+
+      for (let block of blockList) {
+        await dal.upsertBlock(chainModule.simplifyBlock(block));
       }
     });
 
-    describe('getMultisigWalletMembers action', async () => {
+    describe.only('getMultisigWalletMembers action', async () => {
 
       it('should return an array of member addresses', async () => {
         let walletMembers = await chainModule.actions.getMultisigWalletMembers.handler({
           walletAddress: multisigAccount.address
         });
+        console.log(222, walletMembers);
         assert.equal(JSON.stringify(walletMembers), JSON.stringify(memberAddessList));
       });
 
@@ -375,13 +394,15 @@ describe('DEX API tests', async () => {
 
     });
 
-    describe('getLastBlockAtTimestamp action', async () => {
-
-      it('should expose a getLastBlockAtTimestamp action', async () => {
-
-      });
-
-    });
+    // describe('getLastBlockAtTimestamp action', async () => { // TODO 22
+    //
+    //   it('should expose a getLastBlockAtTimestamp action', async () => {
+    //     let transactions = await chainModule.actions.getLastBlockAtTimestamp.handler({
+    //       timestamp:
+    //     });
+    //   });
+    //
+    // });
 
     describe('getMaxBlockHeight action', async () => {
 

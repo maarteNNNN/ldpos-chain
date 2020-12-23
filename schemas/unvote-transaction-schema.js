@@ -2,7 +2,7 @@ const {
   validateWalletAddress
 } = require('./primitives');
 
-function verifyUnvoteTransactionSchema(transaction, networkSymbol) {
+function validateUnvoteTransactionSchema(transaction, networkSymbol) {
   if (!transaction) {
     throw new Error('Unvote transaction was not specified');
   }
@@ -10,5 +10,5 @@ function verifyUnvoteTransactionSchema(transaction, networkSymbol) {
 }
 
 module.exports = {
-  verifyUnvoteTransactionSchema
+  validateUnvoteTransactionSchema
 };

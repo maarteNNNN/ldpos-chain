@@ -255,8 +255,28 @@ class DAL {
     return block;
   }
 
+  async upsertTransaction(transaction) {
+    this.transactions[transaction.id] = {
+      ...transaction
+    };
+  }
+
   async upsertBlock(block) {
     this.blocks[block.height] = block;
+    let { transactions } = block;
+    let len = transactions.length;
+    for (let indexInBlock = 0; indexInBlock < len; i++) {
+      let txn = transactions[indexInBlock];
+      this.transactions[txn.id] = {
+        ...txn,
+        blockId: block.id,
+        indexInBlock
+      };
+    }
+  }
+
+  async getMaxBlockHeight() {
+    return this.blocks.length - 1;
   }
 
   async setLastBlockInfo(blockInfo) {
@@ -275,12 +295,6 @@ class DAL {
       throw error;
     }
     return this.lastBlockInfo;
-  }
-
-  async upsertTransaction(transaction) {
-    this.transactions[transaction.id] = {
-      ...transaction
-    };
   }
 
   async hasTransaction(transactionId) {

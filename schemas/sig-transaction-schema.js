@@ -6,7 +6,7 @@ const {
   validateSignatureHash
 } = require('./primitives');
 
-function verifySigTransactionSchema(sigTransaction, fullCheck) {
+function validateSigTransactionSchema(sigTransaction, fullCheck) {
   if (!sigTransaction) {
     throw new Error('Multisig transaction was not specified');
   }
@@ -21,5 +21,5 @@ function verifySigTransactionSchema(sigTransaction, fullCheck) {
 }
 
 module.exports = {
-  verifySigTransactionSchema
+  validateSigTransactionSchema
 };

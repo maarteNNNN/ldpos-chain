@@ -3,7 +3,7 @@ const {
   validateTransactionAmount
 } = require('./primitives');
 
-function verifyTransferTransactionSchema(transaction, maxSpendableDigits, networkSymbol) {
+function validateTransferTransactionSchema(transaction, maxSpendableDigits, networkSymbol) {
   if (!transaction) {
     throw new Error('Transfer transaction was not specified');
   }
@@ -12,5 +12,5 @@ function verifyTransferTransactionSchema(transaction, maxSpendableDigits, networ
 }
 
 module.exports = {
-  verifyTransferTransactionSchema
+  validateTransferTransactionSchema
 };
