@@ -342,8 +342,35 @@ describe('DEX API tests', async () => {
 
     describe('getOutboundTransactionsFromBlock action', async () => {
 
-      it('should expose a getOutboundTransactionsFromBlock action', async () => {
+      it('should return an array of transactions sent to the specified walletAddress', async () => {
+        let transactions = await chainModule.actions.getOutboundTransactionsFromBlock.handler({
+          walletAddress: client.accountAddress,
+          blockId: 'cfa9f15e7ce79cebc88d2c3f76bd39680ae4279a14e='
+        });
+        assert.equal(Array.isArray(transactions), true);
+        assert.equal(transactions.length, 2);
+        assert.equal(transactions[0].senderAddress, client.accountAddress);
+        assert.equal(transactions[0].id, 'pBi4ac6v8RCaLL1vz2PpyjHwx8nyEhkp2YjAPBYJJLM=');
+        assert.equal(transactions[1].senderAddress, client.accountAddress);
+        assert.equal(transactions[1].id, '8FZkstZsspGrU+caJUIhuBVgpp9zAdU9wU/zngAZNr8=');
+      });
 
+      it('should return an empty array if not transactions match the specified blockId', async () => {
+        let transactions = await chainModule.actions.getOutboundTransactionsFromBlock.handler({
+          walletAddress: client.accountAddress,
+          blockId: 'abc9f15e7de79cebc87d2c3f76ba39480ae5279a12e='
+        });
+        assert.equal(Array.isArray(transactions), true);
+        assert.equal(transactions.length, 0);
+      });
+
+      it('should return an empty array if not transactions match the specified walletAddress', async () => {
+        let transactions = await chainModule.actions.getOutboundTransactionsFromBlock.handler({
+          walletAddress: '1bbcb6922ca73d835a398fa09614054aecfaee465a31259bb6a845c9a37e2058ldpos',
+          blockId: 'dfa9f15e7fe79cebc88d2c3f76ba39680ae5279a14e='
+        });
+        assert.equal(Array.isArray(transactions), true);
+        assert.equal(transactions.length, 0);
       });
 
     });

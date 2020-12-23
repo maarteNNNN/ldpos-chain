@@ -5,7 +5,7 @@ class DAL {
     this.blocks = [null];
     this.transactions = {};
     this.multisigMembers = {};
-    this.latestBlockInfo = null;
+    this.lastBlockInfo = null;
   }
 
   async init(options) {
@@ -198,7 +198,7 @@ class DAL {
     return [...memberAddresses];
   }
 
-  async getLatestBlock() {
+  async getLastBlock() {
     return this.blocks[this.blocks.length - 1];
   }
 
@@ -259,22 +259,22 @@ class DAL {
     this.blocks[block.height] = block;
   }
 
-  async setLatestBlockInfo(blockInfo) {
-    this.latestBlockInfo = {
+  async setLastBlockInfo(blockInfo) {
+    this.lastBlockInfo = {
       ...blockInfo
     }
   }
 
-  async getLatestBlockInfo() {
-    if (!this.latestBlockInfo) {
+  async getLastBlockInfo() {
+    if (!this.lastBlockInfo) {
       let error = new Error(
-        `Latest block did not exist`
+        `Last block did not exist`
       );
       error.name = 'BlockDidNotExistError';
       error.type = 'InvalidActionError';
       throw error;
     }
-    return this.latestBlockInfo;
+    return this.lastBlockInfo;
   }
 
   async upsertTransaction(transaction) {
