@@ -6,7 +6,7 @@ const {
   validateNextMultisigPublicKey
 } = require('./primitives');
 
-function validateMultisigTransactionSchema(multisigTransaction, fullCheck, minRequiredSignatures, networkSymbol) {
+function validateMultisigTransactionSchema(multisigTransaction, minRequiredSignatures, networkSymbol, fullCheck) {
   if (!multisigTransaction) {
     throw new Error('Multisig transaction was not specified');
   }

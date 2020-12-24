@@ -663,9 +663,9 @@ module.exports = class LDPoSChainModule {
     let { senderAddress } = transaction;
     validateMultisigTransactionSchema(
       transaction,
-      fullCheck,
       senderAccount.multisigRequiredSignatureCount,
-      this.networkSymbol
+      this.networkSymbol,
+      fullCheck
     );
 
     if (fullCheck) {
