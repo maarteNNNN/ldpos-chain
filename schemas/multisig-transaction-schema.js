@@ -21,7 +21,6 @@ function validateMultisigTransactionSchema(multisigTransaction, fullCheck, minRe
     if (!signaturePacket) {
       throw new Error('Some multisig transaction signatures were not specified');
     }
-    // TODO 222: The signature needs to include fields from the signature packet itself like nextMultisigPublicKey and multisigKeyIndex in order to guarantee their integrity.
     let {
       signerAddress,
       multisigKeyIndex,

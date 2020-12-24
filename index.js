@@ -248,8 +248,8 @@ module.exports = class LDPoSChainModule {
     let signerSet = new Set();
     while (true) {
       let startTime = Date.now();
-      let blockSignature = await this.verifiedBlockSignatureStream.once(timeout);
-      if (blockSignature.blockId === lastBlock.id) {
+      let { blockId, blockSignature } = await this.verifiedBlockSignatureStream.once(timeout);
+      if (blockId === lastBlock.id) {
         lastBlock.signatures[blockSignature.signerAddress] = blockSignature;
         signerSet.add(blockSignature.signerAddress);
       }
@@ -1096,11 +1096,8 @@ module.exports = class LDPoSChainModule {
     if (!block) {
       throw new Error('Cannot verify signature because there is no block pending');
     }
-    let { signerAddress, blockId } = blockSignature;
+    let { signerAddress } = blockSignature;
 
-    if (block.id !== blockId) {
-      throw new Error(`Signature blockId ${blockId} did not match the last block id ${block.id}`);
-    }
     let signerAccount;
     try {
       signerAccount = await this.getSanitizedAccount(signerAddress);
@@ -1158,7 +1155,7 @@ module.exports = class LDPoSChainModule {
   }
 
   async signBlock(block) {
-    return this.ldposClient.signBlock(block, true);
+    return this.ldposClient.signBlock(block);
   }
 
   async waitUntilNextBlockTimeSlot(options) {
@@ -1754,7 +1751,8 @@ module.exports = class LDPoSChainModule {
 
       validateBlockSignatureSchema(blockSignature, this.networkSymbol);
 
-      let { signatures } = this.lastReceivedBlock;
+      let lastReceivedBlock = this.lastReceivedBlock;
+      let { signatures } = lastReceivedBlock;
 
       if (signatures[blockSignature.signerAddress]) {
         this.logger.warn(
@@ -1764,7 +1762,7 @@ module.exports = class LDPoSChainModule {
       }
 
       try {
-        await this.verifyBlockSignature(this.lastReceivedBlock, blockSignature);
+        await this.verifyBlockSignature(lastReceivedBlock, blockSignature);
       } catch (error) {
         this.logger.warn(
           new Error(`Received invalid block signature - ${error.message}`)
@@ -1772,7 +1770,10 @@ module.exports = class LDPoSChainModule {
         return;
       }
 
-      this.verifiedBlockSignatureStream.write(blockSignature);
+      this.verifiedBlockSignatureStream.write({
+        blockId: lastReceivedBlock.id,
+        blockSignature
+      });
 
       // This is a performance optimization to ensure that peers
       // will not receive multiple instances of the same signature at the same time.

@@ -5,7 +5,6 @@ class DAL {
     this.blocks = [null];
     this.transactions = {};
     this.multisigMembers = {};
-    this.lastBlockInfo = null;
   }
 
   async init(options) {
@@ -265,36 +264,18 @@ class DAL {
     this.blocks[block.height] = block;
     let { transactions } = block;
     let len = transactions.length;
-    for (let indexInBlock = 0; indexInBlock < len; i++) {
-      let txn = transactions[indexInBlock];
+    for (let i = 0; i < len; i++) {
+      let txn = transactions[i];
       this.transactions[txn.id] = {
         ...txn,
         blockId: block.id,
-        indexInBlock
+        indexInBlock: i
       };
     }
   }
 
   async getMaxBlockHeight() {
     return this.blocks.length - 1;
-  }
-
-  async setLastBlockInfo(blockInfo) {
-    this.lastBlockInfo = {
-      ...blockInfo
-    }
-  }
-
-  async getLastBlockInfo() {
-    if (!this.lastBlockInfo) {
-      let error = new Error(
-        `Last block did not exist`
-      );
-      error.name = 'BlockDidNotExistError';
-      error.type = 'InvalidActionError';
-      throw error;
-    }
-    return this.lastBlockInfo;
   }
 
   async hasTransaction(transactionId) {

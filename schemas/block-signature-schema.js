@@ -13,12 +13,11 @@ function validateBlockSignatureSchema(blockSignature, networkSymbol) {
       'Block signature was not specified'
     );
   }
-  validateSignature(blockSignature.signature);
   validateWalletAddress(blockSignature.signerAddress, networkSymbol);
   validateForgingKeyIndex(blockSignature.forgingKeyIndex);
   validateForgingPublicKey(blockSignature.forgingPublicKey);
   validateNextForgingPublicKey(blockSignature.nextForgingPublicKey);
-  validateBlockId(blockSignature.blockId);
+  validateSignature(blockSignature.signature);
 }
 
 module.exports = {

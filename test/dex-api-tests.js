@@ -146,7 +146,7 @@ describe('DEX API tests', async () => {
               recipientAddress: '1072f65df680b2767f55a6bcd505b68d90d227d6d8b2d340fe97aaa016ab6dd7ldpos',
               amount: '1100000000',
               fee: '100000000',
-              timestamp: 1608470523757,
+              timestamp: 1608470599970,
               data: ''
             },
             {
@@ -154,7 +154,7 @@ describe('DEX API tests', async () => {
               recipientAddress: '484a487b1c12b8f46dfe9f15e7fe79ceb88d2c3f76ba39680ae5279a04e7e842ldpos',
               amount: '1200000000',
               fee: '100000000',
-              timestamp: 1608470600000, // TODO 22 adjust timestamp of transactions
+              timestamp: 1608470599972,
               data: ''
             }
           ]
@@ -169,26 +169,25 @@ describe('DEX API tests', async () => {
               recipientAddress: '484a487b1c12b8f46dfe9f15e7fe79ceb88d2c3f76ba39680ae5279a04e7e842ldpos',
               amount: '1300000000',
               fee: '100000000',
-              timestamp: 1608470700000,
+              timestamp: 1608470600000,
               data: ''
             }
           ]
         }
       ].map(block => {
         block.previousBlockId = lastBlockId;
-        let preparedBlock = client.prepareBlock(block);
-        lastBlockId = preparedBlock.id;
+        let { transactions, ...preparedBlockWithoutTxns } = client.prepareBlock(block);
+        lastBlockId = preparedBlockWithoutTxns.id;
         return {
-          height: preparedBlock.height,
-          timestamp: preparedBlock.timestamp,
-          previousBlockId: preparedBlock.previousBlockId,
-          transactions: preparedBlock.transactions.map(
+          height: preparedBlockWithoutTxns.height,
+          timestamp: preparedBlockWithoutTxns.timestamp,
+          previousBlockId: preparedBlockWithoutTxns.previousBlockId,
+          transactions: transactions.map(
             txn => chainModule.simplifyTransaction(client.prepareTransaction(txn))
           ),
-          ...preparedBlock
+          ...preparedBlockWithoutTxns
         };
       });
-      console.log(9999, blockList);
 
       memberAddessList = memberAccounts.map(account => account.address);
       for (let account of memberAccounts) {
@@ -198,17 +197,16 @@ describe('DEX API tests', async () => {
       await dal.registerMultisigWallet(multisigAccount.address, memberAddessList, 2);
 
       for (let block of blockList) {
-        await dal.upsertBlock(chainModule.simplifyBlock(block));
+        await dal.upsertBlock(block);
       }
     });
 
-    describe.only('getMultisigWalletMembers action', async () => {
+    describe('getMultisigWalletMembers action', async () => {
 
       it('should return an array of member addresses', async () => {
         let walletMembers = await chainModule.actions.getMultisigWalletMembers.handler({
           walletAddress: multisigAccount.address
         });
-        console.log(222, walletMembers);
         assert.equal(JSON.stringify(walletMembers), JSON.stringify(memberAddessList));
       });
 
@@ -278,25 +276,25 @@ describe('DEX API tests', async () => {
         assert.equal(Array.isArray(transactions), true);
         assert.equal(transactions.length, 3);
         assert.equal(transactions[0].senderAddress, client.accountAddress);
-        assert.equal(transactions[0].id, 'pBi4ac6v8RCaLL1vz2PpyjHwx8nyEhkp2YjAPBYJJLM=');
+        assert.equal(transactions[0].id, 'Zf4ZBvN1Psa9upHe/HAYnalsDlXndgCRMhzPdUmneFI=');
         assert.equal(transactions[1].senderAddress, client.accountAddress);
-        assert.equal(transactions[1].id, '8FZkstZsspGrU+caJUIhuBVgpp9zAdU9wU/zngAZNr8=');
+        assert.equal(transactions[1].id, 'YONA9/mBBrJ8Ez1h04DXOvFiuc5M/tWQJLQ6r3r+LTU=');
         assert.equal(transactions[2].senderAddress, client.accountAddress);
-        assert.equal(transactions[2].id, 'QbGowi9nkwf5WUYR+6k4aP1NvA+12m8z+/NJvHve10A=');
+        assert.equal(transactions[2].id, 'autXoUw0ovKT3V9aLfjgQH7px4fF5SsAhy07hUz7rh8=');
       });
 
-      it('should only return transactions which are more recent than fromTimestamp', async () => {
+      it('should return transactions which are more recent than fromTimestamp', async () => {
         let transactions = await chainModule.actions.getOutboundTransactions.handler({
           walletAddress: client.accountAddress,
-          fromTimestamp: 1608470523800,
+          fromTimestamp: 1608470599971,
           limit: 100
         });
         assert.equal(Array.isArray(transactions), true);
         assert.equal(transactions.length, 2);
         assert.equal(transactions[0].senderAddress, client.accountAddress);
-        assert.equal(transactions[0].id, '8FZkstZsspGrU+caJUIhuBVgpp9zAdU9wU/zngAZNr8=');
+        assert.equal(transactions[0].id, 'YONA9/mBBrJ8Ez1h04DXOvFiuc5M/tWQJLQ6r3r+LTU=');
         assert.equal(transactions[1].senderAddress, client.accountAddress);
-        assert.equal(transactions[1].id, 'QbGowi9nkwf5WUYR+6k4aP1NvA+12m8z+/NJvHve10A=');
+        assert.equal(transactions[1].id, 'autXoUw0ovKT3V9aLfjgQH7px4fF5SsAhy07hUz7rh8=');
       });
 
       it('should limit the number of transactions based on the specified limit', async () => {
@@ -308,7 +306,7 @@ describe('DEX API tests', async () => {
         assert.equal(Array.isArray(transactions), true);
         assert.equal(transactions.length, 1);
         assert.equal(transactions[0].senderAddress, client.accountAddress);
-        assert.equal(transactions[0].id, 'pBi4ac6v8RCaLL1vz2PpyjHwx8nyEhkp2YjAPBYJJLM=');
+        assert.equal(transactions[0].id, 'Zf4ZBvN1Psa9upHe/HAYnalsDlXndgCRMhzPdUmneFI=');
       });
 
       it('should return an empty array if no transactions can be matched', async () => {
@@ -329,15 +327,15 @@ describe('DEX API tests', async () => {
         let recipientAddress = '484a487b1c12b8f46dfe9f15e7fe79ceb88d2c3f76ba39680ae5279a04e7e842ldpos';
         let transactions = await chainModule.actions.getInboundTransactionsFromBlock.handler({
           walletAddress: recipientAddress,
-          blockId: 'dfa9f15e7fe79cebc88d2c3f76ba39680ae5279a14e='
+          blockId: blockList[0].id
         });
         assert.equal(Array.isArray(transactions), true);
         assert.equal(transactions.length, 1);
         assert.equal(transactions[0].recipientAddress, recipientAddress);
-        assert.equal(transactions[0].id, 'QbGowi9nkwf5WUYR+6k4aP1NvA+12m8z+/NJvHve10A=');
+        assert.equal(transactions[0].id, 'YONA9/mBBrJ8Ez1h04DXOvFiuc5M/tWQJLQ6r3r+LTU=');
       });
 
-      it('should return an empty array if not transactions match the specified blockId', async () => {
+      it('should return an empty array if no transactions match the specified blockId', async () => {
         let recipientAddress = '484a487b1c12b8f46dfe9f15e7fe79ceb88d2c3f76ba39680ae5279a04e7e842ldpos';
         let transactions = await chainModule.actions.getInboundTransactionsFromBlock.handler({
           walletAddress: recipientAddress,
@@ -347,7 +345,7 @@ describe('DEX API tests', async () => {
         assert.equal(transactions.length, 0);
       });
 
-      it('should return an empty array if not transactions match the specified walletAddress', async () => {
+      it('should return an empty array if no transactions match the specified walletAddress', async () => {
         let recipientAddress = '484a487b1c12b8f46dfe9f15e7fe79ceb88d2c3f76ba39680ae5279a04e7e842ldpos';
         let transactions = await chainModule.actions.getInboundTransactionsFromBlock.handler({
           walletAddress: '1bbcb6922ca73d835a398fa09614054aecfaee465a31259bb6a845c9a37e2058ldpos',
@@ -364,17 +362,17 @@ describe('DEX API tests', async () => {
       it('should return an array of transactions sent to the specified walletAddress', async () => {
         let transactions = await chainModule.actions.getOutboundTransactionsFromBlock.handler({
           walletAddress: client.accountAddress,
-          blockId: 'cfa9f15e7ce79cebc88d2c3f76bd39680ae4279a14e='
+          blockId: blockList[0].id
         });
         assert.equal(Array.isArray(transactions), true);
         assert.equal(transactions.length, 2);
         assert.equal(transactions[0].senderAddress, client.accountAddress);
-        assert.equal(transactions[0].id, 'pBi4ac6v8RCaLL1vz2PpyjHwx8nyEhkp2YjAPBYJJLM=');
+        assert.equal(transactions[0].id, 'Zf4ZBvN1Psa9upHe/HAYnalsDlXndgCRMhzPdUmneFI=');
         assert.equal(transactions[1].senderAddress, client.accountAddress);
-        assert.equal(transactions[1].id, '8FZkstZsspGrU+caJUIhuBVgpp9zAdU9wU/zngAZNr8=');
+        assert.equal(transactions[1].id, 'YONA9/mBBrJ8Ez1h04DXOvFiuc5M/tWQJLQ6r3r+LTU=');
       });
 
-      it('should return an empty array if not transactions match the specified blockId', async () => {
+      it('should return an empty array if no transactions match the specified blockId', async () => {
         let transactions = await chainModule.actions.getOutboundTransactionsFromBlock.handler({
           walletAddress: client.accountAddress,
           blockId: 'abc9f15e7de79cebc87d2c3f76ba39480ae5279a12e='
@@ -383,7 +381,7 @@ describe('DEX API tests', async () => {
         assert.equal(transactions.length, 0);
       });
 
-      it('should return an empty array if not transactions match the specified walletAddress', async () => {
+      it('should return an empty array if no transactions match the specified walletAddress', async () => {
         let transactions = await chainModule.actions.getOutboundTransactionsFromBlock.handler({
           walletAddress: '1bbcb6922ca73d835a398fa09614054aecfaee465a31259bb6a845c9a37e2058ldpos',
           blockId: 'dfa9f15e7fe79cebc88d2c3f76ba39680ae5279a14e='
@@ -394,15 +392,13 @@ describe('DEX API tests', async () => {
 
     });
 
-    // describe('getLastBlockAtTimestamp action', async () => { // TODO 22
-    //
-    //   it('should expose a getLastBlockAtTimestamp action', async () => {
-    //     let transactions = await chainModule.actions.getLastBlockAtTimestamp.handler({
-    //       timestamp:
-    //     });
-    //   });
-    //
-    // });
+    describe('getLastBlockAtTimestamp action', async () => {
+
+      it('should expose a getLastBlockAtTimestamp action', async () => {
+
+      });
+
+    });
 
     describe('getMaxBlockHeight action', async () => {
 
