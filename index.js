@@ -6,11 +6,6 @@ const WritableConsumableStream = require('writable-consumable-stream');
 const { validateForgedBlockSchema } = require('./schemas/forged-block-schema');
 const { validateFullySignedBlockSchema } = require('./schemas/fully-signed-block-schema');
 const { validateTransactionSchema } = require('./schemas/transaction-schema');
-const { validateTransferTransactionSchema } = require('./schemas/transfer-transaction-schema');
-const { validateVoteTransactionSchema } = require('./schemas/vote-transaction-schema');
-const { validateUnvoteTransactionSchema } = require('./schemas/unvote-transaction-schema');
-const { validateRegisterMultisigTransactionSchema } = require('./schemas/register-multisig-transaction-schema');
-const { validateInitTransactionSchema } = require('./schemas/init-transaction-schema');
 const { validateBlockSignatureSchema } = require('./schemas/block-signature-schema');
 const { validateMultisigTransactionSchema } = require('./schemas/multisig-transaction-schema');
 const { validateSigTransactionSchema } = require('./schemas/sig-transaction-schema');
@@ -627,7 +622,7 @@ module.exports = class LDPoSChainModule {
     }
   }
 
-  verifyTransactionCorrespondsToSigAccount(senderAccount, transaction, fullCheck) {
+  verifySigTransactionAuthentication(senderAccount, transaction, fullCheck) {
     validateSigTransactionSchema(transaction, fullCheck);
 
     let senderSigPublicKey;
@@ -664,7 +659,7 @@ module.exports = class LDPoSChainModule {
     }
   }
 
-  verifyTransactionCorrespondsToMultisigAccount(senderAccount, multisigMemberAccounts, transaction, fullCheck) {
+  verifyMultisigTransactionAuthentication(senderAccount, multisigMemberAccounts, transaction, fullCheck) {
     let { senderAddress } = transaction;
     validateMultisigTransactionSchema(
       transaction,
@@ -869,34 +864,7 @@ module.exports = class LDPoSChainModule {
     return txnTotal;
   }
 
-  validateGenericTransactionSchema(transaction, fullCheck) {
-    validateTransactionSchema(transaction, this.maxSpendableDigits, this.networkSymbol, this.maxTransactionDataLength);
-
-    let { type } = transaction;
-
-    if (type === 'transfer') {
-      validateTransferTransactionSchema(transaction, this.maxSpendableDigits, this.networkSymbol);
-    } else if (type === 'vote') {
-      validateVoteTransactionSchema(transaction, this.networkSymbol);
-    } else if (type === 'unvote') {
-      validateUnvoteTransactionSchema(transaction, this.networkSymbol);
-    } else if (type === 'registerMultisig') {
-      validateRegisterMultisigTransactionSchema(
-        transaction,
-        this.minMultisigMembers,
-        this.maxMultisigMembers,
-        this.networkSymbol
-      );
-    } else if (type === 'init') {
-      validateInitTransactionSchema(transaction, fullCheck);
-    } else {
-      throw new Error(
-        `Transaction type ${type} was invalid`
-      );
-    }
-  }
-
-  async verifySigTransactionWithoutSignatureCheck(senderAccount, transaction, fullCheck) {
+  async verifySigTransactionAuthorization(senderAccount, transaction, fullCheck) {
     let txnTotal = this.verifyAccountMeetsRequirements(senderAccount, transaction);
 
     if (fullCheck) {
@@ -917,12 +885,12 @@ module.exports = class LDPoSChainModule {
     return txnTotal;
   }
 
-  async verifySigTransaction(senderAccount, transaction, fullCheck) {
-    this.verifyTransactionCorrespondsToSigAccount(senderAccount, transaction, fullCheck);
-    return this.verifySigTransactionWithoutSignatureCheck(senderAccount, transaction, fullCheck);
+  async verifySigTransactionAuth(senderAccount, transaction, fullCheck) {
+    this.verifySigTransactionAuthentication(senderAccount, transaction, fullCheck);
+    return this.verifySigTransactionAuthorization(senderAccount, transaction, fullCheck);
   }
 
-  async verifyMultisigTransactionWithoutSignatureCheck(senderAccount, multisigMemberAccounts, transaction, fullCheck) {
+  async verifyMultisigTransactionAuthorization(senderAccount, multisigMemberAccounts, transaction, fullCheck) {
     let txnTotal = this.verifyAccountMeetsRequirements(senderAccount, transaction);
 
     if (fullCheck) {
@@ -943,9 +911,9 @@ module.exports = class LDPoSChainModule {
     return txnTotal;
   }
 
-  async verifyMultisigTransaction(senderAccount, multisigMemberAccounts, transaction, fullCheck) {
-    this.verifyTransactionCorrespondsToMultisigAccount(senderAccount, multisigMemberAccounts, transaction, fullCheck);
-    return this.verifyMultisigTransactionWithoutSignatureCheck(senderAccount, multisigMemberAccounts, transaction, fullCheck);
+  async verifyMultisigTransactionAuth(senderAccount, multisigMemberAccounts, transaction, fullCheck) {
+    this.verifyMultisigTransactionAuthentication(senderAccount, multisigMemberAccounts, transaction, fullCheck);
+    return this.verifyMultisigTransactionAuthorization(senderAccount, multisigMemberAccounts, transaction, fullCheck);
   }
 
   async verifyFullySignedBlock(block, lastBlock) {
@@ -1012,7 +980,14 @@ module.exports = class LDPoSChainModule {
 
   async verifyBlockTransactions(block) {
     for (let transaction of block.transactions) {
-      this.validateGenericTransactionSchema(transaction, false);
+      validateTransactionSchema(
+        transaction,
+        this.maxSpendableDigits,
+        this.networkSymbol,
+        this.maxTransactionDataLength,
+        this.minMultisigMembers,
+        this.maxMultisigMembers
+      );
     }
 
     await Promise.all(
@@ -1072,9 +1047,9 @@ module.exports = class LDPoSChainModule {
           try {
             let txnTotal;
             if (multisigMemberAccounts) {
-              txnTotal = await this.verifyMultisigTransaction(senderAccount, multisigMemberAccounts, senderTxn, false);
+              txnTotal = await this.verifyMultisigTransactionAuth(senderAccount, multisigMemberAccounts, senderTxn, false);
             } else {
-              txnTotal = await this.verifySigTransaction(senderAccount, senderTxn, false);
+              txnTotal = await this.verifySigTransactionAuth(senderAccount, senderTxn, false);
             }
 
             // Subtract valid transaction total from the in-memory senderAccount balance since it
@@ -1353,9 +1328,9 @@ module.exports = class LDPoSChainModule {
                 try {
                   let txnTotal;
                   if (multisigMemberAccounts) {
-                    txnTotal = await this.verifyMultisigTransaction(senderAccount, multisigMemberAccounts, pendingTxn, false);
+                    txnTotal = await this.verifyMultisigTransactionAuth(senderAccount, multisigMemberAccounts, pendingTxn, false);
                   } else {
-                    txnTotal = await this.verifySigTransaction(senderAccount, pendingTxn, false);
+                    txnTotal = await this.verifySigTransactionAuth(senderAccount, pendingTxn, false);
                   }
 
                   // Subtract valid transaction total from the in-memory senderAccount balance since it
@@ -1528,7 +1503,14 @@ module.exports = class LDPoSChainModule {
       let transaction = event.data;
 
       try {
-        this.validateGenericTransactionSchema(transaction, true);
+        validateTransactionSchema(
+          transaction,
+          this.maxSpendableDigits,
+          this.networkSymbol,
+          this.maxTransactionDataLength,
+          this.minMultisigMembers,
+          this.maxMultisigMembers
+        );
       } catch (error) {
         this.logger.warn(
           new Error(`Received invalid transaction ${transaction.id} - ${error.message}`)
@@ -1566,9 +1548,9 @@ module.exports = class LDPoSChainModule {
         let { senderAccount, multisigMemberAccounts } = await accountStream.senderAccountPromise;
         try {
           if (multisigMemberAccounts) {
-            this.verifyTransactionCorrespondsToMultisigAccount(senderAccount, multisigMemberAccounts, transaction, true);
+            this.verifyMultisigTransactionAuthentication(senderAccount, multisigMemberAccounts, transaction, true);
           } else {
-            this.verifyTransactionCorrespondsToSigAccount(senderAccount, transaction, true);
+            this.verifySigTransactionAuthentication(senderAccount, transaction, true);
           }
           accountStream.write(transaction);
         } catch (error) {
@@ -1599,9 +1581,9 @@ module.exports = class LDPoSChainModule {
       let { senderAccount, multisigMemberAccounts } = await accountStream.senderAccountPromise;
       try {
         if (multisigMemberAccounts) {
-          this.verifyTransactionCorrespondsToMultisigAccount(senderAccount, multisigMemberAccounts, transaction, true);
+          this.verifyMultisigTransactionAuthentication(senderAccount, multisigMemberAccounts, transaction, true);
         } else {
-          this.verifyTransactionCorrespondsToSigAccount(senderAccount, transaction, true);
+          this.verifySigTransactionAuthentication(senderAccount, transaction, true);
         }
         accountStream.write(transaction);
       } catch (error) {
@@ -1623,9 +1605,9 @@ module.exports = class LDPoSChainModule {
         try {
           let txnTotal;
           if (multisigMemberAccounts) {
-            txnTotal = await this.verifyMultisigTransactionWithoutSignatureCheck(senderAccount, multisigMemberAccounts, accountTxn, true);
+            txnTotal = await this.verifyMultisigTransactionAuthorization(senderAccount, multisigMemberAccounts, accountTxn, true);
           } else {
-            txnTotal = await this.verifySigTransactionWithoutSignatureCheck(senderAccount, accountTxn, true);
+            txnTotal = await this.verifySigTransactionAuthorization(senderAccount, accountTxn, true);
           }
 
           if (accountStream.transactionMap.has(accountTxn.id)) {

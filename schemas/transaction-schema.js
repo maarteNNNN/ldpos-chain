@@ -5,15 +5,24 @@ const {
   validateTransactionData
 } = require('./primitives');
 
-function validateTransactionSchema(transaction, maxSpendableDigits, networkSymbol, maxTransactionDataLength) {
+const { validateTransferTransactionSchema } = require('./transfer-transaction-schema');
+const { validateVoteTransactionSchema } = require('./vote-transaction-schema');
+const { validateUnvoteTransactionSchema } = require('./unvote-transaction-schema');
+const { validateRegisterMultisigTransactionSchema } = require('./register-multisig-transaction-schema');
+const { validateInitTransactionSchema } = require('./init-transaction-schema');
+
+function validateTransactionSchema(transaction, maxSpendableDigits, networkSymbol, maxTransactionDataLength, minMultisigMembers, maxMultisigMembers) {
   if (!transaction) {
     throw new Error('Transaction was not specified');
   }
+  let { type } = transaction;
+
   if (
-    transaction.type !== 'transfer' &&
-    transaction.type !== 'vote' &&
-    transaction.type !== 'unvote' &&
-    transaction.type !== 'registerMultisig'
+    type !== 'transfer' &&
+    type !== 'vote' &&
+    type !== 'unvote' &&
+    type !== 'registerMultisig' &&
+    type !== 'init'
   ) {
     throw new Error(
       'Transaction type must be a string which refers to one of the supported transaction types'
@@ -23,6 +32,23 @@ function validateTransactionSchema(transaction, maxSpendableDigits, networkSymbo
   validateTransactionFee(transaction.fee, maxSpendableDigits);
   validateTimestamp(transaction.timestamp);
   validateTransactionData(transaction.data, maxTransactionDataLength);
+
+  if (type === 'transfer') {
+    validateTransferTransactionSchema(transaction, maxSpendableDigits, networkSymbol);
+  } else if (type === 'vote') {
+    validateVoteTransactionSchema(transaction, networkSymbol);
+  } else if (type === 'unvote') {
+    validateUnvoteTransactionSchema(transaction, networkSymbol);
+  } else if (type === 'registerMultisig') {
+    validateRegisterMultisigTransactionSchema(
+      transaction,
+      minMultisigMembers,
+      maxMultisigMembers,
+      networkSymbol
+    );
+  } else if (type === 'init') {
+    validateInitTransactionSchema(transaction);
+  }
 }
 
 module.exports = {
