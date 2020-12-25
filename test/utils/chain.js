@@ -26,7 +26,7 @@ class LDPoSChainModule {
 
   get actions() {
     return {
-      getBlocksFromHeight: async ({ height, limit }) => {
+      getSignedBlocksFromHeight: async ({ height, limit }) => {
         return [];
       }
     };

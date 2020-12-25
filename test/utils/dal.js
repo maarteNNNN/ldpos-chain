@@ -206,7 +206,7 @@ class DAL {
   }
 
   async getLastBlockAtTimestamp(timestamp) {
-    let blockList = Object.values(this.blocks);
+    let blockList = this.blocks.slice(1);
     blockList.sort((blockA, blockB) => {
       if (blockA.timestamp > blockB.timestamp) {
         return -1;

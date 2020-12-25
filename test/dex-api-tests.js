@@ -394,8 +394,14 @@ describe('DEX API tests', async () => {
 
     describe('getLastBlockAtTimestamp action', async () => {
 
-      it('should expose a getLastBlockAtTimestamp action', async () => {
-
+      it('should expose a getLastBlockAtTimestamp action', async () => { // TODO 222: implement getLastBlockHeightAtTimestamp
+        let block = await chainModule.actions.getLastBlockAtTimestamp.handler({
+          timestamp: 1608470599981
+        });
+        assert.notEqual(block, null);
+        assert.equal(block.height, 1);
+        assert.equal(block.id, 'CcxNoDMoh3QG7BfIEbd6B5QIAG37qD/V4W3E4j42ZN0=');
+        // TODO 222: Assert all the required block properties.
       });
 
     });

@@ -138,7 +138,8 @@ module.exports = class LDPoSChainModule {
       getLastBlockAtTimestamp: {
         handler: async action => {
           let { timestamp } = action;
-          return this.dal.getLastBlockAtTimestamp(timestamp);
+          let block = await this.dal.getLastBlockAtTimestamp(timestamp);
+          return this.simplifyBlock(block);
         }
       },
       getMaxBlockHeight: {
@@ -149,6 +150,15 @@ module.exports = class LDPoSChainModule {
       getBlocksFromHeight: {
         handler: async action => {
           let { height, limit } = action;
+          let blocks = await this.dal.getBlocksFromHeight(height, limit);
+          return blocks.map((block) => {
+            return this.simplifyBlock(block);
+          });
+        }
+      },
+      getSignedBlocksFromHeight: {
+        handler: async action => {
+          let { height, limit } = action;
           return this.dal.getBlocksFromHeight(height, limit);
         },
         isPublic: true
@@ -156,19 +166,29 @@ module.exports = class LDPoSChainModule {
       getBlocksBetweenHeights: {
         handler: async action => {
           let { fromHeight, toHeight, limit } = action;
-          return this.dal.getBlocksBetweenHeights(fromHeight, toHeight, limit);
+          let blocks = await this.dal.getBlocksBetweenHeights(fromHeight, toHeight, limit);
+          return blocks.map((block) => {
+            return this.simplifyBlock(block);
+          });
         }
       },
       getBlockAtHeight: {
         handler: async action => {
           let { height } = action;
-          return this.dal.getBlockAtHeight(height);
+          let block = await this.dal.getBlockAtHeight(height);
+          return this.simplifyBlock(block);
         }
       },
       getModuleOptions: {
         handler: async action => this.options
       }
     };
+  }
+
+  async simplifyBlock(signedBlock) {
+    let { transactions, signature, signatures, ...simpleBlock } = signedBlock;
+    simpleBlock.numberOfTransactions = transactions.length;
+    return simpleBlock;
   }
 
   async catchUpWithNetwork(options) {
@@ -195,7 +215,7 @@ module.exports = class LDPoSChainModule {
       let newBlocks;
       try {
         newBlocks = await this.channel.invoke('network:request', {
-          procedure: `${this.alias}:getBlocksFromHeight`,
+          procedure: `${this.alias}:getSignedBlocksFromHeight`,
           data: {
             height: this.lastProcessedBlock.height + 1,
             limit: fetchBlockLimit
