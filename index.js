@@ -991,10 +991,18 @@ module.exports = class LDPoSChainModule {
         }`
       );
     }
-    if (!this.ldposClient.verifyBlock(block, lastBlock.id)) {
-      throw new Error(`Block was invalid`);
+    if (block.previousBlockId !== lastBlock.id) {
+      throw new Error(
+        `Block previousBlockId ${
+          block.previousBlockId
+        } did not match the id of the previous block ${
+          lastBlock.id
+        }`
+      );
     }
-
+    if (!this.ldposClient.verifyBlock(block)) {
+      throw new Error('Block was invalid');
+    }
     await this.verifyBlockTransactions(block);
   }
 
