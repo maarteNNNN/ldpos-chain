@@ -18,7 +18,7 @@ class LDPoSChainModule {
       blockSignature: async (blockSignature) => {
 
       },
-      transactions: async (transactions) => {
+      transaction: async (transaction) => {
 
       }
     }

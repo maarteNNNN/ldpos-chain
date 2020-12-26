@@ -602,8 +602,20 @@ describe('DEX API tests', async () => {
 
     describe('postTransaction action', async () => {
 
-      it('should expose a postTransaction action', async () => {
-
+      it('should accept a prepared (signed) transaction object as argument', async () => {
+        // The format of the prepared (signed) transaction may be different depending on the
+        // implementation of the chain module.
+        let preparedTxn = clientForger.prepareTransaction({
+          type: 'transfer',
+          recipientAddress: '484a487b1c12b8f46dfe9f15e7fe79ceb88d2c3f76ba39680ae5279a04e7e842ldpos',
+          amount: '3300000000',
+          fee: '100000000',
+          timestamp: 100000,
+          message: ''
+        });
+        await chainModule.actions.postTransaction.handler({
+          transaction: preparedTxn
+        });
       });
 
     });

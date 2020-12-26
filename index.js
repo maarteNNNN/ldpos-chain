@@ -82,7 +82,8 @@ module.exports = class LDPoSChainModule {
   get events() {
     return [
       'bootstrap',
-      'chainChanges'
+      'chainChanges',
+      'transaction'
     ];
   }
 
