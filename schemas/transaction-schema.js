@@ -2,7 +2,7 @@ const {
   validateWalletAddress,
   validateTransactionFee,
   validateTimestamp,
-  validateTransactionData
+  validateTransactionMessage
 } = require('./primitives');
 
 const { validateTransferTransactionSchema } = require('./transfer-transaction-schema');
@@ -11,7 +11,7 @@ const { validateUnvoteTransactionSchema } = require('./unvote-transaction-schema
 const { validateRegisterMultisigTransactionSchema } = require('./register-multisig-transaction-schema');
 const { validateInitTransactionSchema } = require('./init-transaction-schema');
 
-function validateTransactionSchema(transaction, maxSpendableDigits, networkSymbol, maxTransactionDataLength, minMultisigMembers, maxMultisigMembers) {
+function validateTransactionSchema(transaction, maxSpendableDigits, networkSymbol, maxTransactionMessageLength, minMultisigMembers, maxMultisigMembers) {
   if (!transaction) {
     throw new Error('Transaction was not specified');
   }
@@ -31,7 +31,7 @@ function validateTransactionSchema(transaction, maxSpendableDigits, networkSymbo
   validateWalletAddress(transaction.senderAddress, networkSymbol);
   validateTransactionFee(transaction.fee, maxSpendableDigits);
   validateTimestamp(transaction.timestamp);
-  validateTransactionData(transaction.data, maxTransactionDataLength);
+  validateTransactionMessage(transaction.message, maxTransactionMessageLength);
 
   if (type === 'transfer') {
     validateTransferTransactionSchema(transaction, maxSpendableDigits, networkSymbol);

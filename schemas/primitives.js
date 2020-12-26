@@ -134,13 +134,13 @@ function validateTransactionId(transactionId) {
   }
 }
 
-function validateTransactionData(data, maxTransactionDataLength) {
-  if (typeof data !== 'string') {
-    throw new Error('Transaction data must be a string');
+function validateTransactionMessage(message, maxTransactionMessageLength) {
+  if (typeof message !== 'string') {
+    throw new Error('Transaction message must be a string');
   }
-  if (data.length > maxTransactionDataLength) {
+  if (message.length > maxTransactionMessageLength) {
     throw new Error(
-      `Transaction data must not exceed ${maxTransactionDataLength} characters`
+      `Transaction message must not exceed ${maxTransactionMessageLength} characters`
     );
   }
 }
@@ -187,7 +187,7 @@ module.exports = {
   validateBlockHeight,
   validatePreviousBlockId,
   validateTransactionId,
-  validateTransactionData,
+  validateTransactionMessage,
   validateTransactionAmount,
   validateTransactionFee,
   validateTimestamp
