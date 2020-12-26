@@ -185,7 +185,7 @@ module.exports = class LDPoSChainModule {
     };
   }
 
-  async simplifyBlock(signedBlock) {
+  simplifyBlock(signedBlock) {
     let { transactions, signature, signatures, ...simpleBlock } = signedBlock;
     simpleBlock.numberOfTransactions = transactions.length;
     return simpleBlock;

@@ -2,7 +2,7 @@ class DAL {
   constructor() {
     this.accounts = {};
     this.votes = {};
-    this.blocks = [null];
+    this.blocks = [];
     this.transactions = {};
     this.multisigMembers = {};
   }
@@ -202,11 +202,11 @@ class DAL {
   }
 
   async getBlocksFromHeight(height, limit) {
-    return this.blocks.slice(height, height + limit);
+    return this.blocks.slice(height - 1, height + limit);
   }
 
   async getLastBlockAtTimestamp(timestamp) {
-    let blockList = this.blocks.slice(1);
+    let blockList = [...this.blocks];
     blockList.sort((blockA, blockB) => {
       if (blockA.timestamp > blockB.timestamp) {
         return -1;
@@ -242,7 +242,7 @@ class DAL {
   }
 
   async getBlockAtHeight(height) {
-    let block = this.blocks[height];
+    let block = this.blocks[height - 1];
     if (!block) {
       let error = new Error(
         `No block existed at height ${height}`
@@ -261,7 +261,7 @@ class DAL {
   }
 
   async upsertBlock(block) {
-    this.blocks[block.height] = block;
+    this.blocks[block.height - 1] = block;
     let { transactions } = block;
     let len = transactions.length;
     for (let i = 0; i < len; i++) {
@@ -275,7 +275,7 @@ class DAL {
   }
 
   async getMaxBlockHeight() {
-    return this.blocks.length - 1;
+    return this.blocks.length;
   }
 
   async hasTransaction(transactionId) {

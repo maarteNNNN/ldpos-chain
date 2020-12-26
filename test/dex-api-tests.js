@@ -396,7 +396,7 @@ describe('DEX API tests', async () => {
 
     describe('getLastBlockAtTimestamp action', async () => {
 
-      it('should expose a getLastBlockAtTimestamp action', async () => {
+      it('should return the highest block which is below the specified timestamp', async () => {
         let block = await chainModule.actions.getLastBlockAtTimestamp.handler({
           timestamp: 1608470599981
         });
@@ -422,16 +422,48 @@ describe('DEX API tests', async () => {
 
     describe('getMaxBlockHeight action', async () => {
 
-      it('should expose a getMaxBlockHeight action', async () => {
-
+      it('should return the height of the block as an integer number', async () => {
+        let height = await chainModule.actions.getMaxBlockHeight.handler();
+        assert.equal(height, 2);
       });
 
     });
 
     describe('getBlocksBetweenHeights action', async () => {
 
-      it('should expose a getBlocksBetweenHeights action', async () => {
+      it('should return blocks whose height is greater than fromHeight and less than or equal to toHeight', async () => {
+        let blocks = await chainModule.actions.getBlocksBetweenHeights.handler({
+          fromHeight: 1,
+          toHeight: 2,
+          limit: 100
+        });
+        assert.equal(Array.isArray(blocks), true);
+        assert.equal(blocks.length, 1);
+        let block = blocks[0];
+        assert.equal(typeof block.id, 'string');
+        assert.equal(Number.isInteger(block.timestamp), true);
+        assert.equal(block.height, 2);
+      });
 
+      it('should return blocks whose height is greater than fromHeight and less than or equal to toHeight', async () => {
+        let blocks = await chainModule.actions.getBlocksBetweenHeights.handler({
+          fromHeight: 0,
+          toHeight: 2,
+          limit: 1
+        });
+        assert.equal(Array.isArray(blocks), true);
+        assert.equal(blocks.length, 1);
+        assert.equal(blocks[0].height, 1);
+      });
+
+      it('should return an empty array if no blocks are matched', async () => {
+        let blocks = await chainModule.actions.getBlocksBetweenHeights.handler({
+          fromHeight: 2,
+          toHeight: 10,
+          limit: 10
+        });
+        assert.equal(Array.isArray(blocks), true);
+        assert.equal(blocks.length, 0);
       });
 
     });
@@ -439,7 +471,26 @@ describe('DEX API tests', async () => {
     describe('getBlockAtHeight action', async () => {
 
       it('should expose a getBlockAtHeight action', async () => {
+        let block = await chainModule.actions.getBlockAtHeight.handler({
+          height: 2
+        });
+        assert.notEqual(block, null);
+        assert.equal(block.height, 2);
+        assert.equal(Number.isInteger(block.timestamp), true);
+      });
 
+      it('should throw a BlockDidNotExistError if no block could be matched', async () => {
+        let caughtError = null;
+        try {
+          await chainModule.actions.getBlockAtHeight.handler({
+            height: 3
+          });
+        } catch (error) {
+          caughtError = error;
+        }
+        assert.notEqual(caughtError, null);
+        assert.equal(caughtError.type, 'InvalidActionError');
+        assert.equal(caughtError.name, 'BlockDidNotExistError');
       });
 
     });
