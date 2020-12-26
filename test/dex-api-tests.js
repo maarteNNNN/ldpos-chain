@@ -20,6 +20,7 @@ describe('DEX API tests', async () => {
   let options;
   let bootstrapEventTriggered;
   let clientForger;
+  let chainChangeEvents;
 
   beforeEach(async () => {
     dal = new DAL();
@@ -38,12 +39,19 @@ describe('DEX API tests', async () => {
     });
     options = {
       genesisPath: './test/utils/genesis.json',
-      forgingPassphrase: 'clerk aware give dog reopen peasant duty cheese tobacco trouble gold angle'
+      forgingPassphrase: 'clerk aware give dog reopen peasant duty cheese tobacco trouble gold angle',
+      minTransactionsPerBlock: 0, // Enable forging empty blocks.
+      forgingInterval: 5000
     };
 
     bootstrapEventTriggered = false;
     channel.subscribe(`${chainModule.alias}:bootstrap`, async () => {
       bootstrapEventTriggered = true;
+    });
+
+    chainChangeEvents = [];
+    channel.subscribe(`${chainModule.alias}:chainChanges`, async (event) => {
+      chainChangeEvents.push(event);
     });
     await chainModule.load(channel, options);
     clientForger = await createClient({
@@ -630,7 +638,14 @@ describe('DEX API tests', async () => {
     });
 
     it('should expose a chainChanges event', async () => {
-
+      await wait(8000);
+      assert.equal(chainChangeEvents.length, 1);
+      let eventData = chainChangeEvents[0].data;
+      assert.equal(eventData.type, 'addBlock');
+      let { block } = eventData;
+      assert.notEqual(block, null);
+      assert.equal(block.height, 2);
+      assert.equal(Number.isInteger(block.timestamp), true);
     });
 
   });

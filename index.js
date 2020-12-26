@@ -58,6 +58,8 @@ module.exports = class LDPoSChainModule {
     }
     this.pendingTransactionStreams = {};
     this.pendingBlocks = [];
+    this.topActiveDelegates = [];
+    this.topActiveDelegateAddressSet = new Set();
     this.lastFullySignedBlock = null;
     this.lastProcessedBlock = null;
     this.lastReceivedBlock = this.lastProcessedBlock;
@@ -236,8 +238,6 @@ module.exports = class LDPoSChainModule {
         break;
       }
 
-      let delegateMajorityCount = Math.ceil(this.delegateCount / 2);
-
       try {
         for (let block of newBlocks) {
           let block = newBlocks[i];
@@ -261,18 +261,36 @@ module.exports = class LDPoSChainModule {
   }
 
   async receiveLastBlockSignatures(lastBlock, requiredSignatureCount, timeout) {
+    if (!requiredSignatureCount) {
+      return;
+    }
     let signerSet = new Set();
     while (true) {
       let startTime = Date.now();
-      let { blockId, blockSignature } = await this.verifiedBlockSignatureStream.once(timeout);
+      let blockSignaturePacket;
+      try {
+        blockSignaturePacket = await this.verifiedBlockSignatureStream.once(timeout);
+      } catch (error) {
+        throw new Error(
+          `Failed to receive enough block signatures before timeout - Only received ${
+            signerSet.size
+          } out of ${
+            requiredSignatureCount
+          } required signatures`
+        );
+      }
+      let { blockId, blockSignature } = blockSignaturePacket;
       if (blockId === lastBlock.id) {
         lastBlock.signatures[blockSignature.signerAddress] = blockSignature;
         signerSet.add(blockSignature.signerAddress);
       }
+      if (signerSet.size >= requiredSignatureCount) {
+        break;
+      }
       let timeDiff = Date.now() - startTime;
       timeout -= timeDiff;
-      if (timeout <= 0 || signerSet.size >= requiredSignatureCount) {
-        break;
+      if (timeout < 0) {
+        timeout = 0;
       }
     }
     return lastBlock.signatures;
@@ -282,14 +300,14 @@ module.exports = class LDPoSChainModule {
     return Math.floor(Date.now() / forgingInterval) * forgingInterval;
   }
 
-  async getForgingDelegateAddressAtTimestamp(timestamp) {
-    let activeDelegates = await this.dal.getTopActiveDelegates(this.delegateCount);
+  getForgingDelegateAddressAtTimestamp(timestamp) {
+    let activeDelegates = this.topActiveDelegates;
     let slotIndex = Math.floor(timestamp / this.forgingInterval);
-    let activeDelegateIndex = slotIndex % activeDelegates.length;
-    return activeDelegates[activeDelegateIndex].address;
+    let targetIndex = slotIndex % activeDelegates.length;
+    return activeDelegates[targetIndex].address;
   }
 
-  async getCurrentForgingDelegateAddress() {
+  getCurrentForgingDelegateAddress() {
     return this.getForgingDelegateAddressAtTimestamp(Date.now());
   }
 
@@ -346,6 +364,11 @@ module.exports = class LDPoSChainModule {
     };
   }
 
+  async fetchTopActiveDelegates() {
+    this.topActiveDelegates = await this.dal.getTopActiveDelegates(this.delegateCount);
+    this.topActiveDelegateAddressSet = new Set(this.topActiveDelegates.map(delegate => delegate.address));
+  }
+
   async processBlock(block) {
     let { transactions, height, signatures: blockSignatureList } = block;
     let senderAddressSet = new Set();
@@ -399,7 +422,7 @@ module.exports = class LDPoSChainModule {
     );
 
     let affectedAccounts = {};
-    for (account of affectedAccountList) {
+    for (let account of affectedAccountList) {
       affectedAccounts[account.address] = account;
     }
 
@@ -602,6 +625,13 @@ module.exports = class LDPoSChainModule {
         }
       }
     }
+
+    await this.fetchTopActiveDelegates();
+
+    this.channel.publish(`${this.alias}:chainChanges`, {
+      type: 'addBlock',
+      block: this.simplifyBlock(block)
+    });
 
     this.lastProcessedBlock = block;
   }
@@ -960,7 +990,7 @@ module.exports = class LDPoSChainModule {
         `Block timestamp ${block.timestamp} was invalid`
       );
     }
-    let targetDelegateAddress = await this.getForgingDelegateAddressAtTimestamp(block.timestamp);
+    let targetDelegateAddress = this.getForgingDelegateAddressAtTimestamp(block.timestamp);
     if (block.forgerAddress !== targetDelegateAddress) {
       throw new Error(
         `The block forgerAddress ${
@@ -1122,18 +1152,7 @@ module.exports = class LDPoSChainModule {
       );
     }
 
-    let activeDelegates;
-    try {
-      activeDelegates = await this.dal.getTopActiveDelegates(this.delegateCount);
-    } catch (error) {
-      throw new Error(
-        `Failed to fetch top active delegates because of error: ${
-          error.message
-        }`
-      );
-    }
-
-    if (!activeDelegates.some(activeDelegates => activeDelegates.address === signerAddress)) {
+    if (!this.topActiveDelegateAddressSet.has(signerAddress)) {
       throw new Error(
         `Account ${signerAddress} is not a top active delegate and therefore cannot be a block signer`
       );
@@ -1251,8 +1270,6 @@ module.exports = class LDPoSChainModule {
     this.minMultisigMembers = minMultisigMembers;
     this.maxMultisigMembers = maxMultisigMembers;
 
-    let delegateMajorityCount = Math.ceil(delegateCount / 2);
-
     let ldposClient;
     let forgingWalletAddress;
 
@@ -1299,7 +1316,18 @@ module.exports = class LDPoSChainModule {
     this.lastReceivedBlock = this.lastProcessedBlock;
     this.lastFullySignedBlock = this.lastProcessedBlock;
 
+    try {
+      await this.fetchTopActiveDelegates();
+    } catch (error) {
+      throw new Error(
+        `Failed to load top active delegates because of error: ${error.message}`
+      );
+    }
+
     while (true) {
+      let activeDelegateCount = Math.min(this.topActiveDelegates.length, delegateCount);
+      let delegateMajorityCount = Math.floor(activeDelegateCount / 2);
+
       // If the node is already on the latest network height, it will just return it.
       this.networkHeight = await this.catchUpWithNetwork({
         forgingInterval,
@@ -1320,7 +1348,7 @@ module.exports = class LDPoSChainModule {
         break;
       }
 
-      let currentForgingDelegateAddress = await this.getCurrentForgingDelegateAddress();
+      let currentForgingDelegateAddress = this.getCurrentForgingDelegateAddress();
       let isCurrentForgingDelegate = forgingWalletAddress && forgingWalletAddress === currentForgingDelegateAddress;
 
       if (isCurrentForgingDelegate) {
@@ -1383,7 +1411,6 @@ module.exports = class LDPoSChainModule {
               }
             })
           );
-
           if (validTransactions.length < this.minTransactionsPerBlock) {
             this.logger.debug(
               `Skipped forging block which contained less than the minimum amount of ${
@@ -1408,7 +1435,7 @@ module.exports = class LDPoSChainModule {
 
       try {
         // Will throw if block is not received in time.
-        lastBlock = await this.receiveLastBlock(forgingBlockBroadcastDelay + propagationTimeout);
+        let lastBlock = await this.receiveLastBlock(forgingBlockBroadcastDelay + propagationTimeout);
 
         if (forgingWalletAddress && !isCurrentForgingDelegate) {
           (async () => {
@@ -1431,7 +1458,6 @@ module.exports = class LDPoSChainModule {
             }
           })();
         }
-
         // Will throw if the required number of valid signatures cannot be gathered in time.
         await this.receiveLastBlockSignatures(lastBlock, delegateMajorityCount, forgingSignatureBroadcastDelay + propagationTimeout);
         await this.processBlock(lastBlock, true);
