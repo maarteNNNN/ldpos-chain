@@ -94,10 +94,18 @@ module.exports = class LDPoSChainModule {
       postTransaction: {
         handler: async action => {
           return this.broadcastTransaction(action.transaction);
-        }
+        },
+        isPublic: true
       },
       getNodeStatus: {
         handler: async () => {}
+      },
+      getAccount: {
+        handler: async action => {
+          let { walletAddress } = action;
+          return this.dal.getAccount(walletAddress);
+        },
+        isPublic: true
       },
       getMultisigWalletMembers: {
         handler: async action => {
@@ -325,8 +333,8 @@ module.exports = class LDPoSChainModule {
     return this.ldposClient.prepareBlock(block);
   }
 
-  async getSanitizedAccount(accountAddress) {
-    let account = await this.dal.getAccount(accountAddress);
+  async getSanitizedAccount(walletAddress) {
+    let account = await this.dal.getAccount(walletAddress);
     return {
       ...account,
       balance: BigInt(account.balance)
@@ -496,7 +504,7 @@ module.exports = class LDPoSChainModule {
           });
         } else if (type === 'init') {
           initList.push({
-            accountAddress: senderAddress,
+            walletAddress: senderAddress,
             change: {
               sigKeyIndex: 0,
               sigPublicKey: txn.sigPublicKey,
@@ -598,7 +606,7 @@ module.exports = class LDPoSChainModule {
     for (let init of initList) {
       try {
         await this.dal.updateAccount(
-          init.accountAddress,
+          init.walletAddress,
           {
             ...init.change,
             updateHeight: height
@@ -1282,7 +1290,7 @@ module.exports = class LDPoSChainModule {
         adapter: this.dal
       });
 
-      forgingWalletAddress = ldposClient.getAccountAddress();
+      forgingWalletAddress = ldposClient.getWalletAddress();
     } else {
       ldposClient = await createClient({
         adapter: this.dal

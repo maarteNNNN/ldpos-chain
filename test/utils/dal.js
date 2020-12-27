@@ -36,14 +36,14 @@ class DAL {
     };
   }
 
-  async hasAccount(accountAddress) {
-    return !!this.accounts[accountAddress];
+  async hasAccount(walletAddress) {
+    return !!this.accounts[walletAddress];
   }
 
-  async getAccount(accountAddress) {
-    let account = this.accounts[accountAddress];
+  async getAccount(walletAddress) {
+    let account = this.accounts[walletAddress];
     if (!account) {
-      let error = new Error(`Account ${accountAddress} did not exist`);
+      let error = new Error(`Account ${walletAddress} did not exist`);
       error.name = 'AccountDidNotExistError';
       error.type = 'InvalidActionError';
       throw error;
@@ -51,10 +51,10 @@ class DAL {
     return account;
   }
 
-  async updateAccount(accountAddress, changePacket) {
-    let account = this.accounts[accountAddress];
+  async updateAccount(walletAddress, changePacket) {
+    let account = this.accounts[walletAddress];
     if (!account) {
-      let error = new Error(`Account ${accountAddress} did not exist`);
+      let error = new Error(`Account ${walletAddress} did not exist`);
       error.name = 'AccountDidNotExistError';
       error.type = 'InvalidActionError';
       throw error;

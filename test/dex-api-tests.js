@@ -328,19 +328,19 @@ describe('DEX API tests', async () => {
 
       it('should return an array of transactions sent from the specified walletAddress', async () => {
         let transactions = await chainModule.actions.getOutboundTransactions.handler({
-          walletAddress: clientForger.accountAddress,
+          walletAddress: clientForger.walletAddress,
           fromTimestamp: 0,
           limit: 100
         });
         assert.equal(Array.isArray(transactions), true);
         assert.equal(transactions.length, 4);
-        assert.equal(transactions[0].senderAddress, clientForger.accountAddress);
+        assert.equal(transactions[0].senderAddress, clientForger.walletAddress);
         assert.equal(transactions[0].id, 'dB/wCCZ5kP461cIJPABMdSL9K2R6trqdi7TnSwm0XMg=');
-        assert.equal(transactions[1].senderAddress, clientForger.accountAddress);
+        assert.equal(transactions[1].senderAddress, clientForger.walletAddress);
         assert.equal(transactions[1].id, 'toogeZxTosL9zEfnf3ZxWeM6oTt5zcgfk6An5dMrbPo=');
-        assert.equal(transactions[2].senderAddress, clientForger.accountAddress);
+        assert.equal(transactions[2].senderAddress, clientForger.walletAddress);
         assert.equal(transactions[2].id, 'ex8EXOTP0dp/KAn7b2lWwtxRCSC5730Vsd4Tln1DXSo=');
-        assert.equal(transactions[3].senderAddress, clientForger.accountAddress);
+        assert.equal(transactions[3].senderAddress, clientForger.walletAddress);
         assert.equal(transactions[3].id, 'bH+gZE+ruBySeUtr3MQXu7ONqKIba1PsmQcpbCx9oXE=');
 
         for (let txn of transactions) {
@@ -354,29 +354,29 @@ describe('DEX API tests', async () => {
 
       it('should return transactions which are more recent than fromTimestamp', async () => {
         let transactions = await chainModule.actions.getOutboundTransactions.handler({
-          walletAddress: clientForger.accountAddress,
+          walletAddress: clientForger.walletAddress,
           fromTimestamp: 15000,
           limit: 100
         });
         assert.equal(Array.isArray(transactions), true);
         assert.equal(transactions.length, 3);
-        assert.equal(transactions[0].senderAddress, clientForger.accountAddress);
+        assert.equal(transactions[0].senderAddress, clientForger.walletAddress);
         assert.equal(transactions[0].id, 'toogeZxTosL9zEfnf3ZxWeM6oTt5zcgfk6An5dMrbPo=');
-        assert.equal(transactions[1].senderAddress, clientForger.accountAddress);
+        assert.equal(transactions[1].senderAddress, clientForger.walletAddress);
         assert.equal(transactions[1].id, 'ex8EXOTP0dp/KAn7b2lWwtxRCSC5730Vsd4Tln1DXSo=');
-        assert.equal(transactions[2].senderAddress, clientForger.accountAddress);
+        assert.equal(transactions[2].senderAddress, clientForger.walletAddress);
         assert.equal(transactions[2].id, 'bH+gZE+ruBySeUtr3MQXu7ONqKIba1PsmQcpbCx9oXE=');
       });
 
       it('should limit the number of transactions based on the specified limit', async () => {
         let transactions = await chainModule.actions.getOutboundTransactions.handler({
-          walletAddress: clientForger.accountAddress,
+          walletAddress: clientForger.walletAddress,
           fromTimestamp: 0,
           limit: 1
         });
         assert.equal(Array.isArray(transactions), true);
         assert.equal(transactions.length, 1);
-        assert.equal(transactions[0].senderAddress, clientForger.accountAddress);
+        assert.equal(transactions[0].senderAddress, clientForger.walletAddress);
         assert.equal(transactions[0].id, 'dB/wCCZ5kP461cIJPABMdSL9K2R6trqdi7TnSwm0XMg=');
       });
 
@@ -442,7 +442,7 @@ describe('DEX API tests', async () => {
 
       it('should return an array of transactions sent to the specified walletAddress', async () => {
         let transactions = await chainModule.actions.getOutboundTransactionsFromBlock.handler({
-          walletAddress: clientForger.accountAddress,
+          walletAddress: clientForger.walletAddress,
           blockId: blockList[0].id
         });
         assert.equal(Array.isArray(transactions), true);
@@ -458,15 +458,15 @@ describe('DEX API tests', async () => {
           assert.equal(typeof txn.recipientAddress, 'string');
         }
 
-        assert.equal(transactions[0].senderAddress, clientForger.accountAddress);
+        assert.equal(transactions[0].senderAddress, clientForger.walletAddress);
         assert.equal(transactions[0].id, 'dB/wCCZ5kP461cIJPABMdSL9K2R6trqdi7TnSwm0XMg=');
-        assert.equal(transactions[1].senderAddress, clientForger.accountAddress);
+        assert.equal(transactions[1].senderAddress, clientForger.walletAddress);
         assert.equal(transactions[1].id, 'toogeZxTosL9zEfnf3ZxWeM6oTt5zcgfk6An5dMrbPo=');
       });
 
       it('should return transactions with a valid signatures property if transaction is from a multisig account', async () => {
         let transactions = await chainModule.actions.getOutboundTransactionsFromBlock.handler({
-          walletAddress: clientForger.accountAddress,
+          walletAddress: clientForger.walletAddress,
           blockId: blockList[2].id
         });
         assert.equal(Array.isArray(transactions), true);
@@ -489,7 +489,7 @@ describe('DEX API tests', async () => {
 
       it('should return an empty array if no transactions match the specified blockId', async () => {
         let transactions = await chainModule.actions.getOutboundTransactionsFromBlock.handler({
-          walletAddress: clientForger.accountAddress,
+          walletAddress: clientForger.walletAddress,
           blockId: 'abc9f15e7de79cebc87d2c3f76ba39480ae5279a12e='
         });
         assert.equal(Array.isArray(transactions), true);
@@ -638,8 +638,8 @@ describe('DEX API tests', async () => {
     });
 
     it('should expose a chainChanges event', async () => {
-      await wait(8000);
-      assert.equal(chainChangeEvents.length, 1);
+      await wait(7000);
+      assert.equal(chainChangeEvents.length >=1, true);
       let eventData = chainChangeEvents[0].data;
       assert.equal(eventData.type, 'addBlock');
       let { block } = eventData;
