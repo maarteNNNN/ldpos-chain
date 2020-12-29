@@ -455,6 +455,7 @@ module.exports = class LDPoSChainModule {
     let voteChangeList = [];
     let multisigRegistrationList = [];
     let initList = [];
+    let totalBlockFees = 0n;
 
     for (let txn of transactions) {
       let {
@@ -484,6 +485,7 @@ module.exports = class LDPoSChainModule {
       }
 
       let txnFee = BigInt(fee);
+      totalBlockFees += txnFee;
 
       if (type === 'transfer') {
         let { recipientAddress, amount } = txn;
@@ -491,15 +493,15 @@ module.exports = class LDPoSChainModule {
 
         let recipientAccount = affectedAccounts[recipientAddress];
         if (!senderAccount.updateHeight || senderAccount.updateHeight < height) {
-          senderAccount.balance = senderAccount.balance - txnAmount - txnFee;
+          senderAccount.balance -= txnAmount + txnFee;
           senderAccount.lastTransactionTimestamp = timestamp;
         }
         if (!recipientAccount.updateHeight || recipientAccount.updateHeight < height) {
-          recipientAccount.balance = recipientAccount.balance + txnAmount;
+          recipientAccount.balance += txnAmount;
         }
       } else {
         if (!senderAccount.updateHeight || senderAccount.updateHeight < height) {
-          senderAccount.balance = senderAccount.balance - txnFee;
+          senderAccount.balance -= txnFee;
           senderAccount.lastTransactionTimestamp = timestamp;
         }
         if (type === 'vote' || type === 'unvote') {
@@ -532,6 +534,17 @@ module.exports = class LDPoSChainModule {
         }
       }
     }
+
+    let signerCount = BigInt(blockSignerAddressSet.size);
+    let comissionPerSigner = totalBlockFees / (signerCount + 1n);
+    let forgerComission = totalBlockFees - comissionPerSigner * signerCount;
+
+    for (let blockSignerAddress of blockSignerAddressSet) {
+      let blockSignerAccount = affectedAccounts[blockSignerAddress];
+      blockSignerAccount.balance += comissionPerSigner;
+    }
+
+    forgerAccount.balance += forgerComission;
 
     await Promise.all(
       [...affectedAddressSet].map(async (affectedAddress) => {
@@ -1803,11 +1816,18 @@ module.exports = class LDPoSChainModule {
       validateBlockSignatureSchema(blockSignature, this.networkSymbol);
 
       let lastReceivedBlock = this.lastReceivedBlock;
-      let { signatures } = lastReceivedBlock;
+      let { forgerAddress, signatures } = lastReceivedBlock;
 
       if (signatures[blockSignature.signerAddress]) {
         this.logger.warn(
           new Error(`Block signature of signer ${blockSignature.signerAddress} has already been received before`)
+        );
+        return;
+      }
+
+      if (blockSignature.signerAddress === forgerAddress) {
+        this.logger.warn(
+          new Error(`Block forger ${forgerAddress} cannot re-sign their own block`)
         );
         return;
       }
