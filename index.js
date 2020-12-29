@@ -51,11 +51,17 @@ module.exports = class LDPoSChainModule {
   constructor(options) {
     this.alias = options.alias || DEFAULT_MODULE_ALIAS;
     this.logger = options.logger || console;
-    if (options.dal) {
-      this.dal = options.dal;
-    } else {
-      // TODO 222: Default to postgres adapter as Data Access Layer
+    let { config } = options;
+    let dalConfig = config.dal || {};
+
+    if (!dalConfig.libPath) {
+      throw new Error(
+        'The LDPoSChainModule config needs to have a dal.libPath property'
+      );
     }
+    const DAL = require(dalConfig.libPath);
+    this.dal = new DAL(dalConfig);
+
     this.pendingTransactionStreams = {};
     this.pendingBlocks = [];
     this.topActiveDelegates = [];

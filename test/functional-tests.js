@@ -1,5 +1,4 @@
 const assert = require('assert');
-const DAL = require('./utils/dal');
 const Channel = require('./utils/channel');
 const NetworkModule = require('./utils/network');
 const MockLDPoSChainModule = require('./utils/chain');
@@ -15,11 +14,16 @@ describe('Functional tests', async () => {
   let bootstrapEventTriggered;
 
   beforeEach(async () => {
-    dal = new DAL();
-
     chainModule = new LDPoSChainModule({
-      dal
+      config: {
+        dal: {
+          libPath: './test/utils/dal'
+        }
+      }
     });
+
+    dal = chainModule.dal;
+
     channel = new Channel({
       modules: {
         network: new NetworkModule({
