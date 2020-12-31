@@ -17,7 +17,7 @@ const DEFAULT_GENESIS_PATH = './genesis/mainnet/genesis.json';
 const DEFAULT_CRYPTO_CLIENT_LIB_PATH = 'ldpos-client';
 const DEFAULT_DELEGATE_COUNT = 21;
 const DEFAULT_FORGING_INTERVAL = 30000;
-const DEFAULT_FETCH_BLOCK_LIMIT = 20;
+const DEFAULT_FETCH_BLOCK_LIMIT = 10;
 const DEFAULT_FETCH_BLOCK_PAUSE = 100;
 const DEFAULT_FETCH_BLOCK_END_CONFIRMATIONS = 10;
 const DEFAULT_FORGING_BLOCK_BROADCAST_DELAY = 2000;
@@ -240,6 +240,13 @@ module.exports = class LDPoSChainModule {
         });
         if (!Array.isArray(newBlocks)) {
           throw new Error('Response to getBlocksFromHeight action must be an array');
+        }
+        if (newBlocks.length > fetchBlockLimit) {
+          throw new Error(
+            `Peer getBlocksFromHeight action must not return more than ${
+              fetchBlockLimit
+            } blocks`
+          );
         }
       } catch (error) {
         this.logger.warn(error);
