@@ -1,7 +1,9 @@
-const pkg = require('./package.json');
 const crypto = require('crypto');
-const genesisBlock = require('./genesis/testnet/genesis.json');
+const shuffle = require('lodash.shuffle');
 const WritableConsumableStream = require('writable-consumable-stream');
+
+const genesisBlock = require('./genesis/testnet/genesis.json');
+const pkg = require('./package.json');
 
 const { validateForgedBlockSchema } = require('./schemas/forged-block-schema');
 const { validateFullySignedBlockSchema } = require('./schemas/fully-signed-block-schema');
@@ -16,6 +18,7 @@ const DEFAULT_MODULE_ALIAS = 'ldpos_chain';
 const DEFAULT_GENESIS_PATH = './genesis/mainnet/genesis.json';
 const DEFAULT_CRYPTO_CLIENT_LIB_PATH = 'ldpos-client';
 const DEFAULT_DELEGATE_COUNT = 21;
+const DEFAULT_MAX_EXTRA_BLOCK_SIGNATURES_TO_STORE = 10;
 const DEFAULT_FORGING_INTERVAL = 30000;
 const DEFAULT_FETCH_BLOCK_LIMIT = 10;
 const DEFAULT_FETCH_BLOCK_PAUSE = 100;
@@ -214,7 +217,7 @@ module.exports = class LDPoSChainModule {
       fetchBlockEndConfirmations,
       fetchBlockLimit,
       fetchBlockPause,
-      delegateMajorityCount
+      blockSignerMajorityCount
     } = options;
 
     let now = Date.now();
@@ -262,7 +265,7 @@ module.exports = class LDPoSChainModule {
       try {
         for (let block of newBlocks) {
           let block = newBlocks[i];
-          validateFullySignedBlockSchema(block, this.maxTransactionsPerBlock, delegateMajorityCount, this.networkSymbol);
+          validateFullySignedBlockSchema(block, this.maxTransactionsPerBlock, blockSignerMajorityCount, this.networkSymbol);
           await this.verifyFullySignedBlock(block, this.lastProcessedBlock);
           await this.processBlock(block, true);
         }
@@ -647,7 +650,18 @@ module.exports = class LDPoSChainModule {
       }
     }
 
-    await this.dal.upsertBlock(block, synched);
+    let blockSignaturesToStore;
+    if (blockSignatureList.length > this.maxExtraBlockSignaturesToStore) {
+      blockSignaturesToStore = shuffle(blockSignatureList)
+        .slice(0, this.maxExtraBlockSignaturesToStore);
+    } else {
+      blockSignaturesToStore = blockSignatureList;
+    }
+
+    await this.dal.upsertBlock({
+      ...block,
+      signatures: blockSignaturesToStore
+    }, synched);
 
     for (let txn of transactions) {
       let senderTxnStream = this.pendingTransactionStreams[txn.senderAddress];
@@ -1360,7 +1374,7 @@ module.exports = class LDPoSChainModule {
 
     while (true) {
       let activeDelegateCount = Math.min(this.topActiveDelegates.length, delegateCount);
-      let delegateMajorityCount = Math.floor(activeDelegateCount / 2);
+      let blockSignerMajorityCount = Math.floor(activeDelegateCount / 2);
 
       // If the node is already on the latest network height, it will just return it.
       this.networkHeight = await this.catchUpWithNetwork({
@@ -1368,7 +1382,7 @@ module.exports = class LDPoSChainModule {
         fetchBlockLimit,
         fetchBlockPause,
         fetchBlockEndConfirmations,
-        delegateMajorityCount
+        blockSignerMajorityCount
       });
       this.nodeHeight = this.networkHeight;
       let nextHeight = this.networkHeight + 1;
@@ -1493,7 +1507,7 @@ module.exports = class LDPoSChainModule {
           })();
         }
         // Will throw if the required number of valid signatures cannot be gathered in time.
-        await this.receiveLastBlockSignatures(lastBlock, delegateMajorityCount, forgingSignatureBroadcastDelay + propagationTimeout);
+        await this.receiveLastBlockSignatures(lastBlock, blockSignerMajorityCount, forgingSignatureBroadcastDelay + propagationTimeout);
         await this.processBlock(lastBlock, false);
         this.lastFullySignedBlock = lastBlock;
 
@@ -1900,6 +1914,7 @@ module.exports = class LDPoSChainModule {
     let defaultOptions = {
       forgingInterval: DEFAULT_FORGING_INTERVAL,
       delegateCount: DEFAULT_DELEGATE_COUNT,
+      maxExtraBlockSignaturesToStore: DEFAULT_MAX_EXTRA_BLOCK_SIGNATURES_TO_STORE,
       fetchBlockLimit: DEFAULT_FETCH_BLOCK_LIMIT,
       fetchBlockPause: DEFAULT_FETCH_BLOCK_PAUSE,
       fetchBlockEndConfirmations: DEFAULT_FETCH_BLOCK_END_CONFIRMATIONS,
@@ -1941,10 +1956,27 @@ module.exports = class LDPoSChainModule {
     this.maxTransactionMessageLength = this.options.maxTransactionMessageLength;
     this.maxVotesPerAccount = this.options.maxVotesPerAccount;
     this.maxPendingTransactionsPerAccount = this.options.maxPendingTransactionsPerAccount;
+    this.maxExtraBlockSignaturesToStore = this.options.maxExtraBlockSignaturesToStore;
+
+    let delegateSignerMajorityCount = Math.floor(this.delegateCount / 2);
+
+    if (this.maxExtraBlockSignaturesToStore < delegateSignerMajorityCount) {
+      throw new Error(
+        `The maxExtraBlockSignaturesToStore option cannot be less than ${
+          delegateSignerMajorityCount
+        }`
+      );
+    }
 
     this.genesis = require(options.genesisPath || DEFAULT_GENESIS_PATH);
     await this.dal.init({
       genesis: this.genesis
+    });
+
+    await this.channel.invoke('app:updateModuleState', {
+      [this.alias]: {
+        maxExtraBlockSignatures: this.maxExtraBlockSignaturesToStore
+      }
     });
 
     this.networkSymbol = await this.dal.getNetworkSymbol();

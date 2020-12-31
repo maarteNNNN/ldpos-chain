@@ -1,6 +1,7 @@
 const assert = require('assert');
 const Channel = require('./utils/channel');
 const NetworkModule = require('./utils/network');
+const AppModule = require('./utils/app');
 const MockLDPoSChainModule = require('./utils/chain');
 const { sha256 } = require('./utils/hash');
 const wait = require('./utils/wait');
@@ -34,6 +35,7 @@ describe('DEX API tests', async () => {
 
     channel = new Channel({
       modules: {
+        app: new AppModule(),
         network: new NetworkModule({
           modules: {
             ldpos_chain: new MockLDPoSChainModule()

@@ -5,7 +5,9 @@ class NetworkModule {
     let moduleNameList = Object.keys(modules);
     for (let moduleName of moduleNameList) {
       let moduleInstance = modules[moduleName];
-      moduleInstance.setNetwork(this);
+      if (moduleInstance.setNetwork) {
+        moduleInstance.setNetwork(this);
+      }
     }
     this.modules = modules;
   }
@@ -18,13 +20,13 @@ class NetworkModule {
     this.emitter.emit(`network:event:${fromModule}:${eventName}`, { data, info });
   }
 
-  get actions() {
+  get actionHandlers() {
     return {
       emit: async ({ event, data }) => {
         let eventParts = event.split(':');
         let moduleName = eventParts[0];
         let eventName = eventParts[1];
-        let targetFunction = this.modules[moduleName].events[eventName];
+        let targetFunction = this.modules[moduleName].eventHandlers[eventName];
         if (!targetFunction) {
           throw new Error(`The network ${eventName} event did not exist on the ${moduleName} module`);
         }
@@ -34,7 +36,7 @@ class NetworkModule {
         let procedureParts = procedure.split(':');
         let moduleName = procedureParts[0];
         let actionName = procedureParts[1];
-        let targetFunction = this.modules[moduleName].actions[actionName];
+        let targetFunction = this.modules[moduleName].actionHandlers[actionName];
         if (!targetFunction) {
           throw new Error(`The network ${actionName} action did not exist on the ${moduleName} module`);
         }

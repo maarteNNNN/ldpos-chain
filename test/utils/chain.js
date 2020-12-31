@@ -7,7 +7,7 @@ class LDPoSChainModule {
     this.network = network;
   }
 
-  get events() {
+  get eventHandlers() {
     return {
       block: async (block) => {
         if (block && block.id && !this.receivedBlockIdSet.has(block.id)) {
@@ -24,7 +24,7 @@ class LDPoSChainModule {
     }
   }
 
-  get actions() {
+  get actionHandlers() {
     return {
       getSignedBlocksFromHeight: async ({ height, limit }) => {
         return [];

@@ -24,7 +24,7 @@ class Channel {
     let procedureParts = procedureName.split(':');
     let moduleName = procedureParts[0];
     let actionName = procedureParts[1];
-    let targetFunction = this.modules[moduleName].actions[actionName];
+    let targetFunction = this.modules[moduleName].actionHandlers[actionName];
     if (!targetFunction) {
       throw new Error(`The channel ${actionName} action did not exist on the ${moduleName} module`);
     }
