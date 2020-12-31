@@ -1973,10 +1973,13 @@ module.exports = class LDPoSChainModule {
       genesis: this.genesis
     });
 
+    let moduleState = {};
+    if (this.maxExtraBlockSignaturesToStore >= this.delegateCount - 1) {
+      moduleState.keepsAllBlockSignatures = true;
+    }
+
     await this.channel.invoke('app:updateModuleState', {
-      [this.alias]: {
-        maxExtraBlockSignatures: this.maxExtraBlockSignaturesToStore
-      }
+      [this.alias]: moduleState
     });
 
     this.networkSymbol = await this.dal.getNetworkSymbol();
