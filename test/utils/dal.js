@@ -260,7 +260,7 @@ class DAL {
     };
   }
 
-  async upsertBlock(block) {
+  async upsertBlock(block, synched) {
     this.blocks[block.height - 1] = block;
     let { transactions } = block;
     let len = transactions.length;

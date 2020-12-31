@@ -264,7 +264,7 @@ module.exports = class LDPoSChainModule {
           let block = newBlocks[i];
           validateFullySignedBlockSchema(block, this.maxTransactionsPerBlock, delegateMajorityCount, this.networkSymbol);
           await this.verifyFullySignedBlock(block, this.lastProcessedBlock);
-          await this.processBlock(block, false);
+          await this.processBlock(block, true);
         }
       } catch (error) {
         this.logger.warn(
@@ -390,7 +390,7 @@ module.exports = class LDPoSChainModule {
     this.topActiveDelegateAddressSet = new Set(this.topActiveDelegates.map(delegate => delegate.address));
   }
 
-  async processBlock(block) {
+  async processBlock(block, synched) {
     let { transactions, height, signatures: blockSignatureList } = block;
     let senderAddressSet = new Set();
     let recipientAddressSet = new Set();
@@ -647,7 +647,7 @@ module.exports = class LDPoSChainModule {
       }
     }
 
-    await this.dal.upsertBlock(block);
+    await this.dal.upsertBlock(block, synched);
 
     for (let txn of transactions) {
       let senderTxnStream = this.pendingTransactionStreams[txn.senderAddress];
@@ -1494,7 +1494,7 @@ module.exports = class LDPoSChainModule {
         }
         // Will throw if the required number of valid signatures cannot be gathered in time.
         await this.receiveLastBlockSignatures(lastBlock, delegateMajorityCount, forgingSignatureBroadcastDelay + propagationTimeout);
-        await this.processBlock(lastBlock, true);
+        await this.processBlock(lastBlock, false);
         this.lastFullySignedBlock = lastBlock;
 
         this.nodeHeight = nextHeight;
