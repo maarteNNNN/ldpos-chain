@@ -669,7 +669,11 @@ module.exports = class LDPoSChainModule {
         senderTxnStream.transactionInfoMap.delete(txn.id);
 
         for (let { transaction: remainingTxn } of senderTxnStream.transactionInfoMap.values()) {
-          if (remainingTxn.timestamp < txn.timestamp) {
+          if (
+            remainingTxn.timestamp < txn.timestamp ||
+            remainingTxn.nextSigPublicKey === txn.sigPublicKey ||
+            remainingTxn.nextMultisigPublicKey === txn.multisigPublicKey
+          ) {
             senderTxnStream.transactionInfoMap.delete(remainingTxn.id);
           }
         }
