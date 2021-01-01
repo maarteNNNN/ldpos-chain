@@ -666,7 +666,13 @@ module.exports = class LDPoSChainModule {
     for (let txn of transactions) {
       let senderTxnStream = this.pendingTransactionStreams[txn.senderAddress];
       if (senderTxnStream) {
-        senderTxnStream.transactionMap.delete(txn.id);
+        senderTxnStream.transactionInfoMap.delete(txn.id);
+
+        for (let { transaction: remainingTxn } of senderTxnStream.transactionInfoMap.values()) {
+          if (remainingTxn.timestamp < txn.timestamp) {
+            senderTxnStream.transactionInfoMap.delete(remainingTxn.id);
+          }
+        }
         if (!this.isAccountStreamBusy(senderTxnStream)) {
           senderTxnStream.close();
           delete this.pendingTransactionStreams[txn.senderAddress];
@@ -1426,8 +1432,8 @@ module.exports = class LDPoSChainModule {
               }
 
               let senderTxnStream = this.pendingTransactionStreams[senderAddress];
-              let pendingTxnMap = senderTxnStream.transactionMap;
-              let pendingTxnList = Object.values(pendingTxnMap);
+              let pendingTxnInfoMap = senderTxnStream.transactionInfoMap;
+              let pendingTxnList = [...pendingTxnInfoMap.values()].map(txnPacket => txnPacket.transaction);
 
               for (let pendingTxn of pendingTxnList) {
                 try {
@@ -1450,8 +1456,8 @@ module.exports = class LDPoSChainModule {
                       error.message
                     }`
                   );
-                  pendingTxnMap.delete(pendingTxn.id);
-                  if (!pendingTxnMap.size) {
+                  pendingTxnInfoMap.delete(pendingTxn.id);
+                  if (!pendingTxnInfoMap.size) {
                     senderTxnStream.close();
                     delete this.pendingTransactionStreams[senderAddress];
                   }
@@ -1598,7 +1604,7 @@ module.exports = class LDPoSChainModule {
   }
 
   isAccountStreamBusy(accountStream) {
-    return !accountStream.pendingTransactionVerificationCount && !accountStream.transactionMap.size;
+    return !accountStream.pendingTransactionVerificationCount && !accountStream.transactionInfoMap.size;
   }
 
   async startTransactionPropagationLoop() {
@@ -1673,7 +1679,7 @@ module.exports = class LDPoSChainModule {
       }
 
       let accountStream = new WritableConsumableStream();
-      accountStream.transactionMap = new Map();
+      accountStream.transactionInfoMap = new Map();
       accountStream.pendingTransactionVerificationCount = 1;
       this.pendingTransactionStreams[senderAddress] = accountStream;
 
@@ -1713,7 +1719,7 @@ module.exports = class LDPoSChainModule {
             txnTotal = await this.verifySigTransactionAuthorization(senderAccount, accountTxn, true);
           }
 
-          if (accountStream.transactionMap.has(accountTxn.id)) {
+          if (accountStream.transactionInfoMap.has(accountTxn.id)) {
             throw new Error(`Transaction ${accountTxn.id} has already been received before`);
           }
 
@@ -1721,7 +1727,7 @@ module.exports = class LDPoSChainModule {
           // may affect the verification of the next transaction in the stream.
           senderAccount.balance -= txnTotal;
 
-          accountStream.transactionMap.set(accountTxn.id, {
+          accountStream.transactionInfoMap.set(accountTxn.id, {
             transaction: accountTxn,
             receivedTimestamp: Date.now()
           });
@@ -1792,14 +1798,14 @@ module.exports = class LDPoSChainModule {
       let { transactions } = block;
       for (let txn of transactions) {
         let pendingTxnStream = this.pendingTransactionStreams[txn.senderAddress];
-        if (!pendingTxnStream || !pendingTxnStream.transactionMap.has(txn.id)) {
+        if (!pendingTxnStream || !pendingTxnStream.transactionInfoMap.has(txn.id)) {
           this.logger.warn(
             new Error(`Block ${block.id} contained an unrecognized transaction ${txn.id}`)
           );
           return;
         }
 
-        let pendingTxn = pendingTxnStream.transactionMap.get(txn.id).transaction;
+        let pendingTxn = pendingTxnStream.transactionInfoMap.get(txn.id).transaction;
         let pendingTxnSignatureHash = this.sha256(pendingTxn.signature);
         if (txn.signatureHash !== pendingTxnSignatureHash) {
           this.logger.warn(
@@ -1880,17 +1886,17 @@ module.exports = class LDPoSChainModule {
     });
   }
 
-  cleanupPendingTransactionMap(expiry) {
+  cleanupPendingTransactionStreams(expiry) {
     let now = Date.now();
 
     let pendingSenderList = Object.keys(this.pendingTransactionStreams);
     for (let senderAddress of pendingSenderList) {
       let senderTxnStream = this.pendingTransactionStreams[senderAddress];
-      let pendingTxnMap = senderTxnStream.transactionMap;
-      for (let { transaction, receivedTimestamp } of pendingTxnMap) {
+      let pendingTxnInfoMap = senderTxnStream.transactionInfoMap;
+      for (let { transaction, receivedTimestamp } of pendingTxnInfoMap.values()) {
         if (now - receivedTimestamp >= expiry) {
-          pendingTxnMap.delete(transaction.id);
-          if (!pendingTxnMap.size) {
+          pendingTxnInfoMap.delete(transaction.id);
+          if (!pendingTxnInfoMap.size) {
             senderTxnStream.close();
             delete this.pendingTransactionStreams[senderAddress];
           }
@@ -1902,7 +1908,7 @@ module.exports = class LDPoSChainModule {
   async startPendingTransactionExpiryLoop() {
     if (this.isActive) {
       this._pendingTransactionExpiryCheckIntervalId = setInterval(() => {
-        this.cleanupPendingTransactionMap(this.pendingTransactionExpiry);
+        this.cleanupPendingTransactionStreams(this.pendingTransactionExpiry);
       }, this.pendingTransactionExpiryCheckInterval);
     }
   }
