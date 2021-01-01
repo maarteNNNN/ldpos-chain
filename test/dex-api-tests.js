@@ -644,7 +644,7 @@ describe('DEX API tests', async () => {
     });
 
     it('should expose a chainChanges event', async () => {
-      await wait(7000);
+      await wait(8000);
       assert.equal(chainChangeEvents.length >=1, true);
       let eventData = chainChangeEvents[0].data;
       assert.equal(eventData.type, 'addBlock');
