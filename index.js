@@ -668,12 +668,15 @@ module.exports = class LDPoSChainModule {
       if (senderTxnStream) {
         senderTxnStream.transactionInfoMap.delete(txn.id);
 
+        let isTxnMultisig = !!txn.signatures;
         for (let { transaction: remainingTxn } of senderTxnStream.transactionInfoMap.values()) {
-          if (
-            remainingTxn.timestamp < txn.timestamp ||
-            remainingTxn.nextSigPublicKey === txn.sigPublicKey ||
-            remainingTxn.nextMultisigPublicKey === txn.multisigPublicKey
-          ) {
+          let transactionKeyChanged;
+          if (remainingTxn.signatures) {
+            transactionKeyChanged = isTxnMultisig && remainingTxn.nextMultisigPublicKey !== txn.multisigPublicKey;
+          } else {
+            transactionKeyChanged = !isTxnMultisig && remainingTxn.nextSigPublicKey !== txn.sigPublicKey;
+          }
+          if (remainingTxn.timestamp < txn.timestamp || transactionKeyChanged) {
             senderTxnStream.transactionInfoMap.delete(remainingTxn.id);
           }
         }
