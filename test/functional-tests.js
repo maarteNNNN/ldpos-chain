@@ -75,7 +75,7 @@ describe('Functional tests', async () => {
 
     describe('when processing a block multiple times', async () => {
 
-      it('should only apply changes to the affected accounts once', async () => {
+      it('should ensure that account changes are idempotent', async () => {
 
       });
 
