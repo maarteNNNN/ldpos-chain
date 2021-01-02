@@ -47,7 +47,11 @@ describe('DEX API tests', async () => {
       genesisPath: './test/utils/genesis.json',
       forgingPassphrase: 'clerk aware give dog reopen peasant duty cheese tobacco trouble gold angle',
       minTransactionsPerBlock: 0, // Enable forging empty blocks.
-      forgingInterval: 5000
+      forgingInterval: 5000,
+      forgingBlockBroadcastDelay: 1000,
+      forgingSignatureBroadcastDelay: 1000,
+      propagationRandomness: 500,
+      propagationTimeout: 3000
     };
 
     bootstrapEventTriggered = false;
