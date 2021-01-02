@@ -47,11 +47,11 @@ describe('DEX API tests', async () => {
       genesisPath: './test/utils/genesis.json',
       forgingPassphrase: 'clerk aware give dog reopen peasant duty cheese tobacco trouble gold angle',
       minTransactionsPerBlock: 0, // Enable forging empty blocks.
-      forgingInterval: 5000,
-      forgingBlockBroadcastDelay: 1000,
-      forgingSignatureBroadcastDelay: 1000,
-      propagationRandomness: 500,
-      propagationTimeout: 3000
+      forgingInterval: 10000,
+      forgingBlockBroadcastDelay: 500,
+      forgingSignatureBroadcastDelay: 500,
+      propagationRandomness: 100,
+      propagationTimeout: 5000
     };
 
     bootstrapEventTriggered = false;
@@ -648,7 +648,7 @@ describe('DEX API tests', async () => {
     });
 
     it('should expose a chainChanges event', async () => {
-      await wait(8000);
+      await wait(13000);
       assert.equal(chainChangeEvents.length >=1, true);
       let eventData = chainChangeEvents[0].data;
       assert.equal(eventData.type, 'addBlock');
