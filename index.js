@@ -12,8 +12,6 @@ const { validateBlockSignatureSchema } = require('./schemas/block-signature-sche
 const { validateMultisigTransactionSchema } = require('./schemas/multisig-transaction-schema');
 const { validateSigTransactionSchema } = require('./schemas/sig-transaction-schema');
 
-// TODO 222: Should multisig members sign the initial registerMultisig transaction or is the signature from the multisig wallet itself the only requirement?
-
 const DEFAULT_MODULE_ALIAS = 'ldpos_chain';
 const DEFAULT_GENESIS_PATH = './genesis/mainnet/genesis.json';
 const DEFAULT_CRYPTO_CLIENT_LIB_PATH = 'ldpos-client';
@@ -43,8 +41,10 @@ const DEFAULT_MIN_TRANSACTION_FEES = {
   transfer: '1000000',
   vote: '2000000',
   unvote: '2000000',
-  registerMultisig: '5000000',
-  init: '1000000'
+  registerSigDetails: '1000000',
+  registerMultisigDetails: '1000000',
+  registerForgingDetails: '1000000',
+  registerMultisigWallet: '5000000'
 };
 
 const NO_PEER_LIMIT = -1;
@@ -128,7 +128,7 @@ module.exports = class LDPoSChainModule {
           let account = await this.getSanitizedAccount(walletAddress);
           if (account.type !== 'multisig') {
             let error = new Error(
-              `Account ${walletAddress} was not a multisig account`
+              `Account ${walletAddress} was not a multisig wallet`
             );
             error.name = 'AccountWasNotMultisigError';
             error.type = 'InvalidActionError';
@@ -451,20 +451,19 @@ module.exports = class LDPoSChainModule {
     }
 
     let forgerAccount = affectedAccounts[block.forgerAddress];
-    forgerAccount.forgingKeyIndex = block.forgingKeyIndex + 1;
     forgerAccount.forgingPublicKey = block.forgingPublicKey;
     forgerAccount.nextForgingPublicKey = block.nextForgingPublicKey;
+    forgerAccount.nextForgingKeyIndex = block.nextForgingKeyIndex;
 
     for (let blockSignature of blockSignatureList) {
       let blockSignerAccount = affectedAccounts[blockSignature.signerAddress];
-      blockSignerAccount.forgingKeyIndex = blockSignerAccount.forgingKeyIndex + 1;
       blockSignerAccount.forgingPublicKey = blockSignerAccount.forgingPublicKey;
       blockSignerAccount.nextForgingPublicKey = blockSignerAccount.nextForgingPublicKey;
+      blockSignerAccount.nextForgingKeyIndex = blockSignerAccount.nextForgingKeyIndex;
     }
 
     let voteChangeList = [];
     let multisigRegistrationList = [];
-    let initList = [];
     let totalBlockFees = 0n;
 
     for (let txn of transactions) {
@@ -474,28 +473,28 @@ module.exports = class LDPoSChainModule {
         fee,
         timestamp,
         signatures,
-        sigKeyIndex,
         sigPublicKey,
-        nextSigPublicKey
+        nextSigPublicKey,
+        nextSigKeyIndex
       } = txn;
       let senderAccount = affectedAccounts[senderAddress];
+
+      let txnFee = BigInt(fee);
+      totalBlockFees += txnFee;
 
       if (signatures) {
         for (let signaturePacket of signatures) {
           let memberAccount = affectedAccounts[signaturePacket.signerAddress];
-          memberAccount.multisigKeyIndex = signaturePacket.multisigKeyIndex + 1;
           memberAccount.multisigPublicKey = signaturePacket.multisigPublicKey;
           memberAccount.nextMultisigPublicKey = signaturePacket.nextMultisigPublicKey;
+          memberAccount.nextMultisigKeyIndex = signaturePacket.nextMultisigKeyIndex;
         }
       } else {
         // If regular transaction (not multisig), update the account sig public keys.
-        senderAccount.sigKeyIndex = sigKeyIndex + 1;
         senderAccount.sigPublicKey = sigPublicKey;
         senderAccount.nextSigPublicKey = nextSigPublicKey;
+        senderAccount.nextSigKeyIndex = nextSigKeyIndex;
       }
-
-      let txnFee = BigInt(fee);
-      totalBlockFees += txnFee;
 
       if (type === 'transfer') {
         let { recipientAddress, amount } = txn;
@@ -520,22 +519,22 @@ module.exports = class LDPoSChainModule {
             voterAddress: senderAddress,
             delegateAddress: txn.delegateAddress
           });
-        } else if (type === 'init') {
-          initList.push({
-            walletAddress: senderAddress,
-            change: {
-              sigKeyIndex: 0,
-              sigPublicKey: txn.sigPublicKey,
-              nextSigPublicKey: txn.nextSigPublicKey,
-              multisigKeyIndex: 0,
-              multisigPublicKey: txn.multisigPublicKey,
-              nextMultisigPublicKey: txn.nextMultisigPublicKey,
-              forgingKeyIndex: 0,
-              forgingPublicKey: txn.forgingPublicKey,
-              nextForgingPublicKey: txn.nextForgingPublicKey
-            }
-          });
-        } else if (type === 'registerMultisig') {
+        } else if (type === 'registerSigDetails') {
+          let { details } = txn;
+          senderAccount.sigPublicKey = details.sigPublicKey;
+          senderAccount.nextSigPublicKey = details.nextSigPublicKey;
+          senderAccount.nextSigKeyIndex = details.nextSigKeyIndex;
+        } else if (type === 'registerMultisigDetails') {
+          let { details } = txn;
+          senderAccount.multisigPublicKey = details.multisigPublicKey;
+          senderAccount.nextMultisigPublicKey = details.nextMultisigPublicKey;
+          senderAccount.nextMultisigKeyIndex = details.nextMultisigKeyIndex;
+        } else if (type === 'registerForgingDetails') {
+          let { details } = txn;
+          senderAccount.forgingPublicKey = details.forgingPublicKey;
+          senderAccount.nextForgingPublicKey = details.nextForgingPublicKey;
+          senderAccount.nextForgingKeyIndex = details.nextForgingKeyIndex;
+        } else if (type === 'registerMultisigWallet') {
           multisigRegistrationList.push({
             multisigAddress: senderAddress,
             memberAddresses: txn.memberAddresses,
@@ -566,20 +565,20 @@ module.exports = class LDPoSChainModule {
         if (senderAddressSet.has(affectedAddress)) {
           accountUpdatePacket.lastTransactionTimestamp = account.lastTransactionTimestamp;
           if (account.type !== ACCOUNT_TYPE_MULTISIG) {
-            accountUpdatePacket.sigKeyIndex = account.sigKeyIndex;
             accountUpdatePacket.sigPublicKey = account.sigPublicKey;
             accountUpdatePacket.nextSigPublicKey = account.nextSigPublicKey;
+            accountUpdatePacket.nextSigKeyIndex = account.nextSigKeyIndex;
           }
         }
         if (multisigMemberAddressSet.has(affectedAddress)) {
-          accountUpdatePacket.multisigKeyIndex = account.multisigKeyIndex;
           accountUpdatePacket.multisigPublicKey = account.multisigPublicKey;
           accountUpdatePacket.nextMultisigPublicKey = account.nextMultisigPublicKey;
+          accountUpdatePacket.nextMultisigKeyIndex = account.nextMultisigKeyIndex;
         }
         if (affectedAddress === block.forgerAddress || blockSignerAddressSet.has(affectedAddress)) {
-          accountUpdatePacket.forgingKeyIndex = account.forgingKeyIndex;
           accountUpdatePacket.forgingPublicKey = account.forgingPublicKey;
           accountUpdatePacket.nextForgingPublicKey = account.nextForgingPublicKey;
+          accountUpdatePacket.nextForgingKeyIndex = account.nextForgingKeyIndex;
         }
         try {
           if (account.updateHeight == null) {
@@ -623,24 +622,6 @@ module.exports = class LDPoSChainModule {
       let { multisigAddress, memberAddresses, requiredSignatureCount } = multisigRegistration;
       try {
         await this.dal.registerMultisigWallet(multisigAddress, memberAddresses, requiredSignatureCount);
-      } catch (error) {
-        if (error.type === 'InvalidActionError') {
-          this.logger.warn(error);
-        } else {
-          throw error;
-        }
-      }
-    }
-
-    for (let init of initList) {
-      try {
-        await this.dal.updateAccount(
-          init.walletAddress,
-          {
-            ...init.change,
-            updateHeight: height
-          }
-        );
       } catch (error) {
         if (error.type === 'InvalidActionError') {
           this.logger.warn(error);
@@ -801,7 +782,7 @@ module.exports = class LDPoSChainModule {
           throw new Error(
             `Multisig member account ${
               memberAccount.address
-            } was not initialized so they cannot sign multisig transactions`
+            } was not registered for multisig so they cannot sign multisig transactions`
           );
         }
         if (
@@ -849,7 +830,7 @@ module.exports = class LDPoSChainModule {
     }
     if (!delegateAccount.forgingPublicKey) {
       throw new Error(
-        `Delegate account was not initialized so it could not be voted for`
+        `Delegate account was not registered for forging so it could not be voted for`
       );
     }
 
@@ -924,13 +905,13 @@ module.exports = class LDPoSChainModule {
               throw new Error(
                 `Account ${
                   memberAddress
-                } did not exist so it could not be a member of a multisig account`
+                } did not exist so it could not be a member of a multisig wallet`
               );
             } else {
               throw new Error(
                 `Failed to fetch account ${
                   memberAddress
-                } to verify that it qualified to be a member of a multisig account`
+                } to verify that it qualified to be a member of a multisig wallet`
               );
             }
           }
@@ -938,14 +919,14 @@ module.exports = class LDPoSChainModule {
             throw new Error(
               `Account ${
                 memberAddress
-              } has not been initialized so it could not be a member of a multisig account`
+              } has not been registered for multisig so it could not be a member of a multisig wallet`
             );
           }
           if (memberAccount.type === 'multisig') {
             throw new Error(
               `Account ${
                 memberAddress
-              } was a multisig account so it could not be a member of another multisig account`
+              } was a multisig wallet so it could not be a member of another multisig wallet`
             );
           }
         }
@@ -990,7 +971,7 @@ module.exports = class LDPoSChainModule {
       await this.verifyVoteTransaction(transaction);
     } else if (type === 'unvote') {
       await this.verifyUnvoteTransaction(transaction);
-    } else if (type === 'registerMultisig') {
+    } else if (type === 'registerMultisigWallet') {
       await this.verifyRegisterMultisigTransaction(transaction);
     }
 
@@ -1016,7 +997,7 @@ module.exports = class LDPoSChainModule {
       await this.verifyVoteTransaction(transaction);
     } else if (type === 'unvote') {
       await this.verifyUnvoteTransaction(transaction);
-    } else if (type === 'registerMultisig') {
+    } else if (type === 'registerMultisigWallet') {
       await this.verifyRegisterMultisigTransaction(transaction);
     }
 
@@ -1363,7 +1344,7 @@ module.exports = class LDPoSChainModule {
     }
     if (!this.lastProcessedBlock) {
       this.lastProcessedBlock = {
-        height: 1,
+        height: 0,
         timestamp: 0,
         transactions: [],
         previousBlockId: null,

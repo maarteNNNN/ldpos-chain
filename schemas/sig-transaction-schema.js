@@ -1,7 +1,7 @@
 const {
-  validateSigKeyIndex,
   validateSigPublicKey,
   validateNextSigPublicKey,
+  validateNextSigKeyIndex,
   validateSignature,
   validateSignatureHash
 } = require('./primitives');
@@ -10,9 +10,9 @@ function validateSigTransactionSchema(sigTransaction, fullCheck) {
   if (!sigTransaction) {
     throw new Error('Multisig transaction was not specified');
   }
-  validateSigKeyIndex(sigTransaction.sigKeyIndex);
   validateSigPublicKey(sigTransaction.sigPublicKey);
   validateNextSigPublicKey(sigTransaction.nextSigPublicKey);
+  validateNextSigKeyIndex(sigTransaction.nextSigKeyIndex);
   if (fullCheck) {
     validateSignature(sigTransaction.signature);
   } else {

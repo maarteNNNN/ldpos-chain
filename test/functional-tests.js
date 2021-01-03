@@ -39,16 +39,6 @@ describe('Functional tests', async () => {
         })
       }
     });
-    options = {
-      genesisPath: './test/utils/genesis.json',
-      forgingPassphrase: 'clerk aware give dog reopen peasant duty cheese tobacco trouble gold angle',
-      minTransactionsPerBlock: 0, // Enable forging empty blocks.
-      forgingInterval: 10000,
-      forgingBlockBroadcastDelay: 500,
-      forgingSignatureBroadcastDelay: 500,
-      propagationRandomness: 100,
-      propagationTimeout: 5000
-    };
 
     bootstrapEventTriggered = false;
     channel.subscribe(`${chainModule.alias}:bootstrap`, async () => {
@@ -59,11 +49,6 @@ describe('Functional tests', async () => {
     channel.subscribe(`${chainModule.alias}:chainChanges`, async (event) => {
       chainChangeEvents.push(event);
     });
-    await chainModule.load(channel, options);
-    clientForger = await createClient({
-      passphrase: options.forgingPassphrase,
-      adapter: dal
-    });
   });
 
   afterEach(async () => {
@@ -72,13 +57,55 @@ describe('Functional tests', async () => {
 
   describe('block forging', async () => {
 
-    beforeEach(async () => {
+    describe('with a single registered delegate', async () => {
 
-    });
+      beforeEach(async () => {
+        options = {
+          genesisPath: './test/utils/genesis.json',
+          forgingPassphrase: 'clerk aware give dog reopen peasant duty cheese tobacco trouble gold angle',
+          minTransactionsPerBlock: 0, // Enable forging empty blocks.
+          forgingInterval: 5000,
+          forgingBlockBroadcastDelay: 500,
+          forgingSignatureBroadcastDelay: 500,
+          propagationRandomness: 100,
+          propagationTimeout: 2000
+        };
 
-    describe('blocks are forged correctly', async () => {
+        await chainModule.load(channel, options);
+        clientForger = await createClient({
+          passphrase: options.forgingPassphrase,
+          adapter: dal
+        });
+      });
 
-      it('should forge blocks', async () => {
+      describe('without any transactions', async () => {
+
+        it('should forge correct number of valid blocks based on forging interval', async () => {
+          await wait(12000);
+          let newBlocks = chainChangeEvents.map(event => event.data.block);
+          let blockList = await chainModule.actions.getBlocksFromHeight.handler({ height: 1, limit: 100 });
+
+          // Can be 3 blocks if the node launches near the end of the first timeslot.
+          let blockCount = newBlocks.length;
+          assert.equal(blockCount === 2 || blockCount === 3, true);
+          assert.equal(newBlocks[0].previousBlockId, null);
+          for (let i = 1; i < blockCount; i++) {
+            let previousBlock = newBlocks[i - 1];
+            let block = newBlocks[i];
+            assert.equal(block.previousBlockId, previousBlock.id);
+          }
+          for (let i = 0; i < blockCount; i++) {
+            let block = newBlocks[i];
+            assert.equal(block.height, i + 1);
+            assert.equal(block.timestamp % 5000, 0);
+            assert.equal(block.forgerAddress, '5c75e6041a05d266914cbf3837da81e29b4a7e66b9f9f8804809e914f6012293ldpos');
+            assert.equal(typeof block.forgingPublicKey, 'string');
+            assert.equal(typeof block.nextForgingPublicKey, 'string');
+            assert.equal(typeof block.nextForgingKeyIndex, 'number');
+            assert.equal(typeof block.id, 'string');
+            assert.equal(block.numberOfTransactions, 0);
+          }
+        });
 
       });
 
@@ -174,21 +201,21 @@ describe('Functional tests', async () => {
 
   });
 
-  describe('registerMultisig transaction', async () => {
+  describe('registerMultisigWallet transaction', async () => {
 
     beforeEach(async () => {
 
     });
 
-    describe('valid registerMultisig', async () => {
+    describe('valid registerMultisigWallet', async () => {
 
-      it('should convert sig account into multisig account', async () => {
+      it('should convert sig account into multisig wallet', async () => {
 
       });
 
     });
 
-    describe('multiple valid registerMultisig', async () => {
+    describe('multiple valid registerMultisigWallet', async () => {
 
       it('should support re-registering an existing multisig wallet with a different set of member addresses', async () => {
 
@@ -196,7 +223,7 @@ describe('Functional tests', async () => {
 
     });
 
-    describe('invalid registerMultisig', async () => {
+    describe('invalid registerMultisigWallet', async () => {
 
       it('should send back an error', async () => {
 
@@ -206,13 +233,13 @@ describe('Functional tests', async () => {
 
   });
 
-  describe('init transaction', async () => {
+  describe('registerSigDetails transaction', async () => {
 
     beforeEach(async () => {
 
     });
 
-    describe('valid init', async () => {
+    describe('valid registerSigDetails', async () => {
 
       it('should add all the necessary keys on the account', async () => {
 
@@ -220,15 +247,15 @@ describe('Functional tests', async () => {
 
     });
 
-    describe('multiple valid init', async () => {
+    describe('multiple valid registerSigDetails', async () => {
 
-      it('should support re-initializing a wallet with a different set of public keys', async () => {
+      it('should support re-registering a wallet with a different set of public keys', async () => {
 
       });
 
     });
 
-    describe('invalid init', async () => {
+    describe('invalid registerSigDetails', async () => {
 
       it('should send back an error', async () => {
 
@@ -238,4 +265,67 @@ describe('Functional tests', async () => {
 
   });
 
+  describe('registerMultisigDetails transaction', async () => {
+
+    beforeEach(async () => {
+
+    });
+
+    describe('valid registerMultisigDetails', async () => {
+
+      it('should add all the necessary keys on the account', async () => {
+
+      });
+
+    });
+
+    describe('multiple valid registerMultisigDetails', async () => {
+
+      it('should support re-registering a wallet with a different set of public keys', async () => {
+
+      });
+
+    });
+
+    describe('invalid registerMultisigDetails', async () => {
+
+      it('should send back an error', async () => {
+
+      });
+
+    });
+
+  });
+
+  describe('registerForgingDetails transaction', async () => {
+
+    beforeEach(async () => {
+
+    });
+
+    describe('valid registerForgingDetails', async () => {
+
+      it('should add all the necessary keys on the account', async () => {
+
+      });
+
+    });
+
+    describe('multiple valid registerForgingDetails', async () => {
+
+      it('should support re-registering a wallet with a different set of public keys', async () => {
+
+      });
+
+    });
+
+    describe('invalid registerForgingDetails', async () => {
+
+      it('should send back an error', async () => {
+
+      });
+
+    });
+
+  });
 });

@@ -2,7 +2,7 @@ const {
   validateSignature,
   validateWalletAddress,
   validateBlockId,
-  validateForgingKeyIndex,
+  validateNextForgingKeyIndex,
   validateForgingPublicKey,
   validateNextForgingPublicKey
 } = require('./primitives');
@@ -14,9 +14,9 @@ function validateBlockSignatureSchema(blockSignature, networkSymbol) {
     );
   }
   validateWalletAddress(blockSignature.signerAddress, networkSymbol);
-  validateForgingKeyIndex(blockSignature.forgingKeyIndex);
   validateForgingPublicKey(blockSignature.forgingPublicKey);
   validateNextForgingPublicKey(blockSignature.nextForgingPublicKey);
+  validateNextForgingKeyIndex(blockSignature.nextForgingKeyIndex);
   validateSignature(blockSignature.signature);
 }
 

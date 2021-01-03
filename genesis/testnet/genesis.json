@@ -3,12 +3,12 @@
     {
       "address": "5c75e6041a05d266914cbf3837da81e29b4a7e66b9f9f8804809e914f6012293ldpos",
       "type": "sig",
-      "forgingKeyIndex": 0,
       "forgingPublicKey": "kDV3ud1DL6FbTE5P+lXLzjmCRaNgHbzvKCxX6LPcTIU=",
-      "multisigKeyIndex": 0,
+      "nextForgingKeyIndex": 0,
       "multisigPublicKey": "kIMXds9V3k2ArVXiCkO9zMZthMG0gxaJD5nkUGvr1jA=",
-      "sigKeyIndex": 0,
+      "nextMultisigKeyIndex": 0,
       "sigPublicKey": "XHXmBBoF0maRTL84N9qB4ptKfma5+fiASAnpFPYBIpM=",
+      "nextSigKeyIndex": 0,
       "balance": "10000000000000000",
       "votes": ["5c75e6041a05d266914cbf3837da81e29b4a7e66b9f9f8804809e914f6012293ldpos"]
     }

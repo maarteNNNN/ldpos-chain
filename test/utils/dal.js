@@ -98,9 +98,9 @@ class DAL {
     }
     if (!delegateAccount.forgingPublicKey) {
       let error = new Error(
-        `Delegate account ${delegateAddress} was not initialized and so it cannot receive votes`
+        `Delegate account ${delegateAddress} was not registered for forging and so it cannot receive votes`
       );
-      error.name = 'DelegateAccountWasNotInitializedError';
+      error.name = 'DelegateAccountWasNotRegisteredError';
       error.type = 'InvalidActionError';
       throw error;
     }
@@ -162,9 +162,9 @@ class DAL {
       }
       if (!memberAccount.multisigPublicKey) {
         let error = new Error(
-          `Account ${memberAddress} was not initialized for multisig member registration`
+          `Account ${memberAddress} was not registered for multisig so it cannot be a member of a multisig wallet`
         );
-        error.name = 'MemberAccountWasNotInitializedError';
+        error.name = 'MemberAccountWasNotRegisteredError';
         error.type = 'InvalidActionError';
         throw error;
       }
@@ -172,7 +172,7 @@ class DAL {
         let error = new Error(
           `Account ${
             memberAddress
-          } was a multisig account so it could not be registered as a member of another multisig account`
+          } was a multisig wallet so it could not be registered as a member of another multisig wallet`
         );
         error.name = 'MemberAccountWasMultisigAccountError';
         error.type = 'InvalidActionError';
@@ -202,7 +202,11 @@ class DAL {
   }
 
   async getBlocksFromHeight(height, limit) {
-    return this.blocks.slice(height - 1, height + limit);
+    if (height < 1) {
+      height = 1;
+    }
+    let startIndex = height - 1;
+    return this.blocks.slice(startIndex, startIndex + limit);
   }
 
   async getLastBlockAtTimestamp(timestamp) {

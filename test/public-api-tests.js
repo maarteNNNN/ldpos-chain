@@ -39,6 +39,7 @@ describe('Public API tests', async () => {
         })
       }
     });
+    
     options = {
       genesisPath: './test/utils/genesis.json',
       forgingPassphrase: 'clerk aware give dog reopen peasant duty cheese tobacco trouble gold angle',

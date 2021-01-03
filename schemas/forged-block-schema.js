@@ -1,7 +1,7 @@
 const {
   validateWalletAddress,
   validateBlockId,
-  validateForgingKeyIndex,
+  validateNextForgingKeyIndex,
   validatePreviousBlockId,
   validateForgingPublicKey,
   validateNextForgingPublicKey,
@@ -34,9 +34,9 @@ function validateForgedBlockSchema(block, minTransactionsPerBlock, maxTransactio
   }
   validateWalletAddress(block.forgerAddress, networkSymbol);
   validateBlockId(block.id);
-  validateForgingKeyIndex(block.forgingKeyIndex);
   validateForgingPublicKey(block.forgingPublicKey);
   validateNextForgingPublicKey(block.nextForgingPublicKey);
+  validateNextForgingKeyIndex(block.nextForgingKeyIndex);
   validateSignature(block.signature);
 }
 

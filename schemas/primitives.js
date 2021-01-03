@@ -18,31 +18,27 @@ function validatePublicKey(publicKey) {
   }
 }
 
-function validateForgingKeyIndex(keyIndex) {
-  if (!Number.isInteger(keyIndex) || keyIndex < 0) {
-    throw new Error('Forging key index must be an integer number greater than or equal to 0');
-  }
-}
-
-function validateForgingPublicKey(publicKey) {
+function validateSigPublicKey(publicKey) {
   try {
     validatePublicKey(publicKey);
   } catch (error) {
-    throw new Error(`Invalid forging public key: ${error.message}`);
+    throw new Error(`Invalid sig public key: ${error.message}`);
   }
 }
 
-function validateNextForgingPublicKey(publicKey) {
+function validateNextSigKeyIndex(keyIndex) {
+  if (!Number.isInteger(keyIndex) || keyIndex < 0 || keyIndex > Number.MAX_SAFE_INTEGER) {
+    throw new Error(
+      `Next sig key index must be an integer number between 0 and ${Number.MAX_SAFE_INTEGER} inclusive`
+    );
+  }
+}
+
+function validateNextSigPublicKey(publicKey) {
   try {
     validatePublicKey(publicKey);
   } catch (error) {
-    throw new Error(`Invalid next forging public key: ${error.message}`);
-  }
-}
-
-function validateMultisigKeyIndex(keyIndex) {
-  if (!Number.isInteger(keyIndex) || keyIndex < 0) {
-    throw new Error('Multisig key index must be an integer number greater than or equal to 0');
+    throw new Error(`Invalid next sig public key: ${error.message}`);
   }
 }
 
@@ -54,6 +50,14 @@ function validateMultisigPublicKey(publicKey) {
   }
 }
 
+function validateNextMultisigKeyIndex(keyIndex) {
+  if (!Number.isInteger(keyIndex) || keyIndex < 0 || keyIndex > Number.MAX_SAFE_INTEGER) {
+    throw new Error(
+      `Next multisig key index must be an integer number between 0 and ${Number.MAX_SAFE_INTEGER} inclusive`
+    );
+  }
+}
+
 function validateNextMultisigPublicKey(publicKey) {
   try {
     validatePublicKey(publicKey);
@@ -62,25 +66,27 @@ function validateNextMultisigPublicKey(publicKey) {
   }
 }
 
-function validateSigKeyIndex(keyIndex) {
-  if (!Number.isInteger(keyIndex) || keyIndex < 0) {
-    throw new Error('Sig key index must be an integer number greater than or equal to 0');
-  }
-}
-
-function validateSigPublicKey(publicKey) {
+function validateForgingPublicKey(publicKey) {
   try {
     validatePublicKey(publicKey);
   } catch (error) {
-    throw new Error(`Invalid sig public key: ${error.message}`);
+    throw new Error(`Invalid forging public key: ${error.message}`);
   }
 }
 
-function validateNextSigPublicKey(publicKey) {
+function validateNextForgingKeyIndex(keyIndex) {
+  if (!Number.isInteger(keyIndex) || keyIndex < 0 || keyIndex > Number.MAX_SAFE_INTEGER) {
+    throw new Error(
+      `Next forging key index must be an integer number between 0 and ${Number.MAX_SAFE_INTEGER} inclusive`
+    );
+  }
+}
+
+function validateNextForgingPublicKey(publicKey) {
   try {
     validatePublicKey(publicKey);
   } catch (error) {
-    throw new Error(`Invalid next sig public key: ${error.message}`);
+    throw new Error(`Invalid next forging public key: ${error.message}`);
   }
 }
 
@@ -172,13 +178,13 @@ function validateTimestamp(timestamp) {
 module.exports = {
   validateWalletAddress,
   validatePublicKey,
-  validateForgingKeyIndex,
+  validateNextForgingKeyIndex,
   validateForgingPublicKey,
   validateNextForgingPublicKey,
-  validateMultisigKeyIndex,
+  validateNextMultisigKeyIndex,
   validateMultisigPublicKey,
   validateNextMultisigPublicKey,
-  validateSigKeyIndex,
+  validateNextSigKeyIndex,
   validateSigPublicKey,
   validateNextSigPublicKey,
   validateSignature,

@@ -8,8 +8,10 @@ const {
 const { validateTransferTransactionSchema } = require('./transfer-transaction-schema');
 const { validateVoteTransactionSchema } = require('./vote-transaction-schema');
 const { validateUnvoteTransactionSchema } = require('./unvote-transaction-schema');
-const { validateRegisterMultisigTransactionSchema } = require('./register-multisig-transaction-schema');
-const { validateInitTransactionSchema } = require('./init-transaction-schema');
+const { validateRegisterSigDetailsTransactionSchema } = require('./register-sig-details-transaction-schema');
+const { validateRegisterMultisigDetailsTransactionSchema } = require('./register-multisig-details-transaction-schema');
+const { validateRegisterForgingDetailsTransactionSchema } = require('./register-forging-details-transaction-schema');
+const { validateRegisterMultisigWalletTransactionSchema } = require('./register-multisig-wallet-transaction-schema');
 
 function validateTransactionSchema(transaction, maxSpendableDigits, networkSymbol, maxTransactionMessageLength, minMultisigMembers, maxMultisigMembers) {
   if (!transaction) {
@@ -21,8 +23,10 @@ function validateTransactionSchema(transaction, maxSpendableDigits, networkSymbo
     type !== 'transfer' &&
     type !== 'vote' &&
     type !== 'unvote' &&
-    type !== 'registerMultisig' &&
-    type !== 'init'
+    type !== 'registerSigDetails' &&
+    type !== 'registerMultisigDetails' &&
+    type !== 'registerForgingDetails' &&
+    type !== 'registerMultisigWallet'
   ) {
     throw new Error(
       'Transaction type must be a string which refers to one of the supported transaction types'
@@ -39,15 +43,19 @@ function validateTransactionSchema(transaction, maxSpendableDigits, networkSymbo
     validateVoteTransactionSchema(transaction, networkSymbol);
   } else if (type === 'unvote') {
     validateUnvoteTransactionSchema(transaction, networkSymbol);
-  } else if (type === 'registerMultisig') {
-    validateRegisterMultisigTransactionSchema(
+  } else if (type === 'registerSigDetails') {
+    validateRegisterSigDetailsTransactionSchema(transaction);
+  } else if (type === 'registerMultisigDetails') {
+    validateRegisterMultisigDetailsTransactionSchema(transaction);
+  } else if (type === 'registerForgingDetails') {
+    validateRegisterForgingDetailsTransactionSchema(transaction);
+  } else if (type === 'registerMultisigWallet') {
+    validateRegisterMultisigWalletTransactionSchema(
       transaction,
       minMultisigMembers,
       maxMultisigMembers,
       networkSymbol
     );
-  } else if (type === 'init') {
-    validateInitTransactionSchema(transaction);
   }
 }
 
