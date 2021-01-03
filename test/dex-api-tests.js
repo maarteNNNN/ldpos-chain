@@ -622,8 +622,13 @@ describe('DEX API tests', async () => {
     describe('postTransaction action', async () => {
 
       it('should accept a prepared (signed) transaction object as argument', async () => {
-        // The format of the prepared (signed) transaction may be different depending on the
-        // implementation of the chain module.
+        // The format of the prepared (signed) transaction will be different depending on the
+        // implementation of the chain module and the specified ChainCrypto adapter.
+        // Since this is used for posting multisig transactions, the transaction will have
+        // a 'signatures' property containing an array of signature objects created by the DEX.
+        // The format of each signature object is flexible depending on the output of the ChainCrypto
+        // adapter but it will have a 'signerAddress' property.
+        // The chain module can handle the transaction and signature objects however it wants.
         let preparedTxn = clientForger.prepareTransaction({
           type: 'transfer',
           recipientAddress: '484a487b1c12b8f46dfe9f15e7fe79ceb88d2c3f76ba39680ae5279a04e7e842ldpos',
