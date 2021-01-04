@@ -121,58 +121,36 @@ describe('Functional tests', async () => {
 
       describe('with transactions', async () => {
 
-        it('should forge correct number of valid blocks based on forging interval', async () => {
-          (async () => {
-            let total = 0;
-            for (let i = 0; i < 10; i++) {
-              total += i + 1;
-              // Recipient passphrase: genius shoulder into daring armor proof cycle bench patrol paper grant picture
-              let preparedTxn = clientA.prepareTransaction({
-                type: 'transfer',
-                recipientAddress: '1072f65df680b2767f55a6bcd505b68d90d227d6d8b2d340fe97aaa016ab6dd7ldpos',
-                amount: `${i + 1}00000000`,
-                fee: `${i + 1}0000000`,
-                timestamp: 100000,
-                message: ''
-              });
-              await chainModule.actions.postTransaction.handler({
-                transaction: preparedTxn
-              });
-              await wait(600);
-            }
-          })();
+        beforeEach(async () => {
+          for (let i = 0; i < 10; i++) {
+            await wait(600);
 
-          await wait(12000);
+            // Recipient passphrase: genius shoulder into daring armor proof cycle bench patrol paper grant picture
+            let preparedTxn = clientA.prepareTransaction({
+              type: 'transfer',
+              recipientAddress: '1072f65df680b2767f55a6bcd505b68d90d227d6d8b2d340fe97aaa016ab6dd7ldpos',
+              amount: `${i + 1}00000000`,
+              fee: `${i + 1}0000000`,
+              timestamp: 100000,
+              message: ''
+            });
+            await chainModule.actions.postTransaction.handler({
+              transaction: preparedTxn
+            });
+          }
+
+          await wait(7000);
+        });
+
+        it('should forge valid blocks which contain the correct number of transactions', async () => {
           let newBlocks = chainChangeEvents.map(event => event.data.block);
           let blockList = await chainModule.actions.getBlocksFromHeight.handler({ height: 1, limit: 100 });
           let totalTxnCount = 0;
-          let txnList = [];
 
           for (let block of blockList) {
             totalTxnCount += block.numberOfTransactions;
-            let blockTxns = await chainModule.actions.getTransactionsFromBlock.handler({ blockId: block.id, offset: 0 });
-            for (let txn of blockTxns) {
-              txnList.push(txn);
-            }
           }
           assert.equal(totalTxnCount, 10);
-          assert.equal(txnList.length, 10);
-
-          let [senderAccount, recipientAccount] = await Promise.all([
-            chainModule.actions.getAccount.handler({
-              walletAddress: clientA.walletAddress
-            }),
-            chainModule.actions.getAccount.handler({
-              walletAddress: '1072f65df680b2767f55a6bcd505b68d90d227d6d8b2d340fe97aaa016ab6dd7ldpos'
-            })
-          ]);
-
-          let initialAmount = 1000;
-          let expectedSentAmount = 55;
-          let expectedFees = 5.5;
-          let unitSize = 100000000;
-          assert.equal(senderAccount.balance, String((initialAmount - expectedSentAmount - expectedFees) * unitSize));
-          assert.equal(recipientAccount.balance, String(expectedSentAmount * unitSize));
         });
 
       });
@@ -184,14 +162,91 @@ describe('Functional tests', async () => {
   describe('block processing', async () => {
 
     beforeEach(async () => {
+      options = {
+        genesisPath: './test/utils/genesis-functional.json',
+        forgingPassphrase: 'clerk aware give dog reopen peasant duty cheese tobacco trouble gold angle',
+        minTransactionsPerBlock: 0, // Enable forging empty blocks.
+        forgingInterval: 5000,
+        forgingBlockBroadcastDelay: 500,
+        forgingSignatureBroadcastDelay: 500,
+        propagationRandomness: 100,
+        propagationTimeout: 2000
+      };
+
+      await chainModule.load(channel, options);
+      clientForger = await createClient({
+        passphrase: options.forgingPassphrase,
+        adapter: dal
+      });
+
+      // Address: 69876bf9db624560b40c40368d762ad0b35d010820e0edfe40d0380ead464d5aldpos
+      walletAPassphrase = 'birth select quiz process bid raccoon memory village snow cable agent bean';
+
+      clientA = await createClient({
+        passphrase: walletAPassphrase,
+        adapter: dal
+      });
+    });
+
+    describe('when processing blocks containing valid transactions', async () => {
+
+      beforeEach(async () => {
+        for (let i = 0; i < 10; i++) {
+          await wait(600);
+
+          // Recipient passphrase: genius shoulder into daring armor proof cycle bench patrol paper grant picture
+          let preparedTxn = clientA.prepareTransaction({
+            type: 'transfer',
+            recipientAddress: '1072f65df680b2767f55a6bcd505b68d90d227d6d8b2d340fe97aaa016ab6dd7ldpos',
+            amount: `${i + 1}00000000`,
+            fee: `${i + 1}0000000`,
+            timestamp: 100000,
+            message: ''
+          });
+          await chainModule.actions.postTransaction.handler({
+            transaction: preparedTxn
+          });
+        }
+
+        await wait(7000);
+      });
+
+      it('should forge valid blocks which contain all the valid broadcasted transactions', async () => {
+        let newBlocks = chainChangeEvents.map(event => event.data.block);
+        let blockList = await chainModule.actions.getBlocksFromHeight.handler({ height: 1, limit: 100 });
+        let totalTxnCount = 0;
+        let txnList = [];
+
+        for (let block of blockList) {
+          totalTxnCount += block.numberOfTransactions;
+          let blockTxns = await chainModule.actions.getTransactionsFromBlock.handler({ blockId: block.id, offset: 0 });
+          for (let txn of blockTxns) {
+            txnList.push(txn);
+          }
+        }
+        assert.equal(totalTxnCount, 10);
+        assert.equal(txnList.length, 10);
+
+        let [senderAccount, recipientAccount] = await Promise.all([
+          chainModule.actions.getAccount.handler({
+            walletAddress: clientA.walletAddress
+          }),
+          chainModule.actions.getAccount.handler({
+            walletAddress: '1072f65df680b2767f55a6bcd505b68d90d227d6d8b2d340fe97aaa016ab6dd7ldpos'
+          })
+        ]);
+
+        let initialAmount = 1000;
+        let expectedSentAmount = 55;
+        let expectedFees = 5.5;
+        let unitSize = 100000000;
+        assert.equal(senderAccount.balance, String((initialAmount - expectedSentAmount - expectedFees) * unitSize));
+        assert.equal(recipientAccount.balance, String(expectedSentAmount * unitSize));
+      });
 
     });
 
     describe('when processing a block multiple times', async () => {
-
-      it('should ensure that account changes are idempotent', async () => {
-
-      });
 
     });
 
