@@ -39,9 +39,9 @@ describe('Public API tests', async () => {
         })
       }
     });
-    
+
     options = {
-      genesisPath: './test/utils/genesis.json',
+      genesisPath: './test/utils/genesis-public-api.json',
       forgingPassphrase: 'clerk aware give dog reopen peasant duty cheese tobacco trouble gold angle',
       minTransactionsPerBlock: 0, // Enable forging empty blocks.
       forgingInterval: 10000,

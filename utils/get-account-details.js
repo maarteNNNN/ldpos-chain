@@ -2,14 +2,16 @@
 
 const bip39 = require('bip39');
 const ProperMerkle = require('proper-merkle');
+const mnemonic = process.argv[2];
+
+if (!mnemonic) {
+  console.error('Passphrase mnemonic was not specified');
+  process.exit(1);
+}
 
 let merkle = new ProperMerkle({
   leafCount: 32
 });
-
-let mnemonic = bip39.generateMnemonic();
-
-console.log('MNEMONIC:', mnemonic);
 
 let network = 'ldpos';
 let seed = bip39.mnemonicToSeedSync(mnemonic).toString('hex');

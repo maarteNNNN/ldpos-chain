@@ -1,0 +1,26 @@
+{
+  "accounts": [
+    {
+      "address": "5c75e6041a05d266914cbf3837da81e29b4a7e66b9f9f8804809e914f6012293ldpos",
+      "forgingPublicKey": "kDV3ud1DL6FbTE5P+lXLzjmCRaNgHbzvKCxX6LPcTIU=",
+      "nextForgingKeyIndex": 0,
+      "multisigPublicKey": "kIMXds9V3k2ArVXiCkO9zMZthMG0gxaJD5nkUGvr1jA=",
+      "nextMultisigKeyIndex": 0,
+      "sigPublicKey": "XHXmBBoF0maRTL84N9qB4ptKfma5+fiASAnpFPYBIpM=",
+      "nextSigKeyIndex": 0,
+      "balance": "9999900000000000",
+      "votes": ["5c75e6041a05d266914cbf3837da81e29b4a7e66b9f9f8804809e914f6012293ldpos"]
+    },
+    {
+      "address": "69876bf9db624560b40c40368d762ad0b35d010820e0edfe40d0380ead464d5aldpos",
+      "forgingPublicKey": "B8qadp7ACj2vjlkgHPxdZokgRGhQgOBiBbw3PixiDG4=",
+      "nextForgingKeyIndex": 0,
+      "multisigPublicKey": "8Qmoim5x5GiLDeNNjX48bId/NSgUz0WIt5cf+DeMBJ0=",
+      "nextMultisigKeyIndex": 0,
+      "sigPublicKey": "aYdr+dtiRWC0DEA2jXYq0LNdAQgg4O3+QNA4Dq1GTVo=",
+      "nextSigKeyIndex": 0,
+      "balance": "100000000000",
+      "votes": ["5c75e6041a05d266914cbf3837da81e29b4a7e66b9f9f8804809e914f6012293ldpos"]
+    }
+  ]
+}

@@ -15,7 +15,7 @@ class DAL {
       let { votes, ...accountWithoutVotes } = account;
       this.accounts[account.address] = {
         ...accountWithoutVotes,
-        updateHeight: 1
+        updateHeight: 0
       };
       for (let delegate of votes) {
         if (!this.votes[delegate]) {
@@ -296,6 +296,20 @@ class DAL {
       throw error;
     }
     return transaction;
+  }
+
+  async getTransactionsFromBlock(blockId, offset, limit) {
+    if (offset == null) {
+      offset = 0;
+    }
+    let transactionList = Object.values(this.transactions);
+    let blockTxns = transactionList.filter(
+      transaction => transaction.blockId === blockId && transaction.indexInBlock >= offset
+    );
+    if (limit == null) {
+      return blockTxns;
+    }
+    return blockTxns.slice(0, limit);
   }
 
   async getOutboundTransactions(walletAddress, fromTimestamp, limit) {

@@ -116,6 +116,12 @@ module.exports = class LDPoSChainModule {
         },
         isPublic: true
       },
+      getTransactionsFromBlock: {
+        handler: async action => {
+          let { blockId, offset, limit } = action;
+          return this.dal.getTransactionsFromBlock(blockId, offset, limit);
+        }
+      },
       getMultisigWalletMembers: {
         handler: async action => {
           let { walletAddress } = action;
@@ -291,9 +297,9 @@ module.exports = class LDPoSChainModule {
     let signerSet = new Set();
     while (true) {
       let startTime = Date.now();
-      let blockSignaturePacket;
+      let blockSignature;
       try {
-        blockSignaturePacket = await this.verifiedBlockSignatureStream.once(timeout);
+        blockSignature = await this.verifiedBlockSignatureStream.once(timeout);
       } catch (error) {
         throw new Error(
           `Failed to receive enough block signatures before timeout - Only received ${
@@ -303,7 +309,7 @@ module.exports = class LDPoSChainModule {
           } required signatures`
         );
       }
-      let { blockId, blockSignature } = blockSignaturePacket;
+      let { blockId } = blockSignature;
       if (blockId === lastBlock.id) {
         lastBlock.signatures[blockSignature.signerAddress] = blockSignature;
         signerSet.add(blockSignature.signerAddress);
@@ -335,8 +341,8 @@ module.exports = class LDPoSChainModule {
     return this.getForgingDelegateAddressAtTimestamp(Date.now());
   }
 
-  sha256(message) {
-    return crypto.createHash('sha256').update(message, 'utf8').digest('hex');
+  sha256(message, encoding) {
+    return crypto.createHash('sha256').update(message, 'utf8').digest(encoding || 'base64');
   }
 
   forgeBlock(height, timestamp, transactions) {
@@ -501,18 +507,12 @@ module.exports = class LDPoSChainModule {
         let txnAmount = BigInt(amount);
 
         let recipientAccount = affectedAccounts[recipientAddress];
-        if (!senderAccount.updateHeight || senderAccount.updateHeight < height) {
-          senderAccount.balance -= txnAmount + txnFee;
-          senderAccount.lastTransactionTimestamp = timestamp;
-        }
-        if (!recipientAccount.updateHeight || recipientAccount.updateHeight < height) {
-          recipientAccount.balance += txnAmount;
-        }
+        senderAccount.balance -= txnAmount + txnFee;
+        senderAccount.lastTransactionTimestamp = timestamp;
+        recipientAccount.balance += txnAmount;
       } else {
-        if (!senderAccount.updateHeight || senderAccount.updateHeight < height) {
-          senderAccount.balance -= txnFee;
-          senderAccount.lastTransactionTimestamp = timestamp;
-        }
+        senderAccount.balance -= txnFee;
+        senderAccount.lastTransactionTimestamp = timestamp;
         if (type === 'vote' || type === 'unvote') {
           voteChangeList.push({
             type,
@@ -586,7 +586,7 @@ module.exports = class LDPoSChainModule {
               ...account,
               updateHeight: height
             });
-          } else {
+          } else if (account.updateHeight < height) {
             await this.dal.updateAccount(
               account.address,
               accountUpdatePacket
@@ -1427,9 +1427,9 @@ module.exports = class LDPoSChainModule {
                 try {
                   let txnTotal;
                   if (multisigMemberAccounts) {
-                    txnTotal = await this.verifyMultisigTransactionAuth(senderAccount, multisigMemberAccounts, pendingTxn, false);
+                    txnTotal = await this.verifyMultisigTransactionAuth(senderAccount, multisigMemberAccounts, pendingTxn, true);
                   } else {
-                    txnTotal = await this.verifySigTransactionAuth(senderAccount, pendingTxn, false);
+                    txnTotal = await this.verifySigTransactionAuth(senderAccount, pendingTxn, true);
                   }
 
                   // Subtract valid transaction total from the in-memory senderAccount balance since it
@@ -1592,13 +1592,12 @@ module.exports = class LDPoSChainModule {
   }
 
   isAccountStreamBusy(accountStream) {
-    return !accountStream.pendingTransactionVerificationCount && !accountStream.transactionInfoMap.size;
+    return !!(accountStream.pendingTransactionVerificationCount || accountStream.transactionInfoMap.size);
   }
 
   async startTransactionPropagationLoop() {
     this.channel.subscribe(`network:event:${this.alias}:transaction`, async (event) => {
       let transaction = event.data;
-
       try {
         validateTransactionSchema(
           transaction,
@@ -1856,10 +1855,7 @@ module.exports = class LDPoSChainModule {
         return;
       }
 
-      this.verifiedBlockSignatureStream.write({
-        blockId: lastReceivedBlock.id,
-        blockSignature
-      });
+      this.verifiedBlockSignatureStream.write(blockSignature);
 
       // This is a performance optimization to ensure that peers
       // will not receive multiple instances of the same signature at the same time.
