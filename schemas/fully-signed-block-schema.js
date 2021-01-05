@@ -1,14 +1,11 @@
 const { validateForgedBlockSchema } = require('./forged-block-schema');
 const { validateBlockSignatureSchema } = require('./block-signature-schema');
 
-function validateFullySignedBlockSchema(block, maxTransactionsPerBlock, minRequiredSignatures, networkSymbol) {
-  validateForgedBlockSchema(block, maxTransactionsPerBlock, networkSymbol);
+function validateFullySignedBlockSchema(block, minTransactionsPerBlock, maxTransactionsPerBlock, minRequiredSignatures, networkSymbol) {
+  validateForgedBlockSchema(block, minTransactionsPerBlock, maxTransactionsPerBlock, networkSymbol);
 
   let { forgerAddress, signatures } = block;
 
-  if (!Array.isArray(signatures)) {
-    throw new Error('Fully signed block signatures must be an array');
-  }
   let signerSet = new Set();
   for (let blockSignature of signatures) {
     validateBlockSignatureSchema(blockSignature, networkSymbol);

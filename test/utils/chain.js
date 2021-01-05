@@ -1,6 +1,7 @@
 class LDPoSChainModule {
   constructor() {
     this.receivedBlockIdSet = new Set();
+    this.receivedBlockList = [];
     this.receivedTransactionIdSet = new Set();
     this.receivedBlockSignatureSet = new Set();
   }
@@ -14,6 +15,7 @@ class LDPoSChainModule {
       block: async (block) => {
         if (block && block.id && !this.receivedBlockIdSet.has(block.id)) {
           this.receivedBlockIdSet.add(block.id);
+          this.receivedBlockList[block.height - 1] = block;
           this.network.trigger('ldpos_chain', 'block', block);
         }
       },
@@ -40,7 +42,8 @@ class LDPoSChainModule {
   get actionHandlers() {
     return {
       getSignedBlocksFromHeight: async ({ height, limit }) => {
-        return [];
+        let startIndex = height - 1;
+        return this.receivedBlockList.slice(startIndex, startIndex + limit);
       }
     };
   }

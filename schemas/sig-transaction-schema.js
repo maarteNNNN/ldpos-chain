@@ -14,9 +14,9 @@ function validateSigTransactionSchema(sigTransaction, fullCheck) {
   validateNextSigPublicKey(sigTransaction.nextSigPublicKey);
   validateNextSigKeyIndex(sigTransaction.nextSigKeyIndex);
   if (fullCheck) {
-    validateSignature(sigTransaction.signature);
+    validateSignature(sigTransaction.senderSignature);
   } else {
-    validateSignatureHash(sigTransaction.signatureHash);
+    validateSignatureHash(sigTransaction.senderSignatureHash);
   }
 }
 

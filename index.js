@@ -212,7 +212,7 @@ module.exports = class LDPoSChainModule {
   }
 
   simplifyBlock(signedBlock) {
-    let { transactions, signature, signatures, ...simpleBlock } = signedBlock;
+    let { transactions, forgerSignature, signatures, ...simpleBlock } = signedBlock;
     simpleBlock.numberOfTransactions = transactions.length;
     return simpleBlock;
   }
@@ -270,8 +270,13 @@ module.exports = class LDPoSChainModule {
 
       try {
         for (let block of newBlocks) {
-          let block = newBlocks[i];
-          validateFullySignedBlockSchema(block, this.maxTransactionsPerBlock, blockSignerMajorityCount, this.networkSymbol);
+          validateFullySignedBlockSchema(
+            block,
+            this.minTransactionsPerBlock,
+            this.maxTransactionsPerBlock,
+            blockSignerMajorityCount,
+            this.networkSymbol
+          );
           await this.verifyFullySignedBlock(block, this.lastProcessedBlock);
           await this.processBlock(block, true);
         }
@@ -373,7 +378,7 @@ module.exports = class LDPoSChainModule {
   }
 
   simplifyTransaction(transaction) {
-    let { signature, signatures, ...txnWithoutSignatures} = transaction;
+    let { senderSignature, signatures, ...txnWithoutSignatures} = transaction;
     if (signatures) {
       // If multisig transaction
       return {
@@ -390,7 +395,7 @@ module.exports = class LDPoSChainModule {
     // If regular sig transaction
     return {
       ...txnWithoutSignatures,
-      signatureHash: this.sha256(signature)
+      senderSignatureHash: this.sha256(senderSignature)
     };
   }
 
@@ -741,7 +746,7 @@ module.exports = class LDPoSChainModule {
     }
     if (fullCheck) {
       if (!this.ldposClient.verifyTransaction(transaction)) {
-        throw new Error('Transaction signature was invalid');
+        throw new Error('Transaction senderSignature was invalid');
       }
     } else {
       if (!this.ldposClient.verifyTransactionId(transaction)) {
@@ -1170,7 +1175,7 @@ module.exports = class LDPoSChainModule {
 
   async verifyBlockSignature(block, blockSignature) {
     if (!block) {
-      throw new Error('Cannot verify signature because there is no block pending');
+      throw new Error('Cannot verify block signature because there is no block pending');
     }
     let { signerAddress } = blockSignature;
 
@@ -1352,6 +1357,7 @@ module.exports = class LDPoSChainModule {
         forgingPublicKey: null,
         nextForgingPublicKey: null,
         id: null,
+        forgerSignature: null,
         signatures: []
       };
     }
@@ -1786,8 +1792,8 @@ module.exports = class LDPoSChainModule {
         }
 
         let pendingTxn = pendingTxnStream.transactionInfoMap.get(txn.id).transaction;
-        let pendingTxnSignatureHash = this.sha256(pendingTxn.signature);
-        if (txn.signatureHash !== pendingTxnSignatureHash) {
+        let pendingTxnSignatureHash = this.sha256(pendingTxn.senderSignature);
+        if (txn.senderSignatureHash !== pendingTxnSignatureHash) { // TODO 2222: What is multisig????
           this.logger.warn(
             new Error(`Block ${block.id} contained a transaction ${txn.id} with an invalid signature hash`)
           );
@@ -1795,11 +1801,7 @@ module.exports = class LDPoSChainModule {
         }
       }
 
-      this.lastReceivedBlock = {
-        ...block,
-        signatures: []
-      };
-
+      this.lastReceivedBlock = block;
       this.verifiedBlockStream.write(this.lastReceivedBlock);
 
       // This is a performance optimization to ensure that peers
@@ -1827,7 +1829,7 @@ module.exports = class LDPoSChainModule {
 
       if (signatures[blockSignature.signerAddress]) {
         this.logger.warn(
-          new Error(`Block signature of signer ${blockSignature.signerAddress} has already been received before`)
+          new Error(`Block signature of delegate ${blockSignature.signerAddress} has already been received before`)
         );
         return;
       }
@@ -1843,7 +1845,7 @@ module.exports = class LDPoSChainModule {
         await this.verifyBlockSignature(lastReceivedBlock, blockSignature);
       } catch (error) {
         this.logger.warn(
-          new Error(`Received invalid block signature - ${error.message}`)
+          new Error(`Received invalid delegate block signature - ${error.message}`)
         );
         return;
       }

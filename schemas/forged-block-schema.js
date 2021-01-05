@@ -37,7 +37,10 @@ function validateForgedBlockSchema(block, minTransactionsPerBlock, maxTransactio
   validateForgingPublicKey(block.forgingPublicKey);
   validateNextForgingPublicKey(block.nextForgingPublicKey);
   validateNextForgingKeyIndex(block.nextForgingKeyIndex);
-  validateSignature(block.signature);
+  validateSignature(block.forgerSignature);
+  if (!Array.isArray(block.signatures)) {
+    throw new Error('Block signatures must be an array');
+  }
 }
 
 module.exports = {

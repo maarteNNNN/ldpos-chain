@@ -293,10 +293,6 @@ describe('Functional tests', async () => {
 
         assert.equal(blockList.length >= 2, true);
 
-        let timestampDiff = blockList[1].timestamp - blockList[0].timestamp;
-        // One of the timeslots should be skipped.
-        assert.equal(timestampDiff, 10000);
-
         assert.equal(blockList[0].height, 1);
         assert.equal(blockList[1].height, 2);
 
