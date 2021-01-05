@@ -1792,12 +1792,36 @@ module.exports = class LDPoSChainModule {
         }
 
         let pendingTxn = pendingTxnStream.transactionInfoMap.get(txn.id).transaction;
-        let pendingTxnSignatureHash = this.sha256(pendingTxn.senderSignature);
-        if (txn.senderSignatureHash !== pendingTxnSignatureHash) { // TODO 2222: What is multisig????
-          this.logger.warn(
-            new Error(`Block ${block.id} contained a transaction ${txn.id} with an invalid signature hash`)
-          );
-          return;
+        if (txn.signatures) {
+          // For multisig transaction.
+          let pendingTxnSignatures = {};
+          for (let pendingSignaturePacket of pendingTxn.signatures) {
+            pendingTxnSignatures[pendingSignaturePacket.signerAddress] = pendingSignaturePacket;
+          }
+          let allSignaturesMatchPending = txn.signatures.every((signaturePacket) => {
+            let expectedSignaturePacket = pendingTxnSignatures[signaturePacket.signerAddress];
+            if (!expectedSignaturePacket) {
+              return false;
+            }
+            let expectedSignatureHash = this.sha256(expectedSignaturePacket.signature);
+            return signaturePacket.signatureHash === expectedSignatureHash;
+          });
+
+          if (!allSignaturesMatchPending) {
+            this.logger.warn(
+              new Error(`Block ${block.id} contained a multisig transaction ${txn.id} with missing or invalid signature hashes`)
+            );
+            return;
+          }
+        } else {
+          // For sig transaction.
+          let expectedSenderSignatureHash = this.sha256(pendingTxn.senderSignature);
+          if (txn.senderSignatureHash !== expectedSenderSignatureHash) {
+            this.logger.warn(
+              new Error(`Block ${block.id} contained a sig transaction ${txn.id} with an invalid sender signature hash`)
+            );
+            return;
+          }
         }
       }
 
