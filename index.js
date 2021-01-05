@@ -1809,7 +1809,9 @@ module.exports = class LDPoSChainModule {
 
           if (!allSignaturesMatchPending) {
             this.logger.warn(
-              new Error(`Block ${block.id} contained a multisig transaction ${txn.id} with missing or invalid signature hashes`)
+              new Error(
+                `Block ${block.id} contained a multisig transaction ${txn.id} with missing or invalid signature hashes`
+              )
             );
             return;
           }
