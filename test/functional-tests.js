@@ -211,7 +211,7 @@ describe('Functional tests', async () => {
         await wait(7000);
       });
 
-      it('should forge valid blocks which contain all the valid broadcasted transactions', async () => {
+      it('should process all valid transactions within blocks and correctly update account balances', async () => {
         let newBlocks = chainChangeEvents.map(event => event.data.block);
         let blockList = await chainModule.actions.getBlocksFromHeight.handler({ height: 1, limit: 100 });
         let totalTxnCount = 0;
@@ -247,6 +247,85 @@ describe('Functional tests', async () => {
     });
 
     describe('when processing a block multiple times', async () => {
+      let realUpsertBlockMethod;
+
+      beforeEach(async () => {
+        let hasFailed = false;
+        realUpsertBlockMethod = chainModule.dal.upsertBlock;
+        chainModule.dal.upsertBlock = function (...args) {
+          let block = args[0];
+          // Fail the first time only. This should force the block at height 2 to be re-processed.
+          if (block.height === 2 && !hasFailed) {
+            hasFailed = true;
+            throw new Error('Failed to upsert block because of simulated database connection issue');
+          }
+          return realUpsertBlockMethod.apply(this, args);
+        };
+        for (let i = 0; i < 10; i++) {
+          await wait(600);
+
+          // Recipient passphrase: genius shoulder into daring armor proof cycle bench patrol paper grant picture
+          let preparedTxn = clientA.prepareTransaction({
+            type: 'transfer',
+            recipientAddress: '1072f65df680b2767f55a6bcd505b68d90d227d6d8b2d340fe97aaa016ab6dd7ldpos',
+            amount: `${i + 1}00000000`,
+            fee: `${i + 1}0000000`,
+            timestamp: 100000,
+            message: ''
+          });
+          await chainModule.actions.postTransaction.handler({
+            transaction: preparedTxn
+          });
+        }
+
+        await wait(12000);
+      });
+
+      afterEach(async () => {
+        chainModule.dal.upsertBlock = realUpsertBlockMethod;
+      });
+
+      it('should update the state in an idempotent way', async () => {
+        let newBlocks = chainChangeEvents.map(event => event.data.block);
+        let blockList = await chainModule.actions.getBlocksFromHeight.handler({ height: 1, limit: 100 });
+        let totalTxnCount = 0;
+        let txnList = [];
+
+        assert.equal(blockList.length >= 2, true);
+
+        let timestampDiff = blockList[1].timestamp - blockList[0].timestamp;
+        // One of the timeslots should be skipped.
+        assert.equal(timestampDiff, 10000);
+
+        assert.equal(blockList[0].height, 1);
+        assert.equal(blockList[1].height, 2);
+
+        for (let block of blockList) {
+          totalTxnCount += block.numberOfTransactions;
+          let blockTxns = await chainModule.actions.getTransactionsFromBlock.handler({ blockId: block.id, offset: 0 });
+          for (let txn of blockTxns) {
+            txnList.push(txn);
+          }
+        }
+        assert.equal(totalTxnCount, 10);
+        assert.equal(txnList.length, 10);
+
+        let [senderAccount, recipientAccount] = await Promise.all([
+          chainModule.actions.getAccount.handler({
+            walletAddress: clientA.walletAddress
+          }),
+          chainModule.actions.getAccount.handler({
+            walletAddress: '1072f65df680b2767f55a6bcd505b68d90d227d6d8b2d340fe97aaa016ab6dd7ldpos'
+          })
+        ]);
+
+        let initialAmount = 1000;
+        let expectedSentAmount = 55;
+        let expectedFees = 5.5;
+        let unitSize = 100000000;
+        assert.equal(senderAccount.balance, String((initialAmount - expectedSentAmount - expectedFees) * unitSize));
+        assert.equal(recipientAccount.balance, String(expectedSentAmount * unitSize));
+      });
 
     });
 
