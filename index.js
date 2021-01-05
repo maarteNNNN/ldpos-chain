@@ -1774,13 +1774,6 @@ module.exports = class LDPoSChainModule {
         );
         return;
       }
-      if (block.height === this.lastReceivedBlock.height) {
-        this.lastDoubleForgedBlockTimestamp = this.lastReceivedBlock.timestamp;
-        this.logger.warn(
-          new Error(`Block ${block.id} was forged at the same height as the last block ${this.lastReceivedBlock.id}`)
-        );
-        return;
-      }
 
       let { transactions } = block;
       for (let txn of transactions) {
