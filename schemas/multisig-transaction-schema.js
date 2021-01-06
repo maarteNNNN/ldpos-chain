@@ -1,6 +1,7 @@
 const {
   validateWalletAddress,
   validateSignature,
+  validateSignatureHash,
   validateMultisigPublicKey,
   validateNextMultisigPublicKey,
   validateNextMultisigKeyIndex

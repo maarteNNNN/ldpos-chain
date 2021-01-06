@@ -19,6 +19,7 @@ describe('Functional tests', async () => {
   let chainChangeEvents;
   let walletAPassphrase;
   let clientA;
+  let clientB;
 
   beforeEach(async () => {
     chainModule = new LDPoSChainModule({
@@ -161,6 +162,8 @@ describe('Functional tests', async () => {
 
   describe('block processing', async () => {
 
+    let multisigClient;
+
     beforeEach(async () => {
       options = {
         genesisPath: './test/utils/genesis-functional.json',
@@ -188,7 +191,7 @@ describe('Functional tests', async () => {
       });
     });
 
-    describe('when processing blocks containing valid transactions', async () => {
+    describe('when processing blocks which contain valid sig transfer transactions', async () => {
 
       beforeEach(async () => {
         for (let i = 0; i < 10; i++) {
@@ -246,7 +249,7 @@ describe('Functional tests', async () => {
 
     });
 
-    describe('when processing a block multiple times', async () => {
+    describe('when processing a block multiple times which contains sig transactions due to database connection failure', async () => {
       let realUpsertBlockMethod;
 
       beforeEach(async () => {
@@ -325,25 +328,277 @@ describe('Functional tests', async () => {
 
     });
 
+    describe('when processing blocks which contain valid multisig transfer transactions', async () => {
+
+      beforeEach(async () => {
+
+        multisigClient = await createClient({
+          passphrase: 'guitar sight absurd copper right amount habit boat trigger bundle high pudding',
+          adapter: dal
+        });
+
+        clientB = await createClient({
+          passphrase: 'trip timber saddle fine shock orbit lamp nominee subject pledge random wedding',
+          adapter: dal
+        });
+
+        for (let i = 0; i < 5; i++) {
+          await wait(1200);
+
+          // Recipient passphrase: genius shoulder into daring armor proof cycle bench patrol paper grant picture
+          let preparedTxn = multisigClient.prepareMultisigTransaction({
+            type: 'transfer',
+            recipientAddress: '1072f65df680b2767f55a6bcd505b68d90d227d6d8b2d340fe97aaa016ab6dd7ldpos',
+            amount: `${i + 1}00000000`,
+            fee: `${i + 1}0000000`,
+            timestamp: 100000,
+            message: ''
+          });
+
+          let memberASignature = clientA.signMultisigTransaction(preparedTxn);
+          let memberBSignature = clientB.signMultisigTransaction(preparedTxn);
+
+          multisigClient.attachMultisigTransactionSignature(preparedTxn, memberASignature);
+          multisigClient.attachMultisigTransactionSignature(preparedTxn, memberBSignature);
+
+          await chainModule.actions.postTransaction.handler({
+            transaction: preparedTxn
+          });
+        }
+
+        await wait(7000);
+      });
+
+      it('should process all valid transactions within blocks and correctly update account balances', async () => {
+        let newBlocks = chainChangeEvents.map(event => event.data.block);
+        let blockList = await chainModule.actions.getBlocksFromHeight.handler({ height: 1, limit: 100 });
+        let totalTxnCount = 0;
+        let txnList = [];
+
+        for (let block of blockList) {
+          totalTxnCount += block.numberOfTransactions;
+          let blockTxns = await chainModule.actions.getTransactionsFromBlock.handler({ blockId: block.id, offset: 0 });
+          for (let txn of blockTxns) {
+            txnList.push(txn);
+          }
+        }
+        assert.equal(totalTxnCount, 5);
+        assert.equal(txnList.length, 5);
+
+        let [senderAccount, recipientAccount] = await Promise.all([
+          chainModule.actions.getAccount.handler({
+            walletAddress: multisigClient.walletAddress
+          }),
+          chainModule.actions.getAccount.handler({
+            walletAddress: '1072f65df680b2767f55a6bcd505b68d90d227d6d8b2d340fe97aaa016ab6dd7ldpos'
+          })
+        ]);
+
+        let initialAmount = 300;
+        let expectedSentAmount = 15;
+        let expectedFees = 1.5;
+        let unitSize = 100000000;
+        assert.equal(senderAccount.balance, String((initialAmount - expectedSentAmount - expectedFees) * unitSize));
+        assert.equal(recipientAccount.balance, String(expectedSentAmount * unitSize));
+      });
+
+    });
+
+    describe('when processing a block multiple times which contains multisig transactions due to database connection failure', async () => {
+      let realUpsertBlockMethod;
+
+      beforeEach(async () => {
+        let hasFailed = false;
+        realUpsertBlockMethod = chainModule.dal.upsertBlock;
+        chainModule.dal.upsertBlock = function (...args) {
+          let block = args[0];
+          // Fail the first time only. This should force the block at height 2 to be re-processed.
+          if (block.height === 2 && !hasFailed) {
+            hasFailed = true;
+            throw new Error('Failed to upsert block because of simulated database connection issue');
+          }
+          return realUpsertBlockMethod.apply(this, args);
+        };
+
+        multisigClient = await createClient({
+          passphrase: 'guitar sight absurd copper right amount habit boat trigger bundle high pudding',
+          adapter: dal
+        });
+
+        clientB = await createClient({
+          passphrase: 'trip timber saddle fine shock orbit lamp nominee subject pledge random wedding',
+          adapter: dal
+        });
+
+        for (let i = 0; i < 5; i++) {
+          await wait(1200);
+
+          // Recipient passphrase: genius shoulder into daring armor proof cycle bench patrol paper grant picture
+          let preparedTxn = multisigClient.prepareMultisigTransaction({
+            type: 'transfer',
+            recipientAddress: '1072f65df680b2767f55a6bcd505b68d90d227d6d8b2d340fe97aaa016ab6dd7ldpos',
+            amount: `${i + 1}00000000`,
+            fee: `${i + 1}0000000`,
+            timestamp: 100000,
+            message: ''
+          });
+
+          let memberASignature = clientA.signMultisigTransaction(preparedTxn);
+          let memberBSignature = clientB.signMultisigTransaction(preparedTxn);
+
+          multisigClient.attachMultisigTransactionSignature(preparedTxn, memberASignature);
+          multisigClient.attachMultisigTransactionSignature(preparedTxn, memberBSignature);
+
+          await chainModule.actions.postTransaction.handler({
+            transaction: preparedTxn
+          });
+        }
+
+        await wait(12000);
+      });
+
+      afterEach(async () => {
+        chainModule.dal.upsertBlock = realUpsertBlockMethod;
+      });
+
+      it('should update the state in an idempotent way', async () => {
+        let newBlocks = chainChangeEvents.map(event => event.data.block);
+        let blockList = await chainModule.actions.getBlocksFromHeight.handler({ height: 1, limit: 100 });
+        let totalTxnCount = 0;
+        let txnList = [];
+
+        assert.equal(blockList.length >= 2, true);
+
+        assert.equal(blockList[0].height, 1);
+        assert.equal(blockList[1].height, 2);
+
+        for (let block of blockList) {
+          totalTxnCount += block.numberOfTransactions;
+          let blockTxns = await chainModule.actions.getTransactionsFromBlock.handler({ blockId: block.id, offset: 0 });
+          for (let txn of blockTxns) {
+            txnList.push(txn);
+          }
+        }
+        assert.equal(totalTxnCount, 5);
+        assert.equal(txnList.length, 5);
+
+        let [senderAccount, recipientAccount] = await Promise.all([
+          chainModule.actions.getAccount.handler({
+            walletAddress: multisigClient.walletAddress
+          }),
+          chainModule.actions.getAccount.handler({
+            walletAddress: '1072f65df680b2767f55a6bcd505b68d90d227d6d8b2d340fe97aaa016ab6dd7ldpos'
+          })
+        ]);
+
+        let initialAmount = 300;
+        let expectedSentAmount = 15;
+        let expectedFees = 1.5;
+        let unitSize = 100000000;
+        assert.equal(senderAccount.balance, String((initialAmount - expectedSentAmount - expectedFees) * unitSize));
+        assert.equal(recipientAccount.balance, String(expectedSentAmount * unitSize));
+      });
+
+    });
+
   });
 
   describe('transfer transaction', async () => {
 
     beforeEach(async () => {
+      options = {
+        genesisPath: './test/utils/genesis-functional.json',
+        forgingPassphrase: 'clerk aware give dog reopen peasant duty cheese tobacco trouble gold angle',
+        minTransactionsPerBlock: 0, // Enable forging empty blocks.
+        forgingInterval: 5000,
+        forgingBlockBroadcastDelay: 500,
+        forgingSignatureBroadcastDelay: 500,
+        propagationRandomness: 100,
+        propagationTimeout: 2000
+      };
 
+      await chainModule.load(channel, options);
+      clientForger = await createClient({
+        passphrase: options.forgingPassphrase,
+        adapter: dal
+      });
+
+      // Address: 69876bf9db624560b40c40368d762ad0b35d010820e0edfe40d0380ead464d5aldpos
+      walletAPassphrase = 'birth select quiz process bid raccoon memory village snow cable agent bean';
+
+      clientA = await createClient({
+        passphrase: walletAPassphrase,
+        adapter: dal
+      });
     });
 
-    describe('valid transfer', async () => {
+    describe('valid transfers', async () => {
 
-      it('should transfer balance from one account to another', async () => {
+      let firstRecipientClient;
 
+      beforeEach(async () => {
+        // Recipient passphrase: genius shoulder into daring armor proof cycle bench patrol paper grant picture
+        let preparedTxn = clientA.prepareTransaction({
+          type: 'transfer',
+          recipientAddress: '1072f65df680b2767f55a6bcd505b68d90d227d6d8b2d340fe97aaa016ab6dd7ldpos',
+          amount: '10000000000',
+          fee: '10000000',
+          timestamp: 100000,
+          message: ''
+        });
+        await chainModule.actions.postTransaction.handler({
+          transaction: preparedTxn
+        });
+
+        await wait(7000);
+
+        firstRecipientClient = await createClient({
+          passphrase: 'genius shoulder into daring armor proof cycle bench patrol paper grant picture',
+          adapter: dal
+        });
+
+        // Recipient passphrase: sniff there advice door hand eyebrow story eyebrow brief window mushroom legend
+        let firstRecipientPreparedTxn = firstRecipientClient.prepareTransaction({
+          type: 'transfer',
+          recipientAddress: 'e8b4bf144b865240bb4ea92f5e281fbf931435f1db4698bb4328c535a8bb7351ldpos',
+          amount: '500000000',
+          fee: '10000000',
+          timestamp: 100000,
+          message: ''
+        });
+        await chainModule.actions.postTransaction.handler({
+          transaction: firstRecipientPreparedTxn
+        });
+
+        await wait(7000);
+      });
+
+      it('should update account balances', async () => {
+        let [initialSenderAccount, firstRecipientAccount, secondRecipientAccount] = await Promise.all([
+          chainModule.actions.getAccount.handler({
+            walletAddress: clientA.walletAddress
+          }),
+          chainModule.actions.getAccount.handler({
+            walletAddress: firstRecipientClient.walletAddress
+          }),
+          chainModule.actions.getAccount.handler({
+            walletAddress: 'e8b4bf144b865240bb4ea92f5e281fbf931435f1db4698bb4328c535a8bb7351ldpos'
+          })
+        ]);
+        assert.notEqual(initialSenderAccount, null);
+        assert.equal(initialSenderAccount.balance, '89990000000');
+        assert.notEqual(firstRecipientAccount, null);
+        assert.equal(firstRecipientAccount.balance, '9490000000');
+        assert.notEqual(firstRecipientAccount.sigPublicKey, firstRecipientAccount.nextSigPublicKey);
+        assert.notEqual(secondRecipientAccount, null);
+        assert.equal(secondRecipientAccount.balance, '500000000');
       });
 
     });
 
     describe('invalid transfer', async () => {
 
-      it('should send back an error', async () => {
+      it('should discard the transfer transaction', async () => {
 
       });
 
@@ -351,7 +606,7 @@ describe('Functional tests', async () => {
 
   });
 
-  describe('vote transaction', async () => {
+  describe.skip('vote transaction', async () => {
 
     beforeEach(async () => {
 
@@ -375,7 +630,7 @@ describe('Functional tests', async () => {
 
   });
 
-  describe('unvote transaction', async () => {
+  describe.skip('unvote transaction', async () => {
 
     beforeEach(async () => {
 
@@ -399,7 +654,7 @@ describe('Functional tests', async () => {
 
   });
 
-  describe('registerMultisigWallet transaction', async () => {
+  describe.skip('registerMultisigWallet transaction', async () => {
 
     beforeEach(async () => {
 
@@ -431,7 +686,7 @@ describe('Functional tests', async () => {
 
   });
 
-  describe('registerSigDetails transaction', async () => {
+  describe.skip('registerSigDetails transaction', async () => {
 
     beforeEach(async () => {
 
@@ -463,7 +718,7 @@ describe('Functional tests', async () => {
 
   });
 
-  describe('registerMultisigDetails transaction', async () => {
+  describe.skip('registerMultisigDetails transaction', async () => {
 
     beforeEach(async () => {
 
@@ -495,7 +750,7 @@ describe('Functional tests', async () => {
 
   });
 
-  describe('registerForgingDetails transaction', async () => {
+  describe.skip('registerForgingDetails transaction', async () => {
 
     beforeEach(async () => {
 

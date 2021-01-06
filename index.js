@@ -589,6 +589,7 @@ module.exports = class LDPoSChainModule {
           if (account.updateHeight == null) {
             await this.dal.upsertAccount({
               ...account,
+              balance: account.balance.toString(),
               updateHeight: height
             });
           } else if (account.updateHeight < height) {
@@ -1106,7 +1107,7 @@ module.exports = class LDPoSChainModule {
             throw new Error(
               `Failed to check if transaction ${
                 transaction.id
-              } already exited during block processing`
+              } already existed during block processing`
             );
           }
         }
