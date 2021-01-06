@@ -3,6 +3,7 @@
 const bip39 = require('bip39');
 const childProcess = require('child_process');
 const { fork } = childProcess;
+const path = require('path');
 const ProperMerkle = require('proper-merkle');
 
 let merkle = new ProperMerkle({
@@ -13,4 +14,4 @@ let mnemonic = bip39.generateMnemonic();
 
 console.log('MNEMONIC:', mnemonic);
 
-fork('./get-account-details.js', [mnemonic]);
+fork(path.resolve(__dirname, './get-account-details.js'), [mnemonic]);

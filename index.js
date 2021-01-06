@@ -1980,9 +1980,15 @@ module.exports = class LDPoSChainModule {
     }
 
     this.genesis = require(options.genesisPath || DEFAULT_GENESIS_PATH);
-    await this.dal.init({
-      genesis: this.genesis
-    });
+    try {
+      await this.dal.init({
+        genesis: this.genesis
+      });
+    } catch (error) {
+      throw new Error(
+        `Failed to initialize from genesis because of error: ${error.message}`
+      );
+    }
 
     let moduleState = {};
     if (this.maxExtraBlockSignaturesToStore >= this.delegateCount - 1) {

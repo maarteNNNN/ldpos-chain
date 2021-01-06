@@ -21,6 +21,35 @@
       "nextSigKeyIndex": 0,
       "balance": "100000000000",
       "votes": ["5c75e6041a05d266914cbf3837da81e29b4a7e66b9f9f8804809e914f6012293ldpos"]
+    },
+    {
+      "address": "04173ed83900ec9b3fcb4e0f1662b1d9770639df41cfff899cc9ae93932987d5ldpos",
+      "forgingPublicKey": "nMMXkQl+rFWzKvhOumcRR8HtyIYY/pxp0RWgTaeoBFo=",
+      "nextForgingKeyIndex": 0,
+      "multisigPublicKey": "eD99N6DH8Q9DOf3fR16MOyni1+rNOsGYhYvvenCKvNM=",
+      "nextMultisigKeyIndex": 0,
+      "sigPublicKey": "BBc+2DkA7Js/y04PFmKx2XcGOd9Bz/+JnMmuk5Mph9U=",
+      "nextSigKeyIndex": 0,
+      "balance": "20000000000",
+      "votes": ["5c75e6041a05d266914cbf3837da81e29b4a7e66b9f9f8804809e914f6012293ldpos"]
+    },
+    {
+      "address": "87f90d40b200463af0e1fabb7c4416b50f5f84354719bce04f87d8a980ac1c33ldpos",
+      "forgingPublicKey": "6bo1Cb6kkukRu/S+3eWm/VLX9MTs8zDVqodmH3XKADo=",
+      "nextForgingKeyIndex": 0,
+      "multisigPublicKey": "glTlBIg7d/ZUYDZV9izH6gNMwCC3RJT6ulRW1/RwPKs=",
+      "nextMultisigKeyIndex": 0,
+      "sigPublicKey": "h/kNQLIARjrw4fq7fEQWtQ9fhDVHGbzgT4fYqYCsHDM=",
+      "nextSigKeyIndex": 0,
+      "balance": "30000000000",
+      "votes": ["5c75e6041a05d266914cbf3837da81e29b4a7e66b9f9f8804809e914f6012293ldpos"]
+    }
+  ],
+  "multisigWallets": [
+    {
+      "address": "87f90d40b200463af0e1fabb7c4416b50f5f84354719bce04f87d8a980ac1c33ldpos",
+      "requiredSignatureCount": 2,
+      "members": ["04173ed83900ec9b3fcb4e0f1662b1d9770639df41cfff899cc9ae93932987d5ldpos", "69876bf9db624560b40c40368d762ad0b35d010820e0edfe40d0380ead464d5aldpos"]
     }
   ]
 }

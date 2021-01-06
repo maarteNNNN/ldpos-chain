@@ -10,20 +10,30 @@ class DAL {
   async init(options) {
     let { genesis } = options;
     let { accounts } = genesis;
+    let multisigWalletList = genesis.multisigWallets || [];
 
-    for (let account of accounts) {
-      let { votes, ...accountWithoutVotes } = account;
-      this.accounts[account.address] = {
-        ...accountWithoutVotes,
-        updateHeight: 0
-      };
-      for (let delegate of votes) {
-        if (!this.votes[delegate]) {
-          this.votes[delegate] = new Set();
-        }
-        this.votes[delegate].add(account.address);
-      }
-    }
+    await Promise.all(
+      accounts.map(async (account) => {
+        let { votes, ...accountWithoutVotes } = account;
+        this.accounts[account.address] = {
+          ...accountWithoutVotes,
+          updateHeight: 0
+        };
+        await Promise.all(
+          votes.map((delegateAddress) => this.upsertVote(account.address, delegateAddress))
+        );
+      })
+    );
+
+    await Promise.all(
+      multisigWalletList.map(async (multisigWallet) => {
+        await this.registerMultisigWallet(
+          multisigWallet.address,
+          multisigWallet.members,
+          multisigWallet.requiredSignatureCount
+        );
+      })
+    );
   }
 
   async getNetworkSymbol() {
