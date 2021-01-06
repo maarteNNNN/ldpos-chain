@@ -659,9 +659,10 @@ module.exports = class LDPoSChainModule {
     // Remove transactions which have been processed as part of the current block from pending transaction maps.
     for (let txn of transactions) {
       let senderTxnStream = this.pendingTransactionStreams[txn.senderAddress];
-      if (senderTxnStream) {
-        senderTxnStream.transactionInfoMap.delete(txn.id);
+      if (!senderTxnStream) {
+        continue;
       }
+      senderTxnStream.transactionInfoMap.delete(txn.id);
     }
 
     // Remove transactions which are relying on outdated keys from pending transaction maps.
@@ -670,6 +671,9 @@ module.exports = class LDPoSChainModule {
       if (senderAccount.type === ACCOUNT_TYPE_MULTISIG) {
         // For multisig, expire based on multisigPublicKey and nextMultisigPublicKey properties of member accounts.
         let senderTxnStream = this.pendingTransactionStreams[senderAddress];
+        if (!senderTxnStream) {
+          continue;
+        }
         let transactionInfoList = [...senderTxnStream.transactionInfoMap.values()];
         for (let { transaction: remainingTxn } of transactionInfoList) {
           let validMemberKeyCount = 0;
@@ -691,6 +695,9 @@ module.exports = class LDPoSChainModule {
       } else {
         // For sig, expire based on the sigPublicKey and nextSigPublicKey properties of the sender account.
         let senderTxnStream = this.pendingTransactionStreams[senderAddress];
+        if (!senderTxnStream) {
+          continue;
+        }
         let transactionInfoList = [...senderTxnStream.transactionInfoMap.values()];
         for (let { transaction: remainingTxn } of transactionInfoList) {
           if (
@@ -718,6 +725,9 @@ module.exports = class LDPoSChainModule {
     // Remove expired transactions from pending transaction maps.
     for (let senderAddress of senderAddressSet) {
       let senderTxnStream = this.pendingTransactionStreams[senderAddress];
+      if (!senderTxnStream) {
+        continue;
+      }
       let latestTxnTimestamp = latestSenderTxnTimestamps[senderAddress];
       for (let { transaction: remainingTxn } of senderTxnStream.transactionInfoMap.values()) {
         if (remainingTxn.timestamp < latestTxnTimestamp) {
