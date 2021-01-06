@@ -73,7 +73,7 @@ module.exports = class LDPoSChainModule {
     this.lastProcessedBlock = null;
     this.lastReceivedBlock = this.lastProcessedBlock;
 
-    this.verifiedBlockStream = new WritableConsumableStream();
+    this.verifiedBlockInfoStream = new WritableConsumableStream();
     this.verifiedBlockSignatureStream = new WritableConsumableStream();
     this.isActive = false;
   }
@@ -277,8 +277,8 @@ module.exports = class LDPoSChainModule {
             blockSignerMajorityCount,
             this.networkSymbol
           );
-          await this.verifyFullySignedBlock(block, this.lastProcessedBlock);
-          await this.processBlock(block, true);
+          let senderAccountDetails = await this.verifyFullySignedBlock(block, this.lastProcessedBlock);
+          await this.processBlock(block, senderAccountDetails, true);
         }
       } catch (error) {
         this.logger.warn(
@@ -291,8 +291,8 @@ module.exports = class LDPoSChainModule {
     return this.lastProcessedBlock.height;
   }
 
-  async receiveLastBlock(timeout) {
-    return this.verifiedBlockStream.once(timeout);
+  async receiveLastBlockInfo(timeout) {
+    return this.verifiedBlockInfoStream.once(timeout);
   }
 
   async receiveLastBlockSignatures(lastBlock, requiredSignatureCount, timeout) {
@@ -404,7 +404,8 @@ module.exports = class LDPoSChainModule {
     this.topActiveDelegateAddressSet = new Set(this.topActiveDelegates.map(delegate => delegate.address));
   }
 
-  async processBlock(block, synched) {
+  async processBlock(block, senderAccountDetails, synched) {
+    this.logger.info(`Started processing block ${block.id}`);
     let { transactions, height, signatures: blockSignatureList } = block;
     let senderAddressSet = new Set();
     let recipientAddressSet = new Set();
@@ -434,6 +435,9 @@ module.exports = class LDPoSChainModule {
 
     let affectedAccountList = await Promise.all(
       [...affectedAddressSet].map(async (address) => {
+        if (senderAccountDetails[address]) {
+          return senderAccountDetails[address].senderAccount;
+        }
         let account;
         try {
           account = await this.getSanitizedAccount(address);
@@ -547,6 +551,7 @@ module.exports = class LDPoSChainModule {
           });
         }
       }
+      this.logger.info(`Processed transaction ${txn.id}`);
     }
 
     let signerCount = BigInt(blockSignerAddressSet.size);
@@ -649,28 +654,79 @@ module.exports = class LDPoSChainModule {
       ...block,
       signatures: blockSignaturesToStore
     }, synched);
+    this.logger.info(`Upserted block ${block.id} into data store`);
 
+    // Remove transactions which have been processed as part of the current block from pending transaction maps.
     for (let txn of transactions) {
       let senderTxnStream = this.pendingTransactionStreams[txn.senderAddress];
       if (senderTxnStream) {
         senderTxnStream.transactionInfoMap.delete(txn.id);
+      }
+    }
 
-        let isTxnMultisig = !!txn.signatures;
-        for (let { transaction: remainingTxn } of senderTxnStream.transactionInfoMap.values()) {
-          let transactionKeyChanged;
-          if (remainingTxn.signatures) {
-            transactionKeyChanged = isTxnMultisig && remainingTxn.nextMultisigPublicKey !== txn.multisigPublicKey;
-          } else {
-            transactionKeyChanged = !isTxnMultisig && remainingTxn.nextSigPublicKey !== txn.sigPublicKey;
+    // Remove transactions which are relying on outdated keys from pending transaction maps.
+    for (let senderAddress of senderAddressSet) {
+      let senderAccount = affectedAccounts[senderAddress];
+      if (senderAccount.type === ACCOUNT_TYPE_MULTISIG) {
+        // For multisig, expire based on multisigPublicKey and nextMultisigPublicKey properties of member accounts.
+        let senderTxnStream = this.pendingTransactionStreams[senderAddress];
+        let transactionInfoList = [...senderTxnStream.transactionInfoMap.values()];
+        for (let { transaction: remainingTxn } of transactionInfoList) {
+          let validMemberKeyCount = 0;
+          for (let { signerAddress, multisigPublicKey } of remainingTxn.signatures) {
+            let memberAccount = affectedAccounts[signerAddress];
+            if (
+              multisigPublicKey === memberAccount.multisigPublicKey ||
+              multisigPublicKey === memberAccount.nextMultisigPublicKey
+            ) {
+              validMemberKeyCount++;
+            }
           }
-          if (remainingTxn.timestamp < txn.timestamp || transactionKeyChanged) {
+          // Multisig transaction should only be removed if there are not enough members with valid keys
+          // remaining based on the multisigRequiredSignatureCount property of the wallet.
+          if (validMemberKeyCount < senderAccount.multisigRequiredSignatureCount) {
             senderTxnStream.transactionInfoMap.delete(remainingTxn.id);
           }
         }
-        if (!this.isAccountStreamBusy(senderTxnStream)) {
-          senderTxnStream.close();
-          delete this.pendingTransactionStreams[txn.senderAddress];
+      } else {
+        // For sig, expire based on the sigPublicKey and nextSigPublicKey properties of the sender account.
+        let senderTxnStream = this.pendingTransactionStreams[senderAddress];
+        let transactionInfoList = [...senderTxnStream.transactionInfoMap.values()];
+        for (let { transaction: remainingTxn } of transactionInfoList) {
+          if (
+            remainingTxn.sigPublicKey !== senderAccount.sigPublicKey &&
+            remainingTxn.sigPublicKey !== senderAccount.nextSigPublicKey
+          ) {
+            senderTxnStream.transactionInfoMap.delete(remainingTxn.id);
+          }
         }
+      }
+    }
+
+    // Compute the latest timestamp for each sender account.
+    let latestSenderTxnTimestamps = {};
+    for (let txn of transactions) {
+      if (latestSenderTxnTimestamps[txn.senderAddress] == null) {
+        latestSenderTxnTimestamps[txn.senderAddress] = txn.timestamp;
+        continue;
+      }
+      if (txn.timestamp > latestSenderTxnTimestamps[txn.senderAddress]) {
+        latestSenderTxnTimestamps[txn.senderAddress] = txn.timestamp;
+      }
+    }
+
+    // Remove expired transactions from pending transaction maps.
+    for (let senderAddress of senderAddressSet) {
+      let senderTxnStream = this.pendingTransactionStreams[senderAddress];
+      let latestTxnTimestamp = latestSenderTxnTimestamps[senderAddress];
+      for (let { transaction: remainingTxn } of senderTxnStream.transactionInfoMap.values()) {
+        if (remainingTxn.timestamp < latestTxnTimestamp) {
+          senderTxnStream.transactionInfoMap.delete(remainingTxn.id);
+        }
+      }
+      if (!this.isAccountStreamBusy(senderTxnStream)) {
+        senderTxnStream.close();
+        delete this.pendingTransactionStreams[senderAddress];
       }
     }
 
@@ -682,6 +738,7 @@ module.exports = class LDPoSChainModule {
     });
 
     this.lastProcessedBlock = block;
+    this.logger.info(`Finished processing block ${block.id}`);
   }
 
   async verifyTransactionDoesNotAlreadyExist(transaction) {
@@ -1016,11 +1073,13 @@ module.exports = class LDPoSChainModule {
   }
 
   async verifyFullySignedBlock(block, lastBlock) {
-    await this.verifyForgedBlock(block, lastBlock);
+    let senderAccountDetails = await this.verifyForgedBlock(block, lastBlock);
 
     await Promise.all(
       block.signatures.map(blockSignature => this.verifyBlockSignature(block, blockSignature))
     );
+
+    return senderAccountDetails;
   }
 
   async verifyForgedBlock(block, lastBlock) {
@@ -1082,7 +1141,7 @@ module.exports = class LDPoSChainModule {
     if (!this.ldposClient.verifyBlock(block)) {
       throw new Error('Block was invalid');
     }
-    await this.verifyBlockTransactions(block);
+    return this.verifyBlockTransactions(block);
   }
 
   async verifyBlockTransactions(block) {
@@ -1132,14 +1191,23 @@ module.exports = class LDPoSChainModule {
 
     let senderAddressList = Object.keys(senderTxns);
 
-    await Promise.all(
+    let senderAccountDetailsList = await Promise.all(
       senderAddressList.map(async (senderAddress) => {
+        let senderAccountInfo;
         let senderAccount;
         let multisigMemberAccounts;
         try {
-          let result = await this.getTransactionSenderAccount(senderAddress);
+          let result = await this.getTransactionSenderAccountDetails(senderAddress);
           senderAccount = result.senderAccount;
           multisigMemberAccounts = result.multisigMemberAccounts;
+          senderAccountInfo = {
+            senderAccount: {
+              ...senderAccount
+            },
+            multisigMemberAccounts: {
+              ...multisigMemberAccounts
+            }
+          };
         } catch (error) {
           throw new Error(
             `Failed to fetch sender account ${
@@ -1170,8 +1238,18 @@ module.exports = class LDPoSChainModule {
             );
           }
         }
+        return senderAccountInfo;
       })
     );
+
+    let senderAccountDetails = {};
+    for (let { senderAccount, multisigMemberAccounts } of senderAccountDetailsList) {
+      senderAccountDetails[senderAccount.address] = {
+        senderAccount,
+        multisigMemberAccounts
+      };
+    }
+    return senderAccountDetails;
   }
 
   async verifyBlockSignature(block, blockSignature) {
@@ -1411,7 +1489,7 @@ module.exports = class LDPoSChainModule {
               let senderAccount;
               let multisigMemberAccounts;
               try {
-                let result = await this.getTransactionSenderAccount(senderAddress);
+                let result = await this.getTransactionSenderAccountDetails(senderAddress);
                 senderAccount = result.senderAccount;
                 multisigMemberAccounts = result.multisigMemberAccounts;
               } catch (err) {
@@ -1427,6 +1505,9 @@ module.exports = class LDPoSChainModule {
               }
 
               let senderTxnStream = this.pendingTransactionStreams[senderAddress];
+              if (!senderTxnStream) {
+                return;
+              }
               let pendingTxnInfoMap = senderTxnStream.transactionInfoMap;
               let pendingTxnList = [...pendingTxnInfoMap.values()].map(txnPacket => txnPacket.transaction);
 
@@ -1484,20 +1565,20 @@ module.exports = class LDPoSChainModule {
 
       try {
         // Will throw if block is not received in time.
-        let lastBlock = await this.receiveLastBlock(forgingBlockBroadcastDelay + propagationTimeout);
+        let { block, senderAccountDetails } = await this.receiveLastBlockInfo(forgingBlockBroadcastDelay + propagationTimeout);
 
         if (forgingWalletAddress && !isCurrentForgingDelegate) {
           (async () => {
             try {
-              let selfSignature = await this.signBlock(lastBlock);
-              lastBlock.signatures[selfSignature.signerAddress] = selfSignature;
+              let selfSignature = await this.signBlock(block);
+              block.signatures[selfSignature.signerAddress] = selfSignature;
               await this.wait(forgingSignatureBroadcastDelay);
-              if (this.lastDoubleForgedBlockTimestamp === lastBlock.timestamp) {
+              if (this.lastDoubleForgedBlockTimestamp === block.timestamp) {
                 throw new Error(
                   `Refused to send signature for block ${
-                    lastBlock.id
+                    block.id
                   } because delegate ${
-                    lastBlock.forgerAddress
+                    block.forgerAddress
                   } tried to double-forge`
                 );
               }
@@ -1508,9 +1589,9 @@ module.exports = class LDPoSChainModule {
           })();
         }
         // Will throw if the required number of valid signatures cannot be gathered in time.
-        await this.receiveLastBlockSignatures(lastBlock, blockSignerMajorityCount, forgingSignatureBroadcastDelay + propagationTimeout);
-        await this.processBlock(lastBlock, false);
-        this.lastFullySignedBlock = lastBlock;
+        await this.receiveLastBlockSignatures(block, blockSignerMajorityCount, forgingSignatureBroadcastDelay + propagationTimeout);
+        await this.processBlock(block, senderAccountDetails, false);
+        this.lastFullySignedBlock = block;
 
         this.nodeHeight = nextHeight;
         this.networkHeight = nextHeight;
@@ -1572,7 +1653,7 @@ module.exports = class LDPoSChainModule {
     return multisigMemberAccounts;
   }
 
-  async getTransactionSenderAccount(senderAddress) {
+  async getTransactionSenderAccountDetails(senderAddress) {
     let senderAccount;
     try {
       senderAccount = await this.getSanitizedAccount(senderAddress);
@@ -1605,6 +1686,7 @@ module.exports = class LDPoSChainModule {
   async startTransactionPropagationLoop() {
     this.channel.subscribe(`network:event:${this.alias}:transaction`, async (event) => {
       let transaction = event.data;
+
       try {
         validateTransactionSchema(
           transaction,
@@ -1679,7 +1761,7 @@ module.exports = class LDPoSChainModule {
 
       let accountStreamConsumer = accountStream.createConsumer();
 
-      accountStream.senderAccountPromise = this.getTransactionSenderAccount(senderAddress);
+      accountStream.senderAccountPromise = this.getTransactionSenderAccountDetails(senderAddress);
 
       let { senderAccount, multisigMemberAccounts } = await accountStream.senderAccountPromise;
       try {
@@ -1749,9 +1831,10 @@ module.exports = class LDPoSChainModule {
     channel.subscribe(`network:event:${this.alias}:block`, async (event) => {
       let block = event.data;
 
+      let senderAccountDetails;
       try {
         validateForgedBlockSchema(block, this.minTransactionsPerBlock, this.maxTransactionsPerBlock, this.networkSymbol);
-        await this.verifyForgedBlock(block, this.lastProcessedBlock);
+        senderAccountDetails = await this.verifyForgedBlock(block, this.lastProcessedBlock);
         let currentBlockTimeSlot = this.getCurrentBlockTimeSlot(this.forgingInterval);
         if (block.timestamp !== currentBlockTimeSlot) {
           throw new Error(
@@ -1829,7 +1912,10 @@ module.exports = class LDPoSChainModule {
       }
 
       this.lastReceivedBlock = block;
-      this.verifiedBlockStream.write(this.lastReceivedBlock);
+      this.verifiedBlockInfoStream.write({
+        block: this.lastReceivedBlock,
+        senderAccountDetails
+      });
 
       // This is a performance optimization to ensure that peers
       // will not receive multiple instances of the same block at the same time.

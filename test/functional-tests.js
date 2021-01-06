@@ -27,6 +27,12 @@ describe('Functional tests', async () => {
         dal: {
           libPath: './test/utils/dal'
         }
+      },
+      logger: {
+        info: () => {},
+        // info: (...args) => console.info.apply(console, args),
+        warn: (...args) => console.warn.apply(console, args),
+        error: (...args) => console.error.apply(console, args)
       }
     });
 
@@ -68,8 +74,8 @@ describe('Functional tests', async () => {
           forgingPassphrase: 'clerk aware give dog reopen peasant duty cheese tobacco trouble gold angle',
           minTransactionsPerBlock: 0, // Enable forging empty blocks.
           forgingInterval: 5000,
-          forgingBlockBroadcastDelay: 500,
-          forgingSignatureBroadcastDelay: 500,
+          forgingBlockBroadcastDelay: 200,
+          forgingSignatureBroadcastDelay: 200,
           propagationRandomness: 100,
           propagationTimeout: 2000
         };
@@ -140,14 +146,13 @@ describe('Functional tests', async () => {
             });
           }
 
-          await wait(7000);
+          await wait(8000);
         });
 
         it('should forge valid blocks which contain the correct number of transactions', async () => {
           let newBlocks = chainChangeEvents.map(event => event.data.block);
           let blockList = await chainModule.actions.getBlocksFromHeight.handler({ height: 1, limit: 100 });
           let totalTxnCount = 0;
-
           for (let block of blockList) {
             totalTxnCount += block.numberOfTransactions;
           }
@@ -177,6 +182,7 @@ describe('Functional tests', async () => {
       };
 
       await chainModule.load(channel, options);
+      await wait(2000);
       clientForger = await createClient({
         passphrase: options.forgingPassphrase,
         adapter: dal
@@ -211,7 +217,7 @@ describe('Functional tests', async () => {
           });
         }
 
-        await wait(7000);
+        await wait(8000);
       });
 
       it('should process all valid transactions within blocks and correctly update account balances', async () => {
@@ -281,7 +287,7 @@ describe('Functional tests', async () => {
           });
         }
 
-        await wait(12000);
+        await wait(8000);
       });
 
       afterEach(async () => {
@@ -366,7 +372,7 @@ describe('Functional tests', async () => {
           });
         }
 
-        await wait(7000);
+        await wait(8000);
       });
 
       it('should process all valid transactions within blocks and correctly update account balances', async () => {
@@ -454,7 +460,7 @@ describe('Functional tests', async () => {
           });
         }
 
-        await wait(12000);
+        await wait(8000);
       });
 
       afterEach(async () => {
@@ -550,7 +556,7 @@ describe('Functional tests', async () => {
           transaction: preparedTxn
         });
 
-        await wait(7000);
+        await wait(8000);
 
         firstRecipientClient = await createClient({
           passphrase: 'genius shoulder into daring armor proof cycle bench patrol paper grant picture',
@@ -570,7 +576,7 @@ describe('Functional tests', async () => {
           transaction: firstRecipientPreparedTxn
         });
 
-        await wait(7000);
+        await wait(8000);
       });
 
       it('should update account balances', async () => {

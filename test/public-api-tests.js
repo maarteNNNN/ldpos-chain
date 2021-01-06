@@ -24,6 +24,12 @@ describe('Public API tests', async () => {
         dal: {
           libPath: './test/utils/dal'
         }
+      },
+      logger: {
+        info: () => {},
+        // info: (...args) => console.info.apply(console, args),
+        warn: (...args) => console.warn.apply(console, args),
+        error: (...args) => console.error.apply(console, args)
       }
     });
 
