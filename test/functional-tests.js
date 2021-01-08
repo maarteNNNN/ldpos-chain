@@ -9,7 +9,7 @@ const { createClient } = require('ldpos-client');
 
 const LDPoSChainModule = require('../index');
 
-describe.only('Functional tests', async () => {
+describe('Functional tests', async () => {
   let chainModule;
   let dal;
   let channel;
@@ -636,7 +636,6 @@ describe.only('Functional tests', async () => {
   describe('vote transaction', async () => {
 
     let caughtError;
-    let activeDelegatesBeforeList;
 
     beforeEach(async () => {
       options = {
@@ -669,8 +668,6 @@ describe.only('Functional tests', async () => {
     describe('valid vote', async () => {
 
       beforeEach(async () => {
-        activeDelegatesBeforeList = await chainModule.actions.getForgingDelegates.handler();
-
         let preparedTxn = clientA.prepareTransaction({
           type: 'vote',
           delegateAddress: '69876bf9db624560b40c40368d762ad0b35d010820e0edfe40d0380ead464d5aldpos',
@@ -699,7 +696,6 @@ describe.only('Functional tests', async () => {
 
       beforeEach(async () => {
         caughtError = null;
-        activeDelegatesBeforeList = await chainModule.actions.getForgingDelegates.handler();
 
         let preparedTxn = clientA.prepareTransaction({
           type: 'vote',
@@ -733,7 +729,6 @@ describe.only('Functional tests', async () => {
 
       beforeEach(async () => {
         caughtError = null;
-        activeDelegatesBeforeList = await chainModule.actions.getForgingDelegates.handler();
 
         let preparedTxn = clientA.prepareTransaction({
           type: 'vote',
@@ -776,24 +771,97 @@ describe.only('Functional tests', async () => {
 
   });
 
-  describe.skip('unvote transaction', async () => {
+  describe('unvote transaction', async () => {
+
+    let caughtError;
 
     beforeEach(async () => {
+      options = {
+        genesisPath: './test/utils/genesis-functional.json',
+        forgingPassphrase: 'clerk aware give dog reopen peasant duty cheese tobacco trouble gold angle',
+        minTransactionsPerBlock: 0, // Enable forging empty blocks.
+        forgingInterval: 5000,
+        forgingBlockBroadcastDelay: 500,
+        forgingSignatureBroadcastDelay: 500,
+        propagationRandomness: 100,
+        propagationTimeout: 2000
+      };
 
+      await chainModule.load(channel, options);
+      clientForger = await createClient({
+        passphrase: options.forgingPassphrase,
+        adapter: dal
+      });
+
+      // Address: 69876bf9db624560b40c40368d762ad0b35d010820e0edfe40d0380ead464d5aldpos
+      walletAPassphrase = 'birth select quiz process bid raccoon memory village snow cable agent bean';
+
+      clientA = await createClient({
+        passphrase: walletAPassphrase,
+        adapter: dal
+      });
     });
 
     describe('valid unvote', async () => {
+      let activeDelegatesBeforeList;
+
+      beforeEach(async () => {
+        activeDelegatesBeforeList = await chainModule.actions.getForgingDelegates.handler();
+
+        let preparedTxn = clientA.prepareTransaction({
+          type: 'unvote',
+          delegateAddress: '5c75e6041a05d266914cbf3837da81e29b4a7e66b9f9f8804809e914f6012293ldpos',
+          fee: '20000000',
+          timestamp: 100000,
+          message: ''
+        });
+
+        await chainModule.actions.postTransaction.handler({
+          transaction: preparedTxn
+        });
+
+        await wait(8000);
+      });
 
       it('should update the top delegate list', async () => {
-
+        let account = await chainModule.actions.getAccount.handler({ walletAddress: clientA.walletAddress });
+        let activeDelegatesAfterList = await chainModule.actions.getForgingDelegates.handler();
+        assert.equal(Array.isArray(activeDelegatesAfterList), true);
+        assert.equal(activeDelegatesAfterList.length, 1);
+        let expectedVoteWeight = BigInt(activeDelegatesBeforeList[0].voteWeight) - BigInt(account.balance);
+        assert.equal(activeDelegatesAfterList[0].voteWeight, expectedVoteWeight.toString());
       });
 
     });
 
-    describe('invalid unvote', async () => {
+    describe('invalid unvote; unvoting an address which the voter is not voting for', async () => {
+
+      let caughtError;
+
+      beforeEach(async () => {
+        activeDelegatesBeforeList = await chainModule.actions.getForgingDelegates.handler();
+
+        let preparedTxn = clientA.prepareTransaction({
+          type: 'unvote',
+          delegateAddress: '04173ed83900ec9b3fcb4e0f1662b1d9770639df41cfff899cc9ae93932987d5ldpos',
+          fee: '20000000',
+          timestamp: 100000,
+          message: ''
+        });
+
+        try {
+          await chainModule.actions.postTransaction.handler({
+            transaction: preparedTxn
+          });
+        } catch (error) {
+          caughtError = error;
+        }
+
+        await wait(8000);
+      });
 
       it('should send back an error', async () => {
-
+        assert.notEqual(caughtError, null);
       });
 
     });
@@ -878,14 +946,6 @@ describe.only('Functional tests', async () => {
 
     });
 
-    describe('multiple valid registerMultisigDetails', async () => {
-
-      it('should support re-registering a wallet with a different set of public keys', async () => {
-
-      });
-
-    });
-
     describe('invalid registerMultisigDetails', async () => {
 
       it('should send back an error', async () => {
@@ -905,14 +965,6 @@ describe.only('Functional tests', async () => {
     describe('valid registerForgingDetails', async () => {
 
       it('should add all the necessary keys on the account', async () => {
-
-      });
-
-    });
-
-    describe('multiple valid registerForgingDetails', async () => {
-
-      it('should support re-registering a wallet with a different set of public keys', async () => {
 
       });
 
