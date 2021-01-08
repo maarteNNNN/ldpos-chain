@@ -12,6 +12,8 @@ const { validateBlockSignatureSchema } = require('./schemas/block-signature-sche
 const { validateMultisigTransactionSchema } = require('./schemas/multisig-transaction-schema');
 const { validateSigTransactionSchema } = require('./schemas/sig-transaction-schema');
 
+// TODO 222: As part of transaction schema verification, reject if there are additional properties which are not required.
+
 const DEFAULT_MODULE_ALIAS = 'ldpos_chain';
 const DEFAULT_GENESIS_PATH = './genesis/mainnet/genesis.json';
 const DEFAULT_CRYPTO_CLIENT_LIB_PATH = 'ldpos-client';
@@ -207,6 +209,12 @@ module.exports = class LDPoSChainModule {
       },
       getModuleOptions: {
         handler: async action => this.options
+      },
+      getForgingDelegates: {
+        handler: async action => {
+          return this.getForgingDelegates();
+        },
+        isPublic: true
       }
     };
   }
@@ -397,6 +405,10 @@ module.exports = class LDPoSChainModule {
       ...txnWithoutSignatures,
       senderSignatureHash: this.sha256(senderSignature)
     };
+  }
+
+  async getForgingDelegates() {
+    return this.topActiveDelegates;
   }
 
   async fetchTopActiveDelegates() {

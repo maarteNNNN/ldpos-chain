@@ -603,25 +603,94 @@ describe('Functional tests', async () => {
     });
 
     describe('invalid transfer', async () => {
+      let caughtError;
 
-      it('should discard the transfer transaction', async () => {
+      beforeEach(async () => {
+        // Recipient passphrase: genius shoulder into daring armor proof cycle bench patrol paper grant picture
+        let preparedTxn = clientA.prepareTransaction({
+          type: 'transfer',
+          recipientAddress: '1072f65df680b2767f55a6bcd505b68d90d227d6d8b2d340fe97aaa016ab6dd7ldpos',
+          amount: '100000000000',
+          fee: '10000000',
+          timestamp: 100000,
+          message: ''
+        });
+        try {
+          await chainModule.actions.postTransaction.handler({
+            transaction: preparedTxn
+          });
+        } catch (error) {
+          caughtError = error;
+        }
+      });
 
+      it('should throw an error', async () => {
+        assert.notEqual(caughtError, null);
+        assert.equal(caughtError.name, 'Error');
       });
 
     });
 
   });
 
-  describe.skip('vote transaction', async () => {
+  describe('vote transaction', async () => {
 
     beforeEach(async () => {
+      options = {
+        genesisPath: './test/utils/genesis-functional.json',
+        forgingPassphrase: 'clerk aware give dog reopen peasant duty cheese tobacco trouble gold angle',
+        minTransactionsPerBlock: 0, // Enable forging empty blocks.
+        forgingInterval: 5000,
+        forgingBlockBroadcastDelay: 500,
+        forgingSignatureBroadcastDelay: 500,
+        propagationRandomness: 100,
+        propagationTimeout: 2000,
+        maxVotesPerAccount: 1
+      };
 
+      await chainModule.load(channel, options);
+      clientForger = await createClient({
+        passphrase: options.forgingPassphrase,
+        adapter: dal
+      });
+
+      // Address: 69876bf9db624560b40c40368d762ad0b35d010820e0edfe40d0380ead464d5aldpos
+      walletAPassphrase = 'birth select quiz process bid raccoon memory village snow cable agent bean';
+
+      clientA = await createClient({
+        passphrase: walletAPassphrase,
+        adapter: dal
+      });
     });
 
     describe('valid vote', async () => {
+      let caughtError;
+      let activeDelegatesBeforeList;
+
+      beforeEach(async () => {
+        activeDelegatesBeforeList = await chainModule.actions.getForgingDelegates.handler();
+
+        // Recipient passphrase: genius shoulder into daring armor proof cycle bench patrol paper grant picture
+        let preparedTxn = clientA.prepareTransaction({
+          type: 'vote',
+          delegateAddress: '69876bf9db624560b40c40368d762ad0b35d010820e0edfe40d0380ead464d5aldpos',
+          fee: '20000000',
+          timestamp: 100000,
+          message: ''
+        });
+        await chainModule.actions.postTransaction.handler({
+          transaction: preparedTxn
+        });
+
+        await wait(8000);
+      });
 
       it('should update the top delegate list', async () => {
-
+        let activeDelegatesAfterList = await chainModule.actions.getForgingDelegates.handler();
+        assert.equal(Array.isArray(activeDelegatesAfterList), true);
+        assert.equal(activeDelegatesAfterList.length, 2);
+        assert.equal(activeDelegatesAfterList[1].address, '69876bf9db624560b40c40368d762ad0b35d010820e0edfe40d0380ead464d5aldpos');
+        assert.equal(activeDelegatesAfterList[1].voteWeight, '99980000000');
       });
 
     });

@@ -376,7 +376,12 @@ class DAL {
       return 0;
     });
 
-    return delegateList.slice(0, delegateCount);
+    return delegateList.slice(0, delegateCount).map((delegate) => {
+      return {
+        ...delegate,
+        voteWeight: delegate.voteWeight.toString()
+      };
+    });
   }
 }
 
