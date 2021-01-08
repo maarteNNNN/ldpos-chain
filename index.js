@@ -5,8 +5,7 @@ const WritableConsumableStream = require('writable-consumable-stream');
 const genesisBlock = require('./genesis/testnet/genesis.json');
 const pkg = require('./package.json');
 
-const { validateForgedBlockSchema } = require('./schemas/forged-block-schema');
-const { validateFullySignedBlockSchema } = require('./schemas/fully-signed-block-schema');
+const { validateBlockSchema } = require('./schemas/block-schema');
 const { validateTransactionSchema } = require('./schemas/transaction-schema');
 const { validateBlockSignatureSchema } = require('./schemas/block-signature-schema');
 const { validateMultisigTransactionSchema } = require('./schemas/multisig-transaction-schema');
@@ -276,11 +275,12 @@ module.exports = class LDPoSChainModule {
 
       try {
         for (let block of newBlocks) {
-          validateFullySignedBlockSchema(
+          validateBlockSchema(
             block,
             this.minTransactionsPerBlock,
             this.maxTransactionsPerBlock,
             blockSignerMajorityCount,
+            this.delegateCount,
             this.networkSymbol
           );
           let senderAccountDetails = await this.verifyFullySignedBlock(block, this.lastProcessedBlock);
@@ -861,6 +861,7 @@ module.exports = class LDPoSChainModule {
     validateMultisigTransactionSchema(
       transaction,
       senderAccount.multisigRequiredSignatureCount,
+      this.maxMultisigMembers,
       this.networkSymbol,
       fullCheck
     );
@@ -1898,7 +1899,7 @@ module.exports = class LDPoSChainModule {
 
       let senderAccountDetails;
       try {
-        validateForgedBlockSchema(block, this.minTransactionsPerBlock, this.maxTransactionsPerBlock, this.networkSymbol);
+        validateBlockSchema(block, this.minTransactionsPerBlock, this.maxTransactionsPerBlock, 0, 0, this.networkSymbol);
         senderAccountDetails = await this.verifyForgedBlock(block, this.lastProcessedBlock);
         let currentBlockTimeSlot = this.getCurrentBlockTimeSlot(this.forgingInterval);
         if (block.timestamp !== currentBlockTimeSlot) {

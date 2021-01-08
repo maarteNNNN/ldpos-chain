@@ -18,15 +18,18 @@ const validSignaturePropertyList = [
   'signatureHash'
 ];
 
-function validateMultisigTransactionSchema(multisigTransaction, minRequiredSignatures, networkSymbol, fullCheck) {
+function validateMultisigTransactionSchema(multisigTransaction, minSignatures, maxSignatures, networkSymbol, fullCheck) {
   if (!multisigTransaction) {
     throw new Error('Multisig transaction was not specified');
   }
-
   let { signatures } = multisigTransaction;
-
   if (!Array.isArray(signatures)) {
     throw new Error('Multisig transaction signatures must be an array');
+  }
+  if (signatures.length > maxSignatures) {
+    throw new Error(
+      `Multisig transaction contained more than the maximum number of ${maxSignatures} signatures`
+    );
   }
   let processedSignerAddressSet = new Set();
   for (let signaturePacket of signatures) {
@@ -49,8 +52,18 @@ function validateMultisigTransactionSchema(multisigTransaction, minRequiredSigna
     validateWalletAddress(signerAddress, networkSymbol);
     if (fullCheck) {
       validateSignature(signature);
+      if (signatureHash) {
+        throw new Error(
+          `Multisig transaction contained a signature object with a signatureHash property which is not allowed during a full check`
+        );
+      }
     } else {
       validateSignatureHash(signatureHash);
+      if (signature) {
+        throw new Error(
+          `Multisig transaction contained a signature object with a signature property which is not allowed during a partial check`
+        );
+      }
     }
 
     let invalidProperty = findInvalidProperty(signaturePacket, validSignaturePropertyList);
@@ -72,10 +85,10 @@ function validateMultisigTransactionSchema(multisigTransaction, minRequiredSigna
     }
     processedSignerAddressSet.add(signerAddress);
   }
-  if (processedSignerAddressSet.size < minRequiredSignatures) {
+  if (processedSignerAddressSet.size < minSignatures) {
     throw new Error(
       `Multisig transaction did not have enough member signatures - At least ${
-        minRequiredSignatures
+        minSignatures
       } distinct signatures are required`
     );
   }

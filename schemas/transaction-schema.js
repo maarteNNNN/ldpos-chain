@@ -73,6 +73,9 @@ function validateTransactionSchema(transaction, maxSpendableDigits, networkSymbo
     'signatures',
     'senderSignature',
     'senderSignatureHash',
+    'sigPublicKey',
+    'nextSigPublicKey',
+    'nextSigKeyIndex',
     ...extraValidProperties
   ];
 
