@@ -38,13 +38,13 @@ const DEFAULT_MAX_VOTES_PER_ACCOUNT = 21;
 const DEFAULT_MAX_PENDING_TRANSACTIONS_PER_ACCOUNT = 30;
 
 const DEFAULT_MIN_TRANSACTION_FEES = {
-  transfer: '1000000',
-  vote: '2000000',
-  unvote: '2000000',
-  registerSigDetails: '1000000',
-  registerMultisigDetails: '1000000',
-  registerForgingDetails: '1000000',
-  registerMultisigWallet: '5000000'
+  transfer: '10000000',
+  vote: '20000000',
+  unvote: '20000000',
+  registerSigDetails: '10000000',
+  registerMultisigDetails: '10000000',
+  registerForgingDetails: '10000000',
+  registerMultisigWallet: '50000000'
 };
 
 const NO_PEER_LIMIT = -1;
@@ -102,7 +102,7 @@ module.exports = class LDPoSChainModule {
     return {
       postTransaction: {
         handler: async action => {
-          return this.broadcastTransaction(action.transaction);
+          return this.postTransaction(action.transaction);
         },
         isPublic: true
       },
@@ -1007,7 +1007,7 @@ module.exports = class LDPoSChainModule {
     );
   }
 
-  async verifyAccountMeetsRequirements(senderAccount, transaction) {
+  verifyAccountMeetsRequirements(senderAccount, transaction) {
     let { senderAddress, amount, fee, timestamp } = transaction;
 
     if (timestamp < senderAccount.lastTransactionTimestamp) {
@@ -1613,6 +1613,30 @@ module.exports = class LDPoSChainModule {
     }
   }
 
+  async postTransaction(transaction) {
+    try {
+      validateTransactionSchema(
+        transaction,
+        this.maxSpendableDigits,
+        this.networkSymbol,
+        this.maxTransactionMessageLength,
+        this.minMultisigMembers,
+        this.maxMultisigMembers
+      );
+      let { senderAccount, multisigMemberAccounts } = await this.getTransactionSenderAccountDetails(transaction.senderAddress);
+      if (multisigMemberAccounts) {
+        await this.verifyMultisigTransactionAuth(senderAccount, multisigMemberAccounts, transaction, true);
+      } else {
+        await this.verifySigTransactionAuth(senderAccount, transaction, true);
+      }
+    } catch (error) {
+      throw new Error(
+        `Failed to post transaction because of error: ${error.message}`
+      );
+    }
+    return this.broadcastTransaction(transaction);
+  }
+
   async broadcastTransaction(transaction) {
     return this.channel.invoke('network:emit', {
       event: `${this.alias}:transaction`,
@@ -1708,7 +1732,7 @@ module.exports = class LDPoSChainModule {
         );
       } catch (error) {
         this.logger.warn(
-          new Error(`Received invalid transaction ${transaction.id} - ${error.message}`)
+          new Error(`Received invalid transaction ${transaction.id} from network - ${error.message}`)
         );
         return;
       }
@@ -1751,7 +1775,7 @@ module.exports = class LDPoSChainModule {
         } catch (error) {
           this.logger.warn(
             new Error(
-              `Received invalid transaction from network - ${error.message}`
+              `Received unauthorized transaction ${transaction.id} from network - ${error.message}`
             )
           );
           accountStream.pendingTransactionVerificationCount--;
