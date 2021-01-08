@@ -9,7 +9,7 @@ const { createClient } = require('ldpos-client');
 
 const LDPoSChainModule = require('../index');
 
-describe('Functional tests', async () => {
+describe.only('Functional tests', async () => {
   let chainModule;
   let dal;
   let channel;
@@ -606,6 +606,7 @@ describe('Functional tests', async () => {
       let caughtError;
 
       beforeEach(async () => {
+        caughtError = null;
         // Recipient passphrase: genius shoulder into daring armor proof cycle bench patrol paper grant picture
         let preparedTxn = clientA.prepareTransaction({
           type: 'transfer',
@@ -626,7 +627,6 @@ describe('Functional tests', async () => {
 
       it('should throw an error', async () => {
         assert.notEqual(caughtError, null);
-        assert.equal(caughtError.name, 'Error');
       });
 
     });
@@ -634,6 +634,9 @@ describe('Functional tests', async () => {
   });
 
   describe('vote transaction', async () => {
+
+    let caughtError;
+    let activeDelegatesBeforeList;
 
     beforeEach(async () => {
       options = {
@@ -645,7 +648,7 @@ describe('Functional tests', async () => {
         forgingSignatureBroadcastDelay: 500,
         propagationRandomness: 100,
         propagationTimeout: 2000,
-        maxVotesPerAccount: 1
+        maxVotesPerAccount: 2
       };
 
       await chainModule.load(channel, options);
@@ -664,13 +667,10 @@ describe('Functional tests', async () => {
     });
 
     describe('valid vote', async () => {
-      let caughtError;
-      let activeDelegatesBeforeList;
 
       beforeEach(async () => {
         activeDelegatesBeforeList = await chainModule.actions.getForgingDelegates.handler();
 
-        // Recipient passphrase: genius shoulder into daring armor proof cycle bench patrol paper grant picture
         let preparedTxn = clientA.prepareTransaction({
           type: 'vote',
           delegateAddress: '69876bf9db624560b40c40368d762ad0b35d010820e0edfe40d0380ead464d5aldpos',
@@ -695,10 +695,81 @@ describe('Functional tests', async () => {
 
     });
 
-    describe('invalid vote', async () => {
+    describe('invalid vote; already voted for delegate', async () => {
+
+      beforeEach(async () => {
+        caughtError = null;
+        activeDelegatesBeforeList = await chainModule.actions.getForgingDelegates.handler();
+
+        let preparedTxn = clientA.prepareTransaction({
+          type: 'vote',
+          delegateAddress: '5c75e6041a05d266914cbf3837da81e29b4a7e66b9f9f8804809e914f6012293ldpos',
+          fee: '20000000',
+          timestamp: 100000,
+          message: ''
+        });
+        try {
+          await chainModule.actions.postTransaction.handler({
+            transaction: preparedTxn
+          });
+        } catch (error) {
+          caughtError = error;
+        }
+
+        await wait(8000);
+      });
 
       it('should send back an error', async () => {
+        // Note that if we post multiple transactions for the same delegate in quick
+        // succession, then both could end up being processed but one will be a no-op.
+        // This error will only occur if the previous vote has already settled into a
+        // block as is the case here.
+        assert.notEqual(caughtError, null);
+      });
 
+    });
+
+    describe('invalid vote; exceeded maximum number of votes per account', async () => {
+
+      beforeEach(async () => {
+        caughtError = null;
+        activeDelegatesBeforeList = await chainModule.actions.getForgingDelegates.handler();
+
+        let preparedTxn = clientA.prepareTransaction({
+          type: 'vote',
+          delegateAddress: '69876bf9db624560b40c40368d762ad0b35d010820e0edfe40d0380ead464d5aldpos',
+          fee: '20000000',
+          timestamp: 100000,
+          message: ''
+        });
+        await chainModule.actions.postTransaction.handler({
+          transaction: preparedTxn
+        });
+
+        let secondPreparedTxn = clientA.prepareTransaction({
+          type: 'vote',
+          delegateAddress: '04173ed83900ec9b3fcb4e0f1662b1d9770639df41cfff899cc9ae93932987d5ldpos',
+          fee: '20000000',
+          timestamp: 100000,
+          message: ''
+        });
+        try {
+          await chainModule.actions.postTransaction.handler({
+            transaction: secondPreparedTxn
+          });
+        } catch (error) {
+          caughtError = error;
+        }
+
+        await wait(8000);
+      });
+
+      it('should send back an error', async () => {
+        let activeDelegatesAfterList = await chainModule.actions.getForgingDelegates.handler();
+        // A vote transaction may be accepted even if it turns out of be a no-op.
+        assert.equal(caughtError, null);
+        assert.equal(Array.isArray(activeDelegatesAfterList), true);
+        assert.equal(activeDelegatesAfterList.length, 2);
       });
 
     });

@@ -628,6 +628,27 @@ module.exports = class LDPoSChainModule {
     for (let voteChange of voteChangeList) {
       try {
         if (voteChange.type === 'vote') {
+          let accountVotes;
+          try {
+            accountVotes = await this.dal.getAccountVotes(voteChange.voterAddress);
+          } catch (error) {
+            if (error.name !== 'VoterAccountDidNotExistError') {
+              throw error;
+            }
+            accountVotes = [];
+          }
+          if (accountVotes.length >= this.maxVotesPerAccount) {
+            let error = new Error(
+              `Voter ${
+                voteChange.voterAddress
+              } exceeded the maximum amount of ${
+                this.maxVotesPerAccount
+              } votes`
+            );
+            error.name = 'VoterAccountExceededMaxVotesError';
+            error.type = 'InvalidActionError';
+            throw error;
+          }
           await this.dal.upsertVote(voteChange.voterAddress, voteChange.delegateAddress);
         } else if (voteChange.type === 'unvote') {
           await this.dal.removeVote(voteChange.voterAddress, voteChange.delegateAddress);
@@ -922,7 +943,7 @@ module.exports = class LDPoSChainModule {
     let votes = await this.dal.getAccountVotes(senderAddress);
     let voteSet = new Set(votes);
 
-    if (voteSet.size > this.maxVotesPerAccount) {
+    if (voteSet.size >= this.maxVotesPerAccount) {
       throw new Error(
         `Voter account ${
           senderAddress

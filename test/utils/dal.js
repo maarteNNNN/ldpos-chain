@@ -123,7 +123,16 @@ class DAL {
     if (!this.votes[delegateAddress]) {
       this.votes[delegateAddress] = new Set();
     }
-    this.votes[delegateAddress].add(voterAddress);
+    let delegateVoterSet = this.votes[delegateAddress];
+    if (delegateVoterSet.has(voterAddress)) {
+      let error = new Error(
+        `Voter ${voterAddress} already voted for delegate ${delegateAddress}`
+      );
+      error.name = 'VoterAlreadyVotedForDelegateError';
+      error.type = 'InvalidActionError';
+      throw error;
+    }
+    delegateVoterSet.add(voterAddress);
   }
 
   async removeVote(voterAddress, delegateAddress) {
