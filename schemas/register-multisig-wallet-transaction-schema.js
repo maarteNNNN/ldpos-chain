@@ -31,6 +31,8 @@ function validateRegisterMultisigWalletTransactionSchema(transaction, minMultisi
   for (let memberAddress of transaction.memberAddresses) {
     validateWalletAddress(memberAddress, networkSymbol);
   }
+
+  return ['requiredSignatureCount', 'memberAddresses'];
 }
 
 module.exports = {

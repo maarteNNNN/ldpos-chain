@@ -7,6 +7,8 @@ function validateVoteTransactionSchema(transaction, networkSymbol) {
     throw new Error('Vote transaction was not specified');
   }
   validateWalletAddress(transaction.delegateAddress, networkSymbol);
+
+  return ['delegateAddress'];
 }
 
 module.exports = {

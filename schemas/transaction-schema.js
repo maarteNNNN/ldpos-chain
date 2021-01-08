@@ -12,6 +12,7 @@ const { validateRegisterSigDetailsTransactionSchema } = require('./register-sig-
 const { validateRegisterMultisigDetailsTransactionSchema } = require('./register-multisig-details-transaction-schema');
 const { validateRegisterForgingDetailsTransactionSchema } = require('./register-forging-details-transaction-schema');
 const { validateRegisterMultisigWalletTransactionSchema } = require('./register-multisig-wallet-transaction-schema');
+const { findInvalidProperty } = require('./find-invalid-property');
 
 function validateTransactionSchema(transaction, maxSpendableDigits, networkSymbol, maxTransactionMessageLength, minMultisigMembers, maxMultisigMembers) {
   if (!transaction) {
@@ -32,29 +33,54 @@ function validateTransactionSchema(transaction, maxSpendableDigits, networkSymbo
       'Transaction type must be a string which refers to one of the supported transaction types'
     );
   }
+
   validateWalletAddress(transaction.senderAddress, networkSymbol);
   validateTransactionFee(transaction.fee, maxSpendableDigits);
   validateTimestamp(transaction.timestamp);
   validateTransactionMessage(transaction.message, maxTransactionMessageLength);
 
+  let extraValidProperties;
   if (type === 'transfer') {
-    validateTransferTransactionSchema(transaction, maxSpendableDigits, networkSymbol);
+    extraValidProperties = validateTransferTransactionSchema(transaction, maxSpendableDigits, networkSymbol);
   } else if (type === 'vote') {
-    validateVoteTransactionSchema(transaction, networkSymbol);
+    extraValidProperties = validateVoteTransactionSchema(transaction, networkSymbol);
   } else if (type === 'unvote') {
-    validateUnvoteTransactionSchema(transaction, networkSymbol);
+    extraValidProperties = validateUnvoteTransactionSchema(transaction, networkSymbol);
   } else if (type === 'registerSigDetails') {
-    validateRegisterSigDetailsTransactionSchema(transaction);
+    extraValidProperties = validateRegisterSigDetailsTransactionSchema(transaction);
   } else if (type === 'registerMultisigDetails') {
-    validateRegisterMultisigDetailsTransactionSchema(transaction);
+    extraValidProperties = validateRegisterMultisigDetailsTransactionSchema(transaction);
   } else if (type === 'registerForgingDetails') {
-    validateRegisterForgingDetailsTransactionSchema(transaction);
+    extraValidProperties = validateRegisterForgingDetailsTransactionSchema(transaction);
   } else if (type === 'registerMultisigWallet') {
-    validateRegisterMultisigWalletTransactionSchema(
+    extraValidProperties = validateRegisterMultisigWalletTransactionSchema(
       transaction,
       minMultisigMembers,
       maxMultisigMembers,
       networkSymbol
+    );
+  } else {
+    extraValidProperties = [];
+  }
+
+  let validPropertyList = [
+    'id',
+    'type',
+    'senderAddress',
+    'fee',
+    'timestamp',
+    'message',
+    'signatures',
+    'senderSignature',
+    'senderSignatureHash',
+    ...extraValidProperties
+  ];
+
+  let invalidProperty = findInvalidProperty(transaction, validPropertyList);
+
+  if (invalidProperty) {
+    throw new Error(
+      `Transaction had an invalid ${invalidProperty} property`
     );
   }
 }

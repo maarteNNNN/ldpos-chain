@@ -9,6 +9,8 @@ function validateTransferTransactionSchema(transaction, maxSpendableDigits, netw
   }
   validateWalletAddress(transaction.recipientAddress, networkSymbol);
   validateTransactionAmount(transaction.amount, maxSpendableDigits);
+
+  return ['recipientAddress', 'amount'];
 }
 
 module.exports = {

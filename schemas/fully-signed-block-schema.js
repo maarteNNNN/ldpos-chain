@@ -14,12 +14,12 @@ function validateFullySignedBlockSchema(block, minTransactionsPerBlock, maxTrans
         `Fully signed block contained a second signature from the block forger ${forgerAddress}`
       );
     }
+    if (signerSet.has(blockSignature.signerAddress)) {
+      throw new Error(
+        `Fully signed block contained a duplicate signature`
+      );
+    }
     signerSet.add(blockSignature.signerAddress);
-  }
-  if (signerSet.size !== signatures.length) {
-    throw new Error(
-      `Fully signed block contained duplicate signatures`
-    );
   }
   if (signerSet.size < minRequiredSignatures) {
     throw new Error(

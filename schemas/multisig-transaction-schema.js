@@ -7,6 +7,17 @@ const {
   validateNextMultisigKeyIndex
 } = require('./primitives');
 
+const { findInvalidProperty } = require('./find-invalid-property');
+
+const validSignaturePropertyList = [
+  'signerAddress',
+  'multisigPublicKey',
+  'nextMultisigPublicKey',
+  'nextMultisigKeyIndex',
+  'signature',
+  'signatureHash'
+];
+
 function validateMultisigTransactionSchema(multisigTransaction, minRequiredSignatures, networkSymbol, fullCheck) {
   if (!multisigTransaction) {
     throw new Error('Multisig transaction was not specified');
@@ -40,6 +51,16 @@ function validateMultisigTransactionSchema(multisigTransaction, minRequiredSigna
       validateSignature(signature);
     } else {
       validateSignatureHash(signatureHash);
+    }
+
+    let invalidProperty = findInvalidProperty(signaturePacket, validSignaturePropertyList);
+
+    if (invalidProperty) {
+      throw new Error(
+        `Multisig transaction contained a signature object with an invalid ${
+          invalidProperty
+        } property`
+      );
     }
 
     if (processedSignerAddressSet.has(signerAddress)) {

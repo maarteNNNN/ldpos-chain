@@ -10,6 +10,22 @@ const {
   validateSignature
 } = require('./primitives');
 
+const { findInvalidProperty } = require('./find-invalid-property');
+
+const validPropertyList = [
+  'id',
+  'height',
+  'timestamp',
+  'previousBlockId',
+  'transactions',
+  'forgerAddress',
+  'forgingPublicKey',
+  'nextForgingPublicKey',
+  'nextForgingKeyIndex',
+  'forgerSignature',
+  'signatures'
+];
+
 function validateForgedBlockSchema(block, minTransactionsPerBlock, maxTransactionsPerBlock, networkSymbol) {
   if (!block) {
     throw new Error('Block was not specified');
@@ -40,6 +56,14 @@ function validateForgedBlockSchema(block, minTransactionsPerBlock, maxTransactio
   validateSignature(block.forgerSignature);
   if (!Array.isArray(block.signatures)) {
     throw new Error('Block signatures must be an array');
+  }
+
+  let invalidProperty = findInvalidProperty(block, validPropertyList);
+
+  if (invalidProperty) {
+    throw new Error(
+      `Block had an invalid ${invalidProperty} property`
+    );
   }
 }
 

@@ -4,6 +4,14 @@ const {
   validateNextForgingKeyIndex
 } = require('./primitives');
 
+const { findInvalidProperty } = require('./find-invalid-property');
+
+const validDetailsPropertyList = [
+  'forgingPublicKey',
+  'nextForgingPublicKey',
+  'nextForgingKeyIndex'
+];
+
 function validateRegisterForgingDetailsTransactionSchema(transaction) {
   if (!transaction) {
     throw new Error('Register forging details transaction was not specified');
@@ -17,6 +25,16 @@ function validateRegisterForgingDetailsTransactionSchema(transaction) {
   validateForgingPublicKey(details.forgingPublicKey);
   validateNextForgingPublicKey(details.nextForgingPublicKey);
   validateNextForgingKeyIndex(details.nextForgingKeyIndex);
+
+  let invalidProperty = findInvalidProperty(details, validDetailsPropertyList);
+
+  if (invalidProperty) {
+    throw new Error(
+      `Register forging details transaction had a details object with an invalid ${invalidProperty} property`
+    );
+  }
+
+  return ['details'];
 }
 
 module.exports = {
