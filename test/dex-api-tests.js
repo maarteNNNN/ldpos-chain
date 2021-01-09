@@ -352,13 +352,13 @@ describe('DEX API tests', async () => {
         assert.equal(Array.isArray(transactions), true);
         assert.equal(transactions.length, 4);
         assert.equal(transactions[0].senderAddress, clientForger.walletAddress);
-        assert.equal(transactions[0].id, 'uAE8E6L5BZ7OHK8td/tcv56sgSTgpP1bnccjTLOP9M4=');
+        assert.equal(transactions[0].id, 'IFSFLr5d2WZjFhwSqFG/DDZMVFj4WkgeINaacYayvPw=');
         assert.equal(transactions[1].senderAddress, clientForger.walletAddress);
-        assert.equal(transactions[1].id, '1kgPUrJ3HPCLu2VGlwOyR6nkb4sR6z6dQLOJ8Dl7QKM=');
+        assert.equal(transactions[1].id, 'kTINYDSiniXS3bz7GSBdOvPiiZ7Pkc0hn5TjD8REx10=');
         assert.equal(transactions[2].senderAddress, clientForger.walletAddress);
-        assert.equal(transactions[2].id, '1u3yf3LQ8uf3f1jaDAgvYZKCw0zus74VTFNBOlHyEew=');
+        assert.equal(transactions[2].id, 'ju6kifm5fvITER36Ie4tCfMrDsEm7gispApnMMODVBk=');
         assert.equal(transactions[3].senderAddress, clientForger.walletAddress);
-        assert.equal(transactions[3].id, 'bH+gZE+ruBySeUtr3MQXu7ONqKIba1PsmQcpbCx9oXE=');
+        assert.equal(transactions[3].id, 'ugmTFF879DkZe05axfpR6XbJgW0VGQLhDOgnvyDkc+A=');
 
         for (let txn of transactions) {
           assert.equal(typeof txn.id, 'string');
@@ -378,11 +378,11 @@ describe('DEX API tests', async () => {
         assert.equal(Array.isArray(transactions), true);
         assert.equal(transactions.length, 3);
         assert.equal(transactions[0].senderAddress, clientForger.walletAddress);
-        assert.equal(transactions[0].id, '1kgPUrJ3HPCLu2VGlwOyR6nkb4sR6z6dQLOJ8Dl7QKM=');
+        assert.equal(transactions[0].id, 'kTINYDSiniXS3bz7GSBdOvPiiZ7Pkc0hn5TjD8REx10=');
         assert.equal(transactions[1].senderAddress, clientForger.walletAddress);
-        assert.equal(transactions[1].id, '1u3yf3LQ8uf3f1jaDAgvYZKCw0zus74VTFNBOlHyEew=');
+        assert.equal(transactions[1].id, 'ju6kifm5fvITER36Ie4tCfMrDsEm7gispApnMMODVBk=');
         assert.equal(transactions[2].senderAddress, clientForger.walletAddress);
-        assert.equal(transactions[2].id, 'bH+gZE+ruBySeUtr3MQXu7ONqKIba1PsmQcpbCx9oXE=');
+        assert.equal(transactions[2].id, 'ugmTFF879DkZe05axfpR6XbJgW0VGQLhDOgnvyDkc+A=');
       });
 
       it('should limit the number of transactions based on the specified limit', async () => {
@@ -394,7 +394,7 @@ describe('DEX API tests', async () => {
         assert.equal(Array.isArray(transactions), true);
         assert.equal(transactions.length, 1);
         assert.equal(transactions[0].senderAddress, clientForger.walletAddress);
-        assert.equal(transactions[0].id, 'uAE8E6L5BZ7OHK8td/tcv56sgSTgpP1bnccjTLOP9M4=');
+        assert.equal(transactions[0].id, 'IFSFLr5d2WZjFhwSqFG/DDZMVFj4WkgeINaacYayvPw=');
       });
 
       it('should return an empty array if no transactions can be matched', async () => {
@@ -430,7 +430,7 @@ describe('DEX API tests', async () => {
         assert.equal(typeof txn.recipientAddress, 'string');
 
         assert.equal(transactions[0].recipientAddress, recipientAddress);
-        assert.equal(transactions[0].id, '1kgPUrJ3HPCLu2VGlwOyR6nkb4sR6z6dQLOJ8Dl7QKM=');
+        assert.equal(transactions[0].id, 'kTINYDSiniXS3bz7GSBdOvPiiZ7Pkc0hn5TjD8REx10=');
       });
 
       it('should return an empty array if no transactions match the specified blockId', async () => {
@@ -476,9 +476,9 @@ describe('DEX API tests', async () => {
         }
 
         assert.equal(transactions[0].senderAddress, clientForger.walletAddress);
-        assert.equal(transactions[0].id, 'uAE8E6L5BZ7OHK8td/tcv56sgSTgpP1bnccjTLOP9M4=');
+        assert.equal(transactions[0].id, 'IFSFLr5d2WZjFhwSqFG/DDZMVFj4WkgeINaacYayvPw=');
         assert.equal(transactions[1].senderAddress, clientForger.walletAddress);
-        assert.equal(transactions[1].id, '1kgPUrJ3HPCLu2VGlwOyR6nkb4sR6z6dQLOJ8Dl7QKM=');
+        assert.equal(transactions[1].id, 'kTINYDSiniXS3bz7GSBdOvPiiZ7Pkc0hn5TjD8REx10=');
       });
 
       it('should return transactions with a valid signatures property if transaction is from a multisig wallet', async () => {
