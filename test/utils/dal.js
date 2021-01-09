@@ -58,7 +58,7 @@ class DAL {
       error.type = 'InvalidActionError';
       throw error;
     }
-    return account;
+    return {...account};
   }
 
   async updateAccount(walletAddress, changePacket) {
@@ -199,7 +199,7 @@ class DAL {
       }
     }
     multisigAccount.type = 'multisig';
-    multisigAccount.multisigRequiredSignatureCount = requiredSignatureCount;
+    multisigAccount.requiredSignatureCount = requiredSignatureCount;
     this.multisigMembers[multisigAddress] = new Set(memberAddresses);
   }
 

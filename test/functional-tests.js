@@ -338,11 +338,13 @@ describe('Functional tests', async () => {
 
       beforeEach(async () => {
 
+        // Address: 87f90d40b200463af0e1fabb7c4416b50f5f84354719bce04f87d8a980ac1c33ldpos
         multisigClient = await createClient({
           passphrase: 'guitar sight absurd copper right amount habit boat trigger bundle high pudding',
           adapter: dal
         });
 
+        // Address: 04173ed83900ec9b3fcb4e0f1662b1d9770639df41cfff899cc9ae93932987d5ldpos
         clientB = await createClient({
           passphrase: 'trip timber saddle fine shock orbit lamp nominee subject pledge random wedding',
           adapter: dal
@@ -773,8 +775,6 @@ describe('Functional tests', async () => {
 
   describe('unvote transaction', async () => {
 
-    let caughtError;
-
     beforeEach(async () => {
       options = {
         genesisPath: './test/utils/genesis-functional.json',
@@ -868,88 +868,399 @@ describe('Functional tests', async () => {
 
   });
 
-  describe.skip('registerMultisigWallet transaction', async () => {
+  describe('registerMultisigWallet transaction', async () => {
 
     beforeEach(async () => {
+      options = {
+        genesisPath: './test/utils/genesis-functional.json',
+        forgingPassphrase: 'clerk aware give dog reopen peasant duty cheese tobacco trouble gold angle',
+        minTransactionsPerBlock: 0, // Enable forging empty blocks.
+        forgingInterval: 5000,
+        forgingBlockBroadcastDelay: 500,
+        forgingSignatureBroadcastDelay: 500,
+        propagationRandomness: 100,
+        propagationTimeout: 3000
+      };
 
+      await chainModule.load(channel, options);
+      clientForger = await createClient({
+        passphrase: options.forgingPassphrase,
+        adapter: dal
+      });
+
+      // Address: 69876bf9db624560b40c40368d762ad0b35d010820e0edfe40d0380ead464d5aldpos
+      clientA = await createClient({
+        passphrase: 'birth select quiz process bid raccoon memory village snow cable agent bean',
+        adapter: dal
+      });
+
+      // Address: 04173ed83900ec9b3fcb4e0f1662b1d9770639df41cfff899cc9ae93932987d5ldpos
+      clientB = await createClient({
+        passphrase: 'trip timber saddle fine shock orbit lamp nominee subject pledge random wedding',
+        adapter: dal
+      });
     });
 
     describe('valid registerMultisigWallet', async () => {
 
-      it('should convert sig account into multisig wallet', async () => {
+      let caughtError;
 
+      beforeEach(async () => {
+        let preparedTxn = clientA.prepareTransaction({
+          type: 'registerMultisigWallet',
+          requiredSignatureCount: 2,
+          memberAddresses: [
+            '5c75e6041a05d266914cbf3837da81e29b4a7e66b9f9f8804809e914f6012293ldpos',
+            '04173ed83900ec9b3fcb4e0f1662b1d9770639df41cfff899cc9ae93932987d5ldpos'
+          ],
+          fee: '50000000',
+          timestamp: 100000,
+          message: ''
+        });
+
+        await chainModule.actions.postTransaction.handler({
+          transaction: preparedTxn
+        });
+
+        await wait(8000);
+
+        // Recipient passphrase: genius shoulder into daring armor proof cycle bench patrol paper grant picture
+        let preparedTransferTxn = clientA.prepareTransaction({
+          type: 'transfer',
+          recipientAddress: '1072f65df680b2767f55a6bcd505b68d90d227d6d8b2d340fe97aaa016ab6dd7ldpos',
+          amount: '12300000000',
+          fee: '10000000',
+          timestamp: 100000,
+          message: ''
+        });
+        try {
+          await chainModule.actions.postTransaction.handler({
+            transaction: preparedTransferTxn
+          });
+        } catch (error) {
+          caughtError = error;
+        }
+
+        await wait(8000);
+      });
+
+      it('should convert sig account into multisig wallet', async () => {
+        let account = await chainModule.actions.getAccount.handler({ walletAddress: clientA.walletAddress });
+        assert.equal(account.type, 'multisig');
+        assert.equal(account.balance, '99950000000');
+        assert.notEqual(caughtError, null);
       });
 
     });
 
     describe('multiple valid registerMultisigWallet', async () => {
 
-      it('should support re-registering an existing multisig wallet with a different set of member addresses', async () => {
+      let accountBefore;
+      let accountAfter;
 
+      beforeEach(async () => {
+        let preparedTxn = clientA.prepareTransaction({
+          type: 'registerMultisigWallet',
+          requiredSignatureCount: 2,
+          memberAddresses: [
+            '5c75e6041a05d266914cbf3837da81e29b4a7e66b9f9f8804809e914f6012293ldpos',
+            '04173ed83900ec9b3fcb4e0f1662b1d9770639df41cfff899cc9ae93932987d5ldpos'
+          ],
+          fee: '50000000',
+          timestamp: 100000,
+          message: ''
+        });
+
+        await chainModule.actions.postTransaction.handler({
+          transaction: preparedTxn
+        });
+
+        await wait(8000);
+
+        accountBefore = await chainModule.actions.getAccount.handler({ walletAddress: clientA.walletAddress });
+
+        let preparedTxnB = clientA.prepareMultisigTransaction({
+          type: 'registerMultisigWallet',
+          requiredSignatureCount: 1,
+          memberAddresses: [
+            '5c75e6041a05d266914cbf3837da81e29b4a7e66b9f9f8804809e914f6012293ldpos'
+          ],
+          fee: '50000000',
+          timestamp: 100000,
+          message: ''
+        });
+
+        let signatureA = clientForger.signMultisigTransaction(preparedTxnB);
+        let signatureB = clientB.signMultisigTransaction(preparedTxnB);
+
+        clientA.attachMultisigTransactionSignature(preparedTxnB, signatureA);
+        clientA.attachMultisigTransactionSignature(preparedTxnB, signatureB);
+
+        await chainModule.actions.postTransaction.handler({
+          transaction: preparedTxnB
+        });
+
+        await wait(8000);
+
+        accountAfter = await chainModule.actions.getAccount.handler({ walletAddress: clientA.walletAddress });
+      });
+
+      it('should support re-registering an existing multisig wallet with a different set of member addresses', async () => {
+        assert.equal(accountBefore.requiredSignatureCount, 2);
+        assert.equal(accountAfter.requiredSignatureCount, 1);
+        assert.equal(accountAfter.balance, '99900000000');
       });
 
     });
 
     describe('invalid registerMultisigWallet', async () => {
 
-      it('should send back an error', async () => {
+      let caughtError;
 
+      beforeEach(async () => {
+        let preparedTxn = clientA.prepareTransaction({
+          type: 'registerMultisigWallet',
+          requiredSignatureCount: 3,
+          memberAddresses: [
+            '5c75e6041a05d266914cbf3837da81e29b4a7e66b9f9f8804809e914f6012293ldpos',
+            '04173ed83900ec9b3fcb4e0f1662b1d9770639df41cfff899cc9ae93932987d5ldpos'
+          ],
+          fee: '50000000',
+          timestamp: 100000,
+          message: ''
+        });
+
+        try {
+          await chainModule.actions.postTransaction.handler({
+            transaction: preparedTxn
+          });
+        } catch (error) {
+          caughtError = error;
+        }
+
+        await wait(8000);
+      });
+
+      it('should send back an error', async () => {
+        assert.notEqual(caughtError, null);
       });
 
     });
 
   });
 
-  describe.skip('registerSigDetails transaction', async () => {
+  describe('registerSigDetails transaction', async () => {
+
+    let caughtError;
 
     beforeEach(async () => {
+      caughtError = null;
 
+      options = {
+        genesisPath: './test/utils/genesis-functional.json',
+        forgingPassphrase: 'clerk aware give dog reopen peasant duty cheese tobacco trouble gold angle',
+        minTransactionsPerBlock: 0, // Enable forging empty blocks.
+        forgingInterval: 5000,
+        forgingBlockBroadcastDelay: 500,
+        forgingSignatureBroadcastDelay: 500,
+        propagationRandomness: 100,
+        propagationTimeout: 3000
+      };
+
+      await chainModule.load(channel, options);
+      clientForger = await createClient({
+        passphrase: options.forgingPassphrase,
+        adapter: dal
+      });
+
+      // Address: 69876bf9db624560b40c40368d762ad0b35d010820e0edfe40d0380ead464d5aldpos
+      clientA = await createClient({
+        passphrase: 'birth select quiz process bid raccoon memory village snow cable agent bean',
+        adapter: dal
+      });
     });
 
     describe('valid registerSigDetails', async () => {
 
-      it('should add all the necessary keys on the account', async () => {
+      beforeEach(async () => {
+        let preparedTxn = clientA.prepareTransaction({
+          type: 'registerSigDetails',
+          details: {
+            sigPublicKey: clientForger.getSigPublicKey(),
+            nextSigPublicKey: clientForger.getNextSigPublicKey(),
+            nextSigKeyIndex: clientForger.sigKeyIndex + 1
+          },
+          fee: '10000000',
+          timestamp: 100000,
+          message: ''
+        });
 
+        await chainModule.actions.postTransaction.handler({
+          transaction: preparedTxn
+        });
+
+        await wait(8000);
+
+        // Should allow control of an account to be transferred to a different user.
+
+        // Recipient passphrase: genius shoulder into daring armor proof cycle bench patrol paper grant picture
+        let preparedTxnB = clientForger.prepareTransaction({
+          type: 'transfer',
+          recipientAddress: '1072f65df680b2767f55a6bcd505b68d90d227d6d8b2d340fe97aaa016ab6dd7ldpos',
+          amount: '2000000000',
+          fee: '10000000',
+          timestamp: 100000,
+          message: '',
+          senderAddress: '69876bf9db624560b40c40368d762ad0b35d010820e0edfe40d0380ead464d5aldpos'
+        });
+
+        try {
+          await chainModule.actions.postTransaction.handler({
+            transaction: preparedTxnB
+          });
+        } catch (error) {
+          caughtError = error;
+        }
+
+        await wait(8000);
       });
 
-    });
-
-    describe('multiple valid registerSigDetails', async () => {
-
-      it('should support re-registering a wallet with a different set of public keys', async () => {
-
+      it('should add all the necessary keys on the account', async () => {
+        let account = await chainModule.actions.getAccount.handler({ walletAddress: clientA.walletAddress });
+        assert.equal(caughtError, null);
+        assert.equal(account.balance, '97980000000');
       });
 
     });
 
     describe('invalid registerSigDetails', async () => {
 
-      it('should send back an error', async () => {
+      beforeEach(async () => {
+        let preparedTxn = clientA.prepareTransaction({
+          type: 'registerSigDetails',
+          details: {
+            sigPublicKey: clientForger.getSigPublicKey(),
+            nextSigPublicKey: clientForger.getNextSigPublicKey(),
+            nextSigKeyIndex: -1
+          },
+          fee: '10000000',
+          timestamp: 100000,
+          message: ''
+        });
 
+        try {
+          await chainModule.actions.postTransaction.handler({
+            transaction: preparedTxn
+          });
+        } catch (error) {
+          caughtError = error;
+        }
+
+        await wait(8000);
+      });
+
+      it('should send back an error', async () => {
+        assert.notEqual(caughtError, null);
       });
 
     });
 
   });
 
-  describe.skip('registerMultisigDetails transaction', async () => {
+  describe('registerMultisigDetails transaction', async () => {
+
+    let caughtError;
 
     beforeEach(async () => {
+      caughtError = null;
 
+      options = {
+        genesisPath: './test/utils/genesis-functional.json',
+        forgingPassphrase: 'clerk aware give dog reopen peasant duty cheese tobacco trouble gold angle',
+        minTransactionsPerBlock: 0, // Enable forging empty blocks.
+        forgingInterval: 5000,
+        forgingBlockBroadcastDelay: 500,
+        forgingSignatureBroadcastDelay: 500,
+        propagationRandomness: 100,
+        propagationTimeout: 3000
+      };
+
+      await chainModule.load(channel, options);
+      clientForger = await createClient({
+        passphrase: options.forgingPassphrase,
+        adapter: dal
+      });
+
+      // Address: 69876bf9db624560b40c40368d762ad0b35d010820e0edfe40d0380ead464d5aldpos
+      clientA = await createClient({
+        passphrase: 'birth select quiz process bid raccoon memory village snow cable agent bean',
+        adapter: dal
+      });
     });
 
     describe('valid registerMultisigDetails', async () => {
 
-      it('should add all the necessary keys on the account', async () => {
+      beforeEach(async () => {
+        let preparedTxn = clientA.prepareTransaction({
+          type: 'registerMultisigDetails',
+          details: {
+            multisigPublicKey: clientForger.getMultisigPublicKey(),
+            nextMultisigPublicKey: clientForger.getNextMultisigPublicKey(),
+            nextMultisigKeyIndex: clientForger.multisigKeyIndex + 1
+          },
+          fee: '10000000',
+          timestamp: 100000,
+          message: ''
+        });
 
+        let accountBefore = await chainModule.actions.getAccount.handler({ walletAddress: clientA.walletAddress });
+        console.log(11111, accountBefore);
+
+        await chainModule.actions.postTransaction.handler({
+          transaction: preparedTxn
+        });
+
+        await wait(8000);
+      });
+
+      it('should add all the necessary keys on the account', async () => {
+        let account = await chainModule.actions.getAccount.handler({ walletAddress: clientA.walletAddress });
+        assert.equal(caughtError, null);
+        assert.equal(account.multisigPublicKey, clientForger.getMultisigPublicKey());
+        assert.equal(account.nextMultisigPublicKey, clientForger.getNextMultisigPublicKey());
+        assert.equal(account.nextMultisigKeyIndex, clientForger.multisigKeyIndex + 1);
       });
 
     });
 
     describe('invalid registerMultisigDetails', async () => {
 
-      it('should send back an error', async () => {
+      beforeEach(async () => {
+        let preparedTxn = clientA.prepareTransaction({
+          type: 'registerMultisigDetails',
+          details: {
+            multisigPublicKey: clientForger.getSigPublicKey(),
+            nextMultisigPublicKey: clientForger.getNextSigPublicKey(),
+            nextMultisigKeyIndex: -1
+          },
+          fee: '10000000',
+          timestamp: 100000,
+          message: ''
+        });
 
+        try {
+          await chainModule.actions.postTransaction.handler({
+            transaction: preparedTxn
+          });
+        } catch (error) {
+          caughtError = error;
+        }
+
+        await wait(8000);
+      });
+
+      it('should send back an error', async () => {
+        assert.notEqual(caughtError, null);
       });
 
     });

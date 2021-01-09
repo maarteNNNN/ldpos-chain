@@ -49,6 +49,8 @@ const DEFAULT_MIN_TRANSACTION_FEES = {
 const NO_PEER_LIMIT = -1;
 const ACCOUNT_TYPE_MULTISIG = 'multisig';
 
+// TODO 222: Ensure that the transaction properties are always in the same order so that it is easy to reconstruct.
+
 module.exports = class LDPoSChainModule {
   constructor(options) {
     this.alias = options.alias || DEFAULT_MODULE_ALIAS;
@@ -139,7 +141,7 @@ module.exports = class LDPoSChainModule {
             error.type = 'InvalidActionError';
             throw error;
           }
-          return account.multisigRequiredSignatureCount;
+          return account.requiredSignatureCount;
         }
       },
       getOutboundTransactions: {
@@ -470,21 +472,26 @@ module.exports = class LDPoSChainModule {
       })
     );
 
-    let affectedAccounts = {};
+    let affectedAccountDetails = {};
     for (let account of affectedAccountList) {
-      affectedAccounts[account.address] = account;
+      affectedAccountDetails[account.address] = {
+        account,
+        changes: {
+          balance: account.balance
+        }
+      };
     }
 
-    let forgerAccount = affectedAccounts[block.forgerAddress];
-    forgerAccount.forgingPublicKey = block.forgingPublicKey;
-    forgerAccount.nextForgingPublicKey = block.nextForgingPublicKey;
-    forgerAccount.nextForgingKeyIndex = block.nextForgingKeyIndex;
+    let forgerAccountChanges = affectedAccountDetails[block.forgerAddress].changes;
+    forgerAccountChanges.forgingPublicKey = block.forgingPublicKey;
+    forgerAccountChanges.nextForgingPublicKey = block.nextForgingPublicKey;
+    forgerAccountChanges.nextForgingKeyIndex = block.nextForgingKeyIndex;
 
     for (let blockSignature of blockSignatureList) {
-      let blockSignerAccount = affectedAccounts[blockSignature.signerAddress];
-      blockSignerAccount.forgingPublicKey = blockSignerAccount.forgingPublicKey;
-      blockSignerAccount.nextForgingPublicKey = blockSignerAccount.nextForgingPublicKey;
-      blockSignerAccount.nextForgingKeyIndex = blockSignerAccount.nextForgingKeyIndex;
+      let blockSignerAccountChanges = affectedAccountDetails[blockSignature.signerAddress].changes;
+      blockSignerAccountChanges.forgingPublicKey = blockSignature.forgingPublicKey;
+      blockSignerAccountChanges.nextForgingPublicKey = blockSignature.nextForgingPublicKey;
+      blockSignerAccountChanges.nextForgingKeyIndex = blockSignature.nextForgingKeyIndex;
     }
 
     let voteChangeList = [];
@@ -502,36 +509,36 @@ module.exports = class LDPoSChainModule {
         nextSigPublicKey,
         nextSigKeyIndex
       } = txn;
-      let senderAccount = affectedAccounts[senderAddress];
+      let senderAccountChanges = affectedAccountDetails[senderAddress].changes;
 
       let txnFee = BigInt(fee);
       totalBlockFees += txnFee;
 
       if (signatures) {
         for (let signaturePacket of signatures) {
-          let memberAccount = affectedAccounts[signaturePacket.signerAddress];
-          memberAccount.multisigPublicKey = signaturePacket.multisigPublicKey;
-          memberAccount.nextMultisigPublicKey = signaturePacket.nextMultisigPublicKey;
-          memberAccount.nextMultisigKeyIndex = signaturePacket.nextMultisigKeyIndex;
+          let memberAccountChanges = affectedAccountDetails[signaturePacket.signerAddress].changes;
+          memberAccountChanges.multisigPublicKey = signaturePacket.multisigPublicKey;
+          memberAccountChanges.nextMultisigPublicKey = signaturePacket.nextMultisigPublicKey;
+          memberAccountChanges.nextMultisigKeyIndex = signaturePacket.nextMultisigKeyIndex;
         }
       } else {
         // If regular transaction (not multisig), update the account sig public keys.
-        senderAccount.sigPublicKey = sigPublicKey;
-        senderAccount.nextSigPublicKey = nextSigPublicKey;
-        senderAccount.nextSigKeyIndex = nextSigKeyIndex;
+        senderAccountChanges.sigPublicKey = sigPublicKey;
+        senderAccountChanges.nextSigPublicKey = nextSigPublicKey;
+        senderAccountChanges.nextSigKeyIndex = nextSigKeyIndex;
       }
 
       if (type === 'transfer') {
         let { recipientAddress, amount } = txn;
         let txnAmount = BigInt(amount);
 
-        let recipientAccount = affectedAccounts[recipientAddress];
-        senderAccount.balance -= txnAmount + txnFee;
-        senderAccount.lastTransactionTimestamp = timestamp;
-        recipientAccount.balance += txnAmount;
+        let recipientAccountChanges = affectedAccountDetails[recipientAddress].changes;
+        senderAccountChanges.balance -= txnAmount + txnFee;
+        senderAccountChanges.lastTransactionTimestamp = timestamp;
+        recipientAccountChanges.balance += txnAmount;
       } else {
-        senderAccount.balance -= txnFee;
-        senderAccount.lastTransactionTimestamp = timestamp;
+        senderAccountChanges.balance -= txnFee;
+        senderAccountChanges.lastTransactionTimestamp = timestamp;
         if (type === 'vote' || type === 'unvote') {
           voteChangeList.push({
             type,
@@ -540,19 +547,19 @@ module.exports = class LDPoSChainModule {
           });
         } else if (type === 'registerSigDetails') {
           let { details } = txn;
-          senderAccount.sigPublicKey = details.sigPublicKey;
-          senderAccount.nextSigPublicKey = details.nextSigPublicKey;
-          senderAccount.nextSigKeyIndex = details.nextSigKeyIndex;
+          senderAccountChanges.sigPublicKey = details.sigPublicKey;
+          senderAccountChanges.nextSigPublicKey = details.nextSigPublicKey;
+          senderAccountChanges.nextSigKeyIndex = details.nextSigKeyIndex;
         } else if (type === 'registerMultisigDetails') {
           let { details } = txn;
-          senderAccount.multisigPublicKey = details.multisigPublicKey;
-          senderAccount.nextMultisigPublicKey = details.nextMultisigPublicKey;
-          senderAccount.nextMultisigKeyIndex = details.nextMultisigKeyIndex;
+          senderAccountChanges.multisigPublicKey = details.multisigPublicKey;
+          senderAccountChanges.nextMultisigPublicKey = details.nextMultisigPublicKey;
+          senderAccountChanges.nextMultisigKeyIndex = details.nextMultisigKeyIndex;
         } else if (type === 'registerForgingDetails') {
           let { details } = txn;
-          senderAccount.forgingPublicKey = details.forgingPublicKey;
-          senderAccount.nextForgingPublicKey = details.nextForgingPublicKey;
-          senderAccount.nextForgingKeyIndex = details.nextForgingKeyIndex;
+          senderAccountChanges.forgingPublicKey = details.forgingPublicKey;
+          senderAccountChanges.nextForgingPublicKey = details.nextForgingPublicKey;
+          senderAccountChanges.nextForgingKeyIndex = details.nextForgingKeyIndex;
         } else if (type === 'registerMultisigWallet') {
           multisigRegistrationList.push({
             multisigAddress: senderAddress,
@@ -569,43 +576,26 @@ module.exports = class LDPoSChainModule {
     let forgerComission = totalBlockFees - comissionPerSigner * signerCount;
 
     for (let blockSignerAddress of blockSignerAddressSet) {
-      let blockSignerAccount = affectedAccounts[blockSignerAddress];
-      blockSignerAccount.balance += comissionPerSigner;
+      affectedAccountDetails[blockSignerAddress].changes.balance += comissionPerSigner;
     }
 
-    forgerAccount.balance += forgerComission;
+    forgerAccountChanges.balance += forgerComission;
 
     await Promise.all(
       [...affectedAddressSet].map(async (affectedAddress) => {
-        let account = affectedAccounts[affectedAddress];
+        let accountInfo = affectedAccountDetails[affectedAddress];
+        let { account } = accountInfo;
+        let accountChanges = accountInfo.changes;
         let accountUpdatePacket = {
-          balance: account.balance.toString(),
+          ...accountChanges,
+          balance: accountChanges.balance.toString(),
           updateHeight: height
         };
-        if (senderAddressSet.has(affectedAddress)) {
-          accountUpdatePacket.lastTransactionTimestamp = account.lastTransactionTimestamp;
-          if (account.type !== ACCOUNT_TYPE_MULTISIG) {
-            accountUpdatePacket.sigPublicKey = account.sigPublicKey;
-            accountUpdatePacket.nextSigPublicKey = account.nextSigPublicKey;
-            accountUpdatePacket.nextSigKeyIndex = account.nextSigKeyIndex;
-          }
-        }
-        if (multisigMemberAddressSet.has(affectedAddress)) {
-          accountUpdatePacket.multisigPublicKey = account.multisigPublicKey;
-          accountUpdatePacket.nextMultisigPublicKey = account.nextMultisigPublicKey;
-          accountUpdatePacket.nextMultisigKeyIndex = account.nextMultisigKeyIndex;
-        }
-        if (affectedAddress === block.forgerAddress || blockSignerAddressSet.has(affectedAddress)) {
-          accountUpdatePacket.forgingPublicKey = account.forgingPublicKey;
-          accountUpdatePacket.nextForgingPublicKey = account.nextForgingPublicKey;
-          accountUpdatePacket.nextForgingKeyIndex = account.nextForgingKeyIndex;
-        }
         try {
           if (account.updateHeight == null) {
             await this.dal.upsertAccount({
               ...account,
-              balance: account.balance.toString(),
-              updateHeight: height
+              ...accountUpdatePacket
             });
           } else if (account.updateHeight < height) {
             await this.dal.updateAccount(
@@ -664,6 +654,9 @@ module.exports = class LDPoSChainModule {
       let { multisigAddress, memberAddresses, requiredSignatureCount } = multisigRegistration;
       try {
         await this.dal.registerMultisigWallet(multisigAddress, memberAddresses, requiredSignatureCount);
+        let senderAccountChanges = affectedAccountDetails[multisigAddress].changes;
+        senderAccountChanges.type = ACCOUNT_TYPE_MULTISIG;
+        senderAccountChanges.requiredSignatureCount = requiredSignatureCount;
       } catch (error) {
         if (error.type === 'InvalidActionError') {
           this.logger.warn(error);
@@ -698,28 +691,43 @@ module.exports = class LDPoSChainModule {
 
     // Remove transactions which are relying on outdated keys from pending transaction maps.
     for (let senderAddress of senderAddressSet) {
-      let senderAccount = affectedAccounts[senderAddress];
-      if (senderAccount.type === ACCOUNT_TYPE_MULTISIG) {
+      let senderAccountInfo = affectedAccountDetails[senderAddress];
+      let senderAccount = senderAccountInfo.account;
+      let senderAccountChanges = senderAccountInfo.changes;
+      let senderType = senderAccountChanges.type || senderAccount.type;
+
+      if (senderType === ACCOUNT_TYPE_MULTISIG) {
         // For multisig, expire based on multisigPublicKey and nextMultisigPublicKey properties of member accounts.
         let senderTxnStream = this.pendingTransactionStreams[senderAddress];
         if (!senderTxnStream) {
           continue;
         }
+        let senderMultisigRequiredSignatureCount;
+        if (senderAccountChanges.requiredSignatureCount == null) {
+          senderMultisigRequiredSignatureCount = senderAccount.requiredSignatureCount;
+        } else {
+          senderMultisigRequiredSignatureCount = senderAccountChanges.requiredSignatureCount;
+        }
         let transactionInfoList = [...senderTxnStream.transactionInfoMap.values()];
         for (let { transaction: remainingTxn } of transactionInfoList) {
           let validMemberKeyCount = 0;
-          for (let { signerAddress, multisigPublicKey } of remainingTxn.signatures) {
-            let memberAccount = affectedAccounts[signerAddress];
+          let remainingSignatures = remainingTxn.signatures || [];
+          for (let { signerAddress, multisigPublicKey } of remainingSignatures) {
+            let memberAccountInfo = affectedAccountDetails[signerAddress];
+            let memberAccount = memberAccountInfo.account;
+            let memberAccountChanges = memberAccountInfo.changes;
+            let memberMultisigPublicKey = memberAccountChanges.multisigPublicKey || memberAccount.multisigPublicKey;
+            let memberNextMultisigPublicKey = memberAccountChanges.nextMultisigPublicKey || memberAccount.nextMultisigPublicKey;
             if (
-              multisigPublicKey === memberAccount.multisigPublicKey ||
-              multisigPublicKey === memberAccount.nextMultisigPublicKey
+              multisigPublicKey === memberMultisigPublicKey ||
+              multisigPublicKey === memberNextMultisigPublicKey
             ) {
               validMemberKeyCount++;
             }
           }
           // Multisig transaction should only be removed if there are not enough members with valid keys
-          // remaining based on the multisigRequiredSignatureCount property of the wallet.
-          if (validMemberKeyCount < senderAccount.multisigRequiredSignatureCount) {
+          // remaining based on the requiredSignatureCount property of the wallet.
+          if (validMemberKeyCount < senderMultisigRequiredSignatureCount) {
             senderTxnStream.transactionInfoMap.delete(remainingTxn.id);
           }
         }
@@ -729,11 +737,13 @@ module.exports = class LDPoSChainModule {
         if (!senderTxnStream) {
           continue;
         }
+        let senderSigPublicKey = senderAccountChanges.sigPublicKey || senderAccount.sigPublicKey;
+        let senderNextSigPublicKey = senderAccountChanges.nextSigPublicKey || senderAccount.nextSigPublicKey;
         let transactionInfoList = [...senderTxnStream.transactionInfoMap.values()];
         for (let { transaction: remainingTxn } of transactionInfoList) {
           if (
-            remainingTxn.sigPublicKey !== senderAccount.sigPublicKey &&
-            remainingTxn.sigPublicKey !== senderAccount.nextSigPublicKey
+            remainingTxn.sigPublicKey !== senderSigPublicKey &&
+            remainingTxn.sigPublicKey !== senderNextSigPublicKey
           ) {
             senderTxnStream.transactionInfoMap.delete(remainingTxn.id);
           }
@@ -860,7 +870,7 @@ module.exports = class LDPoSChainModule {
     let { senderAddress } = transaction;
     validateMultisigTransactionSchema(
       transaction,
-      senderAccount.multisigRequiredSignatureCount,
+      senderAccount.requiredSignatureCount,
       this.maxMultisigMembers,
       this.networkSymbol,
       fullCheck
@@ -997,7 +1007,7 @@ module.exports = class LDPoSChainModule {
     }
   }
 
-  async verifyRegisterMultisigTransaction(transaction) {
+  async verifyRegisterMultisigWalletTransaction(transaction) {
     let { memberAddresses } = transaction;
     await Promise.all(
       memberAddresses.map(
@@ -1077,7 +1087,7 @@ module.exports = class LDPoSChainModule {
     } else if (type === 'unvote') {
       await this.verifyUnvoteTransaction(transaction);
     } else if (type === 'registerMultisigWallet') {
-      await this.verifyRegisterMultisigTransaction(transaction);
+      await this.verifyRegisterMultisigWalletTransaction(transaction);
     }
 
     return txnTotal;
@@ -1103,7 +1113,7 @@ module.exports = class LDPoSChainModule {
     } else if (type === 'unvote') {
       await this.verifyUnvoteTransaction(transaction);
     } else if (type === 'registerMultisigWallet') {
-      await this.verifyRegisterMultisigTransaction(transaction);
+      await this.verifyRegisterMultisigWalletTransaction(transaction);
     }
 
     return txnTotal;
