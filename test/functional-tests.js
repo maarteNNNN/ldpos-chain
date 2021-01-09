@@ -9,7 +9,7 @@ const { createClient } = require('ldpos-client');
 
 const LDPoSChainModule = require('../index');
 
-describe('Functional tests', async () => {
+describe.only('Functional tests', async () => {
   let chainModule;
   let dal;
   let channel;
@@ -1085,11 +1085,9 @@ describe('Functional tests', async () => {
       beforeEach(async () => {
         let preparedTxn = clientA.prepareTransaction({
           type: 'registerSigDetails',
-          details: {
-            sigPublicKey: clientForger.getSigPublicKey(),
-            nextSigPublicKey: clientForger.getNextSigPublicKey(),
-            nextSigKeyIndex: clientForger.sigKeyIndex + 1
-          },
+          newSigPublicKey: clientForger.getSigPublicKey(),
+          newNextSigPublicKey: clientForger.getNextSigPublicKey(),
+          newNextSigKeyIndex: clientForger.sigKeyIndex + 1,
           fee: '10000000',
           timestamp: 100000,
           message: ''
@@ -1138,11 +1136,9 @@ describe('Functional tests', async () => {
       beforeEach(async () => {
         let preparedTxn = clientA.prepareTransaction({
           type: 'registerSigDetails',
-          details: {
-            sigPublicKey: clientForger.getSigPublicKey(),
-            nextSigPublicKey: clientForger.getNextSigPublicKey(),
-            nextSigKeyIndex: -1
-          },
+          newSigPublicKey: clientForger.getSigPublicKey(),
+          newNextSigPublicKey: clientForger.getNextSigPublicKey(),
+          newNextSigKeyIndex: -1,
           fee: '10000000',
           timestamp: 100000,
           message: ''
@@ -1203,11 +1199,9 @@ describe('Functional tests', async () => {
       beforeEach(async () => {
         let preparedTxn = clientA.prepareTransaction({
           type: 'registerMultisigDetails',
-          details: {
-            multisigPublicKey: clientForger.getMultisigPublicKey(),
-            nextMultisigPublicKey: clientForger.getNextMultisigPublicKey(),
-            nextMultisigKeyIndex: clientForger.multisigKeyIndex + 1
-          },
+          newMultisigPublicKey: clientForger.getMultisigPublicKey(),
+          newNextMultisigPublicKey: clientForger.getNextMultisigPublicKey(),
+          newNextMultisigKeyIndex: clientForger.multisigKeyIndex + 1,
           fee: '10000000',
           timestamp: 100000,
           message: ''
@@ -1235,11 +1229,9 @@ describe('Functional tests', async () => {
       beforeEach(async () => {
         let preparedTxn = clientA.prepareTransaction({
           type: 'registerMultisigDetails',
-          details: {
-            multisigPublicKey: clientForger.getSigPublicKey(),
-            nextMultisigPublicKey: clientForger.getNextSigPublicKey(),
-            nextMultisigKeyIndex: -1
-          },
+          newMultisigPublicKey: clientForger.getSigPublicKey(),
+          newNextMultisigPublicKey: clientForger.getNextSigPublicKey(),
+          newNextMultisigKeyIndex: -1,
           fee: '10000000',
           timestamp: 100000,
           message: ''
@@ -1300,11 +1292,9 @@ describe('Functional tests', async () => {
       beforeEach(async () => {
         let preparedTxn = clientA.prepareTransaction({
           type: 'registerForgingDetails',
-          details: {
-            forgingPublicKey: clientForger.getForgingPublicKey(),
-            nextForgingPublicKey: clientForger.getNextForgingPublicKey(),
-            nextForgingKeyIndex: clientForger.forgingKeyIndex + 1
-          },
+          newForgingPublicKey: clientForger.getForgingPublicKey(),
+          newNextForgingPublicKey: clientForger.getNextForgingPublicKey(),
+          newNextForgingKeyIndex: clientForger.forgingKeyIndex + 1,
           fee: '10000000',
           timestamp: 100000,
           message: ''
@@ -1332,11 +1322,9 @@ describe('Functional tests', async () => {
       beforeEach(async () => {
         let preparedTxn = clientA.prepareTransaction({
           type: 'registerForgingDetails',
-          details: {
-            forgingPublicKey: clientForger.getSigPublicKey(),
-            nextForgingPublicKey: clientForger.getNextSigPublicKey(),
-            nextForgingKeyIndex: -1
-          },
+          newForgingPublicKey: clientForger.getSigPublicKey(),
+          newNextForgingPublicKey: clientForger.getNextSigPublicKey(),
+          newNextForgingKeyIndex: -1,
           fee: '10000000',
           timestamp: 100000,
           message: ''

@@ -546,20 +546,32 @@ module.exports = class LDPoSChainModule {
             delegateAddress: txn.delegateAddress
           });
         } else if (type === 'registerSigDetails') {
-          let { details } = txn;
-          senderAccountChanges.sigPublicKey = details.sigPublicKey;
-          senderAccountChanges.nextSigPublicKey = details.nextSigPublicKey;
-          senderAccountChanges.nextSigKeyIndex = details.nextSigKeyIndex;
+          let {
+            newSigPublicKey,
+            newNextSigPublicKey,
+            newNextSigKeyIndex
+          } = txn;
+          senderAccountChanges.sigPublicKey = newSigPublicKey;
+          senderAccountChanges.nextSigPublicKey = newNextSigPublicKey;
+          senderAccountChanges.nextSigKeyIndex = newNextSigKeyIndex;
         } else if (type === 'registerMultisigDetails') {
-          let { details } = txn;
-          senderAccountChanges.multisigPublicKey = details.multisigPublicKey;
-          senderAccountChanges.nextMultisigPublicKey = details.nextMultisigPublicKey;
-          senderAccountChanges.nextMultisigKeyIndex = details.nextMultisigKeyIndex;
+          let {
+            newMultisigPublicKey,
+            newNextMultisigPublicKey,
+            newNextMultisigKeyIndex
+          } = txn;
+          senderAccountChanges.multisigPublicKey = newMultisigPublicKey;
+          senderAccountChanges.nextMultisigPublicKey = newNextMultisigPublicKey;
+          senderAccountChanges.nextMultisigKeyIndex = newNextMultisigKeyIndex;
         } else if (type === 'registerForgingDetails') {
-          let { details } = txn;
-          senderAccountChanges.forgingPublicKey = details.forgingPublicKey;
-          senderAccountChanges.nextForgingPublicKey = details.nextForgingPublicKey;
-          senderAccountChanges.nextForgingKeyIndex = details.nextForgingKeyIndex;
+          let {
+            newForgingPublicKey,
+            newNextForgingPublicKey,
+            newNextForgingKeyIndex
+          } = txn;
+          senderAccountChanges.forgingPublicKey = newForgingPublicKey;
+          senderAccountChanges.nextForgingPublicKey = newNextForgingPublicKey;
+          senderAccountChanges.nextForgingKeyIndex = newNextForgingKeyIndex;
         } else if (type === 'registerMultisigWallet') {
           multisigRegistrationList.push({
             multisigAddress: senderAddress,
