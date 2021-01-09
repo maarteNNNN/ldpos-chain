@@ -77,7 +77,7 @@ describe('Functional tests', async () => {
           forgingBlockBroadcastDelay: 200,
           forgingSignatureBroadcastDelay: 200,
           propagationRandomness: 100,
-          propagationTimeout: 2000
+          propagationTimeout: 3000
         };
 
         await chainModule.load(channel, options);
@@ -178,7 +178,7 @@ describe('Functional tests', async () => {
         forgingBlockBroadcastDelay: 500,
         forgingSignatureBroadcastDelay: 500,
         propagationRandomness: 100,
-        propagationTimeout: 2000
+        propagationTimeout: 3000
       };
 
       await chainModule.load(channel, options);
@@ -520,7 +520,7 @@ describe('Functional tests', async () => {
         forgingBlockBroadcastDelay: 500,
         forgingSignatureBroadcastDelay: 500,
         propagationRandomness: 100,
-        propagationTimeout: 2000
+        propagationTimeout: 3000
       };
 
       await chainModule.load(channel, options);
@@ -646,7 +646,7 @@ describe('Functional tests', async () => {
         forgingBlockBroadcastDelay: 500,
         forgingSignatureBroadcastDelay: 500,
         propagationRandomness: 100,
-        propagationTimeout: 2000,
+        propagationTimeout: 3000,
         maxVotesPerAccount: 2
       };
 
@@ -784,7 +784,7 @@ describe('Functional tests', async () => {
         forgingBlockBroadcastDelay: 500,
         forgingSignatureBroadcastDelay: 500,
         propagationRandomness: 100,
-        propagationTimeout: 2000
+        propagationTimeout: 3000
       };
 
       await chainModule.load(channel, options);

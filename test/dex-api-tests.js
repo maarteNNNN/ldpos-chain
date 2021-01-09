@@ -55,8 +55,8 @@ describe('DEX API tests', async () => {
       forgingPassphrase: 'clerk aware give dog reopen peasant duty cheese tobacco trouble gold angle',
       minTransactionsPerBlock: 0, // Enable forging empty blocks.
       forgingInterval: 10000,
-      forgingBlockBroadcastDelay: 500,
-      forgingSignatureBroadcastDelay: 500,
+      forgingBlockBroadcastDelay: 200,
+      forgingSignatureBroadcastDelay: 200,
       propagationRandomness: 100,
       propagationTimeout: 5000
     };
