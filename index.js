@@ -49,8 +49,6 @@ const DEFAULT_MIN_TRANSACTION_FEES = {
 const NO_PEER_LIMIT = -1;
 const ACCOUNT_TYPE_MULTISIG = 'multisig';
 
-// TODO 222: Ensure that the transaction properties are always in the same order so that it is easy to reconstruct.
-
 module.exports = class LDPoSChainModule {
   constructor(options) {
     this.alias = options.alias || DEFAULT_MODULE_ALIAS;
