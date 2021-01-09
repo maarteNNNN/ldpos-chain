@@ -1213,9 +1213,6 @@ describe('Functional tests', async () => {
           message: ''
         });
 
-        let accountBefore = await chainModule.actions.getAccount.handler({ walletAddress: clientA.walletAddress });
-        console.log(11111, accountBefore);
-
         await chainModule.actions.postTransaction.handler({
           transaction: preparedTxn
         });
@@ -1267,27 +1264,101 @@ describe('Functional tests', async () => {
 
   });
 
-  describe.skip('registerForgingDetails transaction', async () => {
+  describe('registerForgingDetails transaction', async () => {
+
+    let caughtError;
 
     beforeEach(async () => {
+      caughtError = null;
 
+      options = {
+        genesisPath: './test/utils/genesis-functional.json',
+        forgingPassphrase: 'clerk aware give dog reopen peasant duty cheese tobacco trouble gold angle',
+        minTransactionsPerBlock: 0, // Enable forging empty blocks.
+        forgingInterval: 5000,
+        forgingBlockBroadcastDelay: 500,
+        forgingSignatureBroadcastDelay: 500,
+        propagationRandomness: 100,
+        propagationTimeout: 3000
+      };
+
+      await chainModule.load(channel, options);
+      clientForger = await createClient({
+        passphrase: options.forgingPassphrase,
+        adapter: dal
+      });
+
+      // Address: 69876bf9db624560b40c40368d762ad0b35d010820e0edfe40d0380ead464d5aldpos
+      clientA = await createClient({
+        passphrase: 'birth select quiz process bid raccoon memory village snow cable agent bean',
+        adapter: dal
+      });
     });
 
     describe('valid registerForgingDetails', async () => {
 
-      it('should add all the necessary keys on the account', async () => {
+      beforeEach(async () => {
+        let preparedTxn = clientA.prepareTransaction({
+          type: 'registerForgingDetails',
+          details: {
+            forgingPublicKey: clientForger.getForgingPublicKey(),
+            nextForgingPublicKey: clientForger.getNextForgingPublicKey(),
+            nextForgingKeyIndex: clientForger.forgingKeyIndex + 1
+          },
+          fee: '10000000',
+          timestamp: 100000,
+          message: ''
+        });
 
+        await chainModule.actions.postTransaction.handler({
+          transaction: preparedTxn
+        });
+
+        await wait(8000);
+      });
+
+      it('should add all the necessary keys on the account', async () => {
+        let account = await chainModule.actions.getAccount.handler({ walletAddress: clientA.walletAddress });
+        assert.equal(caughtError, null);
+        assert.equal(account.forgingPublicKey, clientForger.getForgingPublicKey());
+        assert.equal(account.nextForgingPublicKey, clientForger.getNextForgingPublicKey());
+        assert.equal(account.nextForgingKeyIndex, clientForger.forgingKeyIndex + 1);
       });
 
     });
 
     describe('invalid registerForgingDetails', async () => {
 
-      it('should send back an error', async () => {
+      beforeEach(async () => {
+        let preparedTxn = clientA.prepareTransaction({
+          type: 'registerForgingDetails',
+          details: {
+            forgingPublicKey: clientForger.getSigPublicKey(),
+            nextForgingPublicKey: clientForger.getNextSigPublicKey(),
+            nextForgingKeyIndex: -1
+          },
+          fee: '10000000',
+          timestamp: 100000,
+          message: ''
+        });
 
+        try {
+          await chainModule.actions.postTransaction.handler({
+            transaction: preparedTxn
+          });
+        } catch (error) {
+          caughtError = error;
+        }
+
+        await wait(8000);
+      });
+
+      it('should send back an error', async () => {
+        assert.notEqual(caughtError, null);
       });
 
     });
 
   });
+
 });
