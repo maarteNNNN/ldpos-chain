@@ -16,7 +16,7 @@
     "bip39": "^3.0.3",
     "ldpos-client": "^2.0.2",
     "lodash.shuffle": "^4.2.0",
-    "proper-merkle": "^2.0.0",
+    "proper-merkle": "^2.0.3",
     "writable-consumable-stream": "^2.0.0"
   },
   "devDependencies": {
