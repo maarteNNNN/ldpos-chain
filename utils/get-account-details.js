@@ -15,16 +15,15 @@ let merkle = new ProperMerkle({
 
 let network = 'ldpos';
 let seed = bip39.mnemonicToSeedSync(mnemonic).toString('hex');
-let networkSeed = `${network}-${seed}`;
 
 console.log('SEED:', seed);
 console.log('');
 
-let forgingTree = merkle.generateMSSTreeSync(`${networkSeed}-forging`, 0);
-let multisigTree = merkle.generateMSSTreeSync(`${networkSeed}-multisig`, 0);
-let sigTree = merkle.generateMSSTreeSync(`${networkSeed}-sig`, 0);
+let forgingTree = merkle.generateMSSTreeSync(seed, `${network}-forging-0`);
+let multisigTree = merkle.generateMSSTreeSync(seed, `${network}-multisig-0`);
+let sigTree = merkle.generateMSSTreeSync(seed, `${network}-sig-0`);
 
-let walletAddress = `${Buffer.from(sigTree.publicRootHash, 'base64').toString('hex')}ldpos`;
+let walletAddress = `${Buffer.from(sigTree.publicRootHash, 'base64').toString('hex')}${network}`;
 
 console.log('------FORGING PUBLIC KEY------');
 console.log(forgingTree.publicRootHash);

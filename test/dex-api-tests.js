@@ -120,12 +120,12 @@ describe('DEX API tests', async () => {
 
       // Passphrase: panic test motion image soldier cloth script spice trigger magnet accident add
       multisigAccount = {
-        address: 'f1515e20713e5eb02dcfac71a1b5f6b426ffd9c080097c9d9ac6bbcc392c4fbfldpos',
-        forgingPublicKey: 'yEEktni3Otjqo0CRZ190fPTQvPZ7ad7aa2H2bPI6viM=',
+        address: '17475c261ba8b5b7653700dfda1a2952053a4400efd8c9cbd4bbd86912c4a419ldpos',
+        forgingPublicKey: 'KSxPdmjDS1LKGraH7fD9HjtjAYc6Y+H7O5ON0y90M9w=',
         nextForgingKeyIndex: 0,
-        multisigPublicKey: 'Ciq+Jx/kCYjxKvGcqiJPuBDFQpbkuqcplszbdOUkXNk=',
+        multisigPublicKey: 'KDlcXmucsuE5VS1WKUCCA2doLRS9U4rOxqzEtnnySfg=',
         nextMultisigKeyIndex: 0,
-        sigPublicKey: '8VFeIHE+XrAtz6xxobX2tCb/2cCACXydmsa7zDksT78=',
+        sigPublicKey: 'F0dcJhuotbdlNwDf2hopUgU6RADv2MnL1LvYaRLEpBk=',
         nextSigKeyIndex: 0,
         balance: '100000000000'
       };
@@ -133,34 +133,34 @@ describe('DEX API tests', async () => {
       memberAccounts = [
         // Passphrase: birth select quiz process bid raccoon memory village snow cable agent bean
         {
-          address: '69876bf9db624560b40c40368d762ad0b35d010820e0edfe40d0380ead464d5aldpos',
-          forgingPublicKey: 'B8qadp7ACj2vjlkgHPxdZokgRGhQgOBiBbw3PixiDG4=',
+          address: '660c22683a6d466f66740042677ed1adc8bb723bd871c32c93f52eaa224a817fldpos',
+          forgingPublicKey: 'VyMOMKKy63KLCA1YkqTjaBZnlm5wdk0TOVu2LmAfAK0=',
           nextForgingKeyIndex: 0,
-          multisigPublicKey: '8Qmoim5x5GiLDeNNjX48bId/NSgUz0WIt5cf+DeMBJ0=',
+          multisigPublicKey: 'xreuBmWlBA/6og9dXjIkiiH7BHISFRBXIks3AFAzrmc=',
           nextMultisigKeyIndex: 0,
-          sigPublicKey: 'aYdr+dtiRWC0DEA2jXYq0LNdAQgg4O3+QNA4Dq1GTVo=',
+          sigPublicKey: 'ZgwiaDptRm9mdABCZ37Rrci7cjvYccMsk/UuqiJKgX8=',
           nextSigKeyIndex: 0,
           balance: '10000000000'
         },
         // Passphrase: genius shoulder into daring armor proof cycle bench patrol paper grant picture
         {
-          address: '1072f65df680b2767f55a6bcd505b68d90d227d6d8b2d340fe97aaa016ab6dd7ldpos',
-          forgingPublicKey: 'BD849jw/q+a4iNCx/9S/dcTFwzCd8M6bGxGqzSvydKU=',
+          address: '772e25778a36dc33a7c00115471d270ead1458c170b222e9c63f17da588dd9edldpos',
+          forgingPublicKey: 'SzXp6/L1ZztVN/LKxkkYQHR9BKoUuf1hjFf0a8vkZIE=',
           nextForgingKeyIndex: 0,
-          multisigPublicKey: 'fcPqQCjP5JiErw49QKWWRXtXDKgVRUIJzQgqC3n2co4=',
+          multisigPublicKey: 'Zzqtg8AErQsUHSIiDFFX8O72WqhkzKgRFcZazfupOLM=',
           nextMultisigKeyIndex: 0,
-          sigPublicKey: 'EHL2XfaAsnZ/Vaa81QW2jZDSJ9bYstNA/peqoBarbdc=',
+          sigPublicKey: 'dy4ld4o23DOnwAEVRx0nDq0UWMFwsiLpxj8X2liN2e0=',
           nextSigKeyIndex: 0,
           balance: '20000000000'
         },
         // Passphrase: emotion belt burden flash vital neglect old census dress kid ocean warfare
         {
-          address: '484a487b1c12b8f46dfe9f15e7fe79ceb88d2c3f76ba39680ae5279a04e7e842ldpos',
-          forgingPublicKey: 'hkMI/VZcN7e5zGDRgXiJFdUEXVmaNAv9DMXUXzusc7Q=',
+          address: '708fc8aa632c697cb4239aba8e2b6b55a3a2824b061fa4dd500207d34d450ad0ldpos',
+          forgingPublicKey: 'a8b9hWja0sLqsynJ+edM0N8rNUWQaIRbhfi/P0Njfkw=',
           nextForgingKeyIndex: 0,
-          multisigPublicKey: 'Vfh2TLCRB0ZngEDTVgfU0/FJ5+4BiR36M+uk47IO+oE=',
+          multisigPublicKey: 'lik8+MS783g9rqqqki1aZm7spwIfr/Uog+sKN50tK6Y=',
           nextMultisigKeyIndex: 0,
-          sigPublicKey: 'SEpIexwSuPRt/p8V5/55zriNLD92ujloCuUnmgTn6EI=',
+          sigPublicKey: 'cI/IqmMsaXy0I5q6jitrVaOigksGH6TdUAIH001FCtA=',
           nextSigKeyIndex: 0,
           balance: '30000000000'
         }
@@ -192,7 +192,7 @@ describe('DEX API tests', async () => {
           transactions: [
             {
               type: 'transfer',
-              recipientAddress: '1072f65df680b2767f55a6bcd505b68d90d227d6d8b2d340fe97aaa016ab6dd7ldpos',
+              recipientAddress: '772e25778a36dc33a7c00115471d270ead1458c170b222e9c63f17da588dd9edldpos',
               amount: '1100000000',
               fee: '100000000',
               timestamp: 10000,
@@ -200,7 +200,7 @@ describe('DEX API tests', async () => {
             },
             {
               type: 'transfer',
-              recipientAddress: '484a487b1c12b8f46dfe9f15e7fe79ceb88d2c3f76ba39680ae5279a04e7e842ldpos',
+              recipientAddress: '660c22683a6d466f66740042677ed1adc8bb723bd871c32c93f52eaa224a817fldpos',
               amount: '1200000000',
               fee: '100000000',
               timestamp: 20000,
@@ -215,7 +215,7 @@ describe('DEX API tests', async () => {
           transactions: [
             {
               type: 'transfer',
-              recipientAddress: '484a487b1c12b8f46dfe9f15e7fe79ceb88d2c3f76ba39680ae5279a04e7e842ldpos',
+              recipientAddress: '660c22683a6d466f66740042677ed1adc8bb723bd871c32c93f52eaa224a817fldpos',
               amount: '1300000000',
               fee: '100000000',
               timestamp: 30000,
@@ -230,7 +230,7 @@ describe('DEX API tests', async () => {
           transactions: [
             {
               type: 'transfer',
-              recipientAddress: '484a487b1c12b8f46dfe9f15e7fe79ceb88d2c3f76ba39680ae5279a04e7e842ldpos',
+              recipientAddress: '660c22683a6d466f66740042677ed1adc8bb723bd871c32c93f52eaa224a817fldpos',
               amount: '1300000000',
               fee: '100000000',
               timestamp: 80000,
@@ -329,7 +329,7 @@ describe('DEX API tests', async () => {
         let caughtError = null;
         try {
           await chainModule.actions.getMinMultisigRequiredSignatures.handler({
-            walletAddress: '484a487b1c12b8f46dfe9f15e7fe79ceb88d2c3f76ba39680ae5279a04e7e842ldpos'
+            walletAddress: '660c22683a6d466f66740042677ed1adc8bb723bd871c32c93f52eaa224a817fldpos'
           });
         } catch (error) {
           caughtError = error;
@@ -352,13 +352,13 @@ describe('DEX API tests', async () => {
         assert.equal(Array.isArray(transactions), true);
         assert.equal(transactions.length, 4);
         assert.equal(transactions[0].senderAddress, clientForger.walletAddress);
-        assert.equal(transactions[0].id, 'IFSFLr5d2WZjFhwSqFG/DDZMVFj4WkgeINaacYayvPw=');
+        assert.equal(transactions[0].id, 'o9vq17lJ6cbVPf6uewUSVpF1JSDR9CpvDM2SCCI2QOc=');
         assert.equal(transactions[1].senderAddress, clientForger.walletAddress);
-        assert.equal(transactions[1].id, 'kTINYDSiniXS3bz7GSBdOvPiiZ7Pkc0hn5TjD8REx10=');
+        assert.equal(transactions[1].id, 'rXe8wVRFSOLpSQNNMnHJ2yNH683iiZMrjRJil6WcjK0=');
         assert.equal(transactions[2].senderAddress, clientForger.walletAddress);
-        assert.equal(transactions[2].id, 'ju6kifm5fvITER36Ie4tCfMrDsEm7gispApnMMODVBk=');
+        assert.equal(transactions[2].id, 'sb7YWN5BKuDDnnVkjRUepH4kLcdQdVd4KUIqxW7uMqY=');
         assert.equal(transactions[3].senderAddress, clientForger.walletAddress);
-        assert.equal(transactions[3].id, 'ugmTFF879DkZe05axfpR6XbJgW0VGQLhDOgnvyDkc+A=');
+        assert.equal(transactions[3].id, 'z5acncVaKKI+ppwN95zT0Qhv971EZVOXdEhGZ5NbR6Y=');
 
         for (let txn of transactions) {
           assert.equal(typeof txn.id, 'string');
@@ -378,11 +378,11 @@ describe('DEX API tests', async () => {
         assert.equal(Array.isArray(transactions), true);
         assert.equal(transactions.length, 3);
         assert.equal(transactions[0].senderAddress, clientForger.walletAddress);
-        assert.equal(transactions[0].id, 'kTINYDSiniXS3bz7GSBdOvPiiZ7Pkc0hn5TjD8REx10=');
+        assert.equal(transactions[0].id, 'rXe8wVRFSOLpSQNNMnHJ2yNH683iiZMrjRJil6WcjK0=');
         assert.equal(transactions[1].senderAddress, clientForger.walletAddress);
-        assert.equal(transactions[1].id, 'ju6kifm5fvITER36Ie4tCfMrDsEm7gispApnMMODVBk=');
+        assert.equal(transactions[1].id, 'sb7YWN5BKuDDnnVkjRUepH4kLcdQdVd4KUIqxW7uMqY=');
         assert.equal(transactions[2].senderAddress, clientForger.walletAddress);
-        assert.equal(transactions[2].id, 'ugmTFF879DkZe05axfpR6XbJgW0VGQLhDOgnvyDkc+A=');
+        assert.equal(transactions[2].id, 'z5acncVaKKI+ppwN95zT0Qhv971EZVOXdEhGZ5NbR6Y=');
       });
 
       it('should limit the number of transactions based on the specified limit', async () => {
@@ -394,7 +394,7 @@ describe('DEX API tests', async () => {
         assert.equal(Array.isArray(transactions), true);
         assert.equal(transactions.length, 1);
         assert.equal(transactions[0].senderAddress, clientForger.walletAddress);
-        assert.equal(transactions[0].id, 'IFSFLr5d2WZjFhwSqFG/DDZMVFj4WkgeINaacYayvPw=');
+        assert.equal(transactions[0].id, 'o9vq17lJ6cbVPf6uewUSVpF1JSDR9CpvDM2SCCI2QOc=');
       });
 
       it('should return an empty array if no transactions can be matched', async () => {
@@ -412,7 +412,7 @@ describe('DEX API tests', async () => {
     describe('getInboundTransactionsFromBlock action', async () => {
 
       it('should return an array of transactions sent to the specified walletAddress', async () => {
-        let recipientAddress = '484a487b1c12b8f46dfe9f15e7fe79ceb88d2c3f76ba39680ae5279a04e7e842ldpos';
+        let recipientAddress = '660c22683a6d466f66740042677ed1adc8bb723bd871c32c93f52eaa224a817fldpos';
         let transactions = await chainModule.actions.getInboundTransactionsFromBlock.handler({
           walletAddress: recipientAddress,
           blockId: blockList[0].id
@@ -430,11 +430,11 @@ describe('DEX API tests', async () => {
         assert.equal(typeof txn.recipientAddress, 'string');
 
         assert.equal(transactions[0].recipientAddress, recipientAddress);
-        assert.equal(transactions[0].id, 'kTINYDSiniXS3bz7GSBdOvPiiZ7Pkc0hn5TjD8REx10=');
+        assert.equal(transactions[0].id, 'rXe8wVRFSOLpSQNNMnHJ2yNH683iiZMrjRJil6WcjK0=');
       });
 
       it('should return an empty array if no transactions match the specified blockId', async () => {
-        let recipientAddress = '484a487b1c12b8f46dfe9f15e7fe79ceb88d2c3f76ba39680ae5279a04e7e842ldpos';
+        let recipientAddress = '660c22683a6d466f66740042677ed1adc8bb723bd871c32c93f52eaa224a817fldpos';
         let transactions = await chainModule.actions.getInboundTransactionsFromBlock.handler({
           walletAddress: recipientAddress,
           blockId: 'abc9f15e7de79cebc87d2c3f76ba39480ae5279a12e='
@@ -444,7 +444,7 @@ describe('DEX API tests', async () => {
       });
 
       it('should return an empty array if no transactions match the specified walletAddress', async () => {
-        let recipientAddress = '484a487b1c12b8f46dfe9f15e7fe79ceb88d2c3f76ba39680ae5279a04e7e842ldpos';
+        let recipientAddress = '660c22683a6d466f66740042677ed1adc8bb723bd871c32c93f52eaa224a817fldpos';
         let transactions = await chainModule.actions.getInboundTransactionsFromBlock.handler({
           walletAddress: '1bbcb6922ca73d835a398fa09614054aecfaee465a31259bb6a845c9a37e2058ldpos',
           blockId: 'dfa9f15e7fe79cebc88d2c3f76ba39680ae5279a14e='
@@ -476,9 +476,9 @@ describe('DEX API tests', async () => {
         }
 
         assert.equal(transactions[0].senderAddress, clientForger.walletAddress);
-        assert.equal(transactions[0].id, 'IFSFLr5d2WZjFhwSqFG/DDZMVFj4WkgeINaacYayvPw=');
+        assert.equal(transactions[0].id, 'o9vq17lJ6cbVPf6uewUSVpF1JSDR9CpvDM2SCCI2QOc=');
         assert.equal(transactions[1].senderAddress, clientForger.walletAddress);
-        assert.equal(transactions[1].id, 'kTINYDSiniXS3bz7GSBdOvPiiZ7Pkc0hn5TjD8REx10=');
+        assert.equal(transactions[1].id, 'rXe8wVRFSOLpSQNNMnHJ2yNH683iiZMrjRJil6WcjK0=');
       });
 
       it('should return transactions with a valid signatures property if transaction is from a multisig wallet', async () => {
@@ -637,7 +637,7 @@ describe('DEX API tests', async () => {
         // The chain module can handle the transaction and signature objects however it wants.
         let preparedTxn = clientForger.prepareTransaction({
           type: 'transfer',
-          recipientAddress: '484a487b1c12b8f46dfe9f15e7fe79ceb88d2c3f76ba39680ae5279a04e7e842ldpos',
+          recipientAddress: '660c22683a6d466f66740042677ed1adc8bb723bd871c32c93f52eaa224a817fldpos',
           amount: '3300000000',
           fee: '100000000',
           timestamp: 100000,
