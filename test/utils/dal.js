@@ -1,3 +1,5 @@
+const DEFAULT_NETWORK_SYMBOL = 'ldpos';
+
 class DAL {
   constructor() {
     this.accounts = {};
@@ -11,6 +13,7 @@ class DAL {
     let { genesis } = options;
     let { accounts } = genesis;
     let multisigWalletList = genesis.multisigWallets || [];
+    this.networkSymbol = genesis.networkSymbol || DEFAULT_NETWORK_SYMBOL;
 
     await Promise.all(
       accounts.map(async (accountInfo) => {
@@ -38,7 +41,7 @@ class DAL {
   }
 
   async getNetworkSymbol() {
-    return 'ldpos';
+    return this.networkSymbol;
   }
 
   async upsertAccount(account) {
