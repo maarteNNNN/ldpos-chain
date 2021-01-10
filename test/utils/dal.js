@@ -13,12 +13,13 @@ class DAL {
     let multisigWalletList = genesis.multisigWallets || [];
 
     await Promise.all(
-      accounts.map(async (account) => {
-        let { votes, ...accountWithoutVotes } = account;
-        this.accounts[account.address] = {
+      accounts.map(async (accountInfo) => {
+        let { votes, ...accountWithoutVotes } = accountInfo;
+        let account = {
           ...accountWithoutVotes,
           updateHeight: 0
         };
+        await this.upsertAccount(account);
         await Promise.all(
           votes.map((delegateAddress) => this.upsertVote(account.address, delegateAddress))
         );
