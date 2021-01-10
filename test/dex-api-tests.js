@@ -16,6 +16,7 @@ const LDPoSChainModule = require('../index');
 describe('DEX API tests', async () => {
   let chainModule;
   let dal;
+  let adapter;
   let channel;
   let options;
   let bootstrapEventTriggered;
@@ -38,6 +39,18 @@ describe('DEX API tests', async () => {
     });
 
     dal = chainModule.dal;
+
+    adapter = {
+      getNetworkSymbol: async () => {
+        return chainModule.actions.getNetworkSymbol.handler();
+      },
+      getAccount: async (walletAddress) => {
+        return chainModule.actions.getAccount.handler({ walletAddress });
+      },
+      postTransaction: async (transaction) => {
+        return chainModule.actions.postTransaction.handler({ transaction });
+      }
+    };
 
     channel = new Channel({
       modules: {
@@ -73,7 +86,7 @@ describe('DEX API tests', async () => {
     await chainModule.load(channel, options);
     clientForger = await createClient({
       passphrase: options.forgingPassphrase,
-      adapter: dal
+      adapter
     });
   });
 
@@ -175,11 +188,11 @@ describe('DEX API tests', async () => {
 
       clientA = await createClient({
         passphrase: multisigMemberAPassphrase,
-        adapter: dal
+        adapter
       });
       clientB = await createClient({
         passphrase: multisigMemberBPassphrase,
-        adapter: dal
+        adapter
       });
 
       let lastBlockId = null;

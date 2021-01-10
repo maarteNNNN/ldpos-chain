@@ -99,6 +99,12 @@ module.exports = class LDPoSChainModule {
 
   get actions() {
     return {
+      getNetworkSymbol: {
+        handler: async action => {
+          return this.networkSymbol;
+        },
+        isPublic: true
+      },
       postTransaction: {
         handler: async action => {
           return this.postTransaction(action.transaction);
