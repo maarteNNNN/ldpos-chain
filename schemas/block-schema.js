@@ -1,10 +1,8 @@
 const {
   validateWalletAddress,
+  validateKeyIndex,
   validateBlockId,
-  validateNextForgingKeyIndex,
-  validatePreviousBlockId,
-  validateForgingPublicKey,
-  validateNextForgingPublicKey,
+  validatePublicKey,
   validateTimestamp,
   validateBlockHeight,
   validateSignature
@@ -30,10 +28,10 @@ function validateBlockSchema(block, minTransactionsPerBlock, maxTransactionsPerB
   if (!block) {
     throw new Error('Block was not specified');
   }
-  validateBlockHeight(block.height);
-  validateTimestamp(block.timestamp);
+  validateBlockHeight('height', block);
+  validateTimestamp('timestamp', block);
   if (block.previousBlockId != null) {
-    validatePreviousBlockId(block.previousBlockId);
+    validateBlockId('previousBlockId', block);
   }
   if (!Array.isArray(block.transactions)) {
     throw new Error('Block transactions must be an array');
@@ -48,12 +46,12 @@ function validateBlockSchema(block, minTransactionsPerBlock, maxTransactionsPerB
       `Block contained too many transactions - Maximum allowed is ${maxTransactionsPerBlock}`
     );
   }
-  validateWalletAddress(block.forgerAddress, networkSymbol);
-  validateBlockId(block.id);
-  validateForgingPublicKey(block.forgingPublicKey);
-  validateNextForgingPublicKey(block.nextForgingPublicKey);
-  validateNextForgingKeyIndex(block.nextForgingKeyIndex);
-  validateSignature(block.forgerSignature);
+  validateWalletAddress('forgerAddress', block, networkSymbol);
+  validateBlockId('id', block);
+  validatePublicKey('forgingPublicKey', block);
+  validatePublicKey('nextForgingPublicKey', block);
+  validateKeyIndex('nextForgingKeyIndex', block);
+  validateSignature('forgerSignature', block);
   if (!Array.isArray(block.signatures)) {
     throw new Error('Block signatures must be an array');
   }

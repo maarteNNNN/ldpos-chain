@@ -1,7 +1,6 @@
 const {
-  validateMultisigPublicKey,
-  validateNextMultisigPublicKey,
-  validateNextMultisigKeyIndex
+  validatePublicKey,
+  validateKeyIndex
 } = require('./primitives');
 
 function validateRegisterMultisigDetailsTransactionSchema(transaction) {
@@ -9,9 +8,9 @@ function validateRegisterMultisigDetailsTransactionSchema(transaction) {
     throw new Error('Register multisig details transaction was not specified');
   }
 
-  validateMultisigPublicKey(transaction.newMultisigPublicKey);
-  validateNextMultisigPublicKey(transaction.newNextMultisigPublicKey);
-  validateNextMultisigKeyIndex(transaction.newNextMultisigKeyIndex);
+  validatePublicKey('newMultisigPublicKey', transaction);
+  validatePublicKey('newNextMultisigPublicKey', transaction);
+  validateKeyIndex('newNextMultisigKeyIndex', transaction);
 
   return ['newMultisigPublicKey', 'newNextMultisigPublicKey', 'newNextMultisigKeyIndex'];
 }

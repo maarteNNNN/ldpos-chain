@@ -2,9 +2,8 @@ const {
   validateWalletAddress,
   validateSignature,
   validateSignatureHash,
-  validateMultisigPublicKey,
-  validateNextMultisigPublicKey,
-  validateNextMultisigKeyIndex
+  validatePublicKey,
+  validateKeyIndex
 } = require('./primitives');
 
 const { findInvalidProperty } = require('./find-invalid-property');
@@ -38,27 +37,24 @@ function validateMultisigTransactionSchema(multisigTransaction, minSignatures, m
     }
     let {
       signerAddress,
-      multisigPublicKey,
-      nextMultisigPublicKey,
-      nextMultisigKeyIndex,
       signature,
       signatureHash
     } = signaturePacket;
 
-    validateMultisigPublicKey(multisigPublicKey);
-    validateNextMultisigPublicKey(nextMultisigPublicKey);
-    validateNextMultisigKeyIndex(nextMultisigKeyIndex);
+    validatePublicKey('multisigPublicKey', signaturePacket);
+    validatePublicKey('nextMultisigPublicKey', signaturePacket);
+    validateKeyIndex('nextMultisigKeyIndex', signaturePacket);
 
-    validateWalletAddress(signerAddress, networkSymbol);
+    validateWalletAddress('signerAddress', signaturePacket, networkSymbol);
     if (fullCheck) {
-      validateSignature(signature);
+      validateSignature('signature', signaturePacket);
       if (signatureHash) {
         throw new Error(
           `Multisig transaction contained a signature object with a signatureHash property which is not allowed during a full check`
         );
       }
     } else {
-      validateSignatureHash(signatureHash);
+      validateSignatureHash('signatureHash', signaturePacket);
       if (signature) {
         throw new Error(
           `Multisig transaction contained a signature object with a signature property which is not allowed during a partial check`

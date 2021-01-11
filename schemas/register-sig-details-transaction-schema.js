@@ -1,7 +1,6 @@
 const {
-  validateSigPublicKey,
-  validateNextSigPublicKey,
-  validateNextSigKeyIndex
+  validatePublicKey,
+  validateKeyIndex
 } = require('./primitives');
 
 function validateRegisterSigDetailsTransactionSchema(transaction) {
@@ -9,9 +8,9 @@ function validateRegisterSigDetailsTransactionSchema(transaction) {
     throw new Error('Register sig details transaction was not specified');
   }
 
-  validateSigPublicKey(transaction.newSigPublicKey);
-  validateNextSigPublicKey(transaction.newNextSigPublicKey);
-  validateNextSigKeyIndex(transaction.newNextSigKeyIndex);
+  validatePublicKey('newSigPublicKey', transaction);
+  validatePublicKey('newNextSigPublicKey', transaction);
+  validateKeyIndex('newNextSigKeyIndex', transaction);
 
   return ['newSigPublicKey', 'newNextSigPublicKey', 'newNextSigKeyIndex'];
 }

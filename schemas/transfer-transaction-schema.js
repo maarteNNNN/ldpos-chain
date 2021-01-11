@@ -7,8 +7,8 @@ function validateTransferTransactionSchema(transaction, maxSpendableDigits, netw
   if (!transaction) {
     throw new Error('Transfer transaction was not specified');
   }
-  validateWalletAddress(transaction.recipientAddress, networkSymbol);
-  validateTransactionAmount(transaction.amount, maxSpendableDigits);
+  validateWalletAddress('recipientAddress', transaction, networkSymbol);
+  validateTransactionAmount('amount', transaction, maxSpendableDigits);
 
   return ['recipientAddress', 'amount'];
 }

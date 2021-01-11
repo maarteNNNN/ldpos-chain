@@ -1,7 +1,6 @@
 const {
-  validateForgingPublicKey,
-  validateNextForgingPublicKey,
-  validateNextForgingKeyIndex
+  validatePublicKey,
+  validateKeyIndex
 } = require('./primitives');
 
 function validateRegisterForgingDetailsTransactionSchema(transaction) {
@@ -9,9 +8,9 @@ function validateRegisterForgingDetailsTransactionSchema(transaction) {
     throw new Error('Register forging details transaction was not specified');
   }
 
-  validateForgingPublicKey(transaction.newForgingPublicKey);
-  validateNextForgingPublicKey(transaction.newNextForgingPublicKey);
-  validateNextForgingKeyIndex(transaction.newNextForgingKeyIndex);
+  validatePublicKey('newForgingPublicKey', transaction);
+  validatePublicKey('newNextForgingPublicKey', transaction);
+  validateKeyIndex('newNextForgingKeyIndex', transaction);
 
   return ['newForgingPublicKey', 'newNextForgingPublicKey', 'newNextForgingKeyIndex'];
 }

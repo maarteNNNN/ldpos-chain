@@ -2,9 +2,8 @@ const {
   validateSignature,
   validateWalletAddress,
   validateBlockId,
-  validateNextForgingKeyIndex,
-  validateForgingPublicKey,
-  validateNextForgingPublicKey
+  validateKeyIndex,
+  validatePublicKey
 } = require('./primitives');
 
 const { findInvalidProperty } = require('./find-invalid-property');
@@ -23,11 +22,11 @@ function validateBlockSignatureSchema(blockSignature, networkSymbol) {
       'Block signature was not specified'
     );
   }
-  validateWalletAddress(blockSignature.signerAddress, networkSymbol);
-  validateForgingPublicKey(blockSignature.forgingPublicKey);
-  validateNextForgingPublicKey(blockSignature.nextForgingPublicKey);
-  validateNextForgingKeyIndex(blockSignature.nextForgingKeyIndex);
-  validateSignature(blockSignature.signature);
+  validateWalletAddress('signerAddress', blockSignature, networkSymbol);
+  validatePublicKey('forgingPublicKey', blockSignature);
+  validatePublicKey('nextForgingPublicKey', blockSignature);
+  validateKeyIndex('nextForgingKeyIndex', blockSignature);
+  validateSignature('signature', blockSignature);
 
   let invalidProperty = findInvalidProperty(blockSignature, validPropertyList);
   if (invalidProperty) {

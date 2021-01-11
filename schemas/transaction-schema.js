@@ -34,10 +34,10 @@ function validateTransactionSchema(transaction, maxSpendableDigits, networkSymbo
     );
   }
 
-  validateWalletAddress(transaction.senderAddress, networkSymbol);
-  validateTransactionFee(transaction.fee, maxSpendableDigits);
-  validateTimestamp(transaction.timestamp);
-  validateTransactionMessage(transaction.message, maxTransactionMessageLength);
+  validateWalletAddress('senderAddress', transaction, networkSymbol);
+  validateTransactionFee('fee', transaction, maxSpendableDigits);
+  validateTimestamp('timestamp', transaction);
+  validateTransactionMessage('message', transaction, maxTransactionMessageLength);
 
   let extraValidProperties;
   if (type === 'transfer') {
