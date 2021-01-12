@@ -587,15 +587,7 @@ module.exports = class LDPoSChainModule {
       this.logger.info(`Processed transaction ${txn.id}`);
     }
 
-    let signerCount = BigInt(blockSignerAddressSet.size);
-    let comissionPerSigner = totalBlockFees / (signerCount + 1n);
-    let forgerComission = totalBlockFees - comissionPerSigner * signerCount;
-
-    for (let blockSignerAddress of blockSignerAddressSet) {
-      affectedAccountDetails[blockSignerAddress].changes.balance += comissionPerSigner;
-    }
-
-    forgerAccountChanges.balance += forgerComission;
+    forgerAccountChanges.balance += totalBlockFees;
 
     await Promise.all(
       [...affectedAddressSet].map(async (affectedAddress) => {
