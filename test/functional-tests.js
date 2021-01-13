@@ -44,10 +44,10 @@ describe('Functional tests', async () => {
         return chainModule.actions.getNetworkSymbol.handler();
       },
       getAccount: async (walletAddress) => {
-        return chainModule.actions.getAccount.handler({ walletAddress });
+        return chainModule.actions.getAccount.handler({ params: { walletAddress } });
       },
       postTransaction: async (transaction) => {
-        return chainModule.actions.postTransaction.handler({ transaction });
+        return chainModule.actions.postTransaction.handler({ params: { transaction } });
       }
     };
 
@@ -82,6 +82,7 @@ describe('Functional tests', async () => {
     describe('with a single registered delegate', async () => {
 
       beforeEach(async () => {
+        // Forger address: 092188ca7934529fc624acf62f2b6ce96c3167424f54aa467428f3d0dcdcc60cldpos
         options = {
           genesisPath: './test/utils/genesis-functional.json',
           forgingPassphrase: 'clerk aware give dog reopen peasant duty cheese tobacco trouble gold angle',
@@ -113,7 +114,12 @@ describe('Functional tests', async () => {
         it('should forge correct number of valid blocks based on forging interval', async () => {
           await wait(12000);
           let newBlocks = chainChangeEvents.map(event => event.data.block);
-          let blockList = await chainModule.actions.getBlocksFromHeight.handler({ height: 1, limit: 100 });
+          let blockList = await chainModule.actions.getBlocksFromHeight.handler({
+            params: {
+              height: 1,
+              limit: 100
+            }
+          });
 
           // Can be 3 blocks if the node launches near the end of the first timeslot.
           let blockCount = newBlocks.length;
@@ -155,7 +161,9 @@ describe('Functional tests', async () => {
               message: ''
             });
             await chainModule.actions.postTransaction.handler({
-              transaction: preparedTxn
+              params: {
+                transaction: preparedTxn
+              }
             });
           }
 
@@ -164,7 +172,12 @@ describe('Functional tests', async () => {
 
         it('should forge valid blocks which contain the correct number of transactions', async () => {
           let newBlocks = chainChangeEvents.map(event => event.data.block);
-          let blockList = await chainModule.actions.getBlocksFromHeight.handler({ height: 1, limit: 100 });
+          let blockList = await chainModule.actions.getBlocksFromHeight.handler({
+            params: {
+              height: 1,
+              limit: 100
+            }
+          });
           let totalTxnCount = 0;
           for (let block of blockList) {
             totalTxnCount += block.numberOfTransactions;
@@ -226,7 +239,9 @@ describe('Functional tests', async () => {
             message: ''
           });
           await chainModule.actions.postTransaction.handler({
-            transaction: preparedTxn
+            params: {
+              transaction: preparedTxn
+            }
           });
         }
 
@@ -235,13 +250,23 @@ describe('Functional tests', async () => {
 
       it('should process all valid transactions within blocks and correctly update account balances', async () => {
         let newBlocks = chainChangeEvents.map(event => event.data.block);
-        let blockList = await chainModule.actions.getBlocksFromHeight.handler({ height: 1, limit: 100 });
+        let blockList = await chainModule.actions.getBlocksFromHeight.handler({
+          params: {
+            height: 1,
+            limit: 100
+          }
+        });
         let totalTxnCount = 0;
         let txnList = [];
 
         for (let block of blockList) {
           totalTxnCount += block.numberOfTransactions;
-          let blockTxns = await chainModule.actions.getTransactionsFromBlock.handler({ blockId: block.id, offset: 0 });
+          let blockTxns = await chainModule.actions.getTransactionsFromBlock.handler({
+            params: {
+              blockId: block.id,
+              offset: 0
+            }
+          });
           for (let txn of blockTxns) {
             txnList.push(txn);
           }
@@ -251,10 +276,14 @@ describe('Functional tests', async () => {
 
         let [senderAccount, recipientAccount] = await Promise.all([
           chainModule.actions.getAccount.handler({
-            walletAddress: clientA.walletAddress
+            params: {
+              walletAddress: clientA.walletAddress
+            }
           }),
           chainModule.actions.getAccount.handler({
-            walletAddress: '772e25778a36dc33a7c00115471d270ead1458c170b222e9c63f17da588dd9edldpos'
+            params: {
+              walletAddress: '772e25778a36dc33a7c00115471d270ead1458c170b222e9c63f17da588dd9edldpos'
+            }
           })
         ]);
 
@@ -296,7 +325,9 @@ describe('Functional tests', async () => {
             message: ''
           });
           await chainModule.actions.postTransaction.handler({
-            transaction: preparedTxn
+            params: {
+              transaction: preparedTxn
+            }
           });
         }
 
@@ -309,7 +340,12 @@ describe('Functional tests', async () => {
 
       it('should update the state in an idempotent way', async () => {
         let newBlocks = chainChangeEvents.map(event => event.data.block);
-        let blockList = await chainModule.actions.getBlocksFromHeight.handler({ height: 1, limit: 100 });
+        let blockList = await chainModule.actions.getBlocksFromHeight.handler({
+          params: {
+            height: 1,
+            limit: 100
+          }
+        });
         let totalTxnCount = 0;
         let txnList = [];
 
@@ -320,7 +356,12 @@ describe('Functional tests', async () => {
 
         for (let block of blockList) {
           totalTxnCount += block.numberOfTransactions;
-          let blockTxns = await chainModule.actions.getTransactionsFromBlock.handler({ blockId: block.id, offset: 0 });
+          let blockTxns = await chainModule.actions.getTransactionsFromBlock.handler({
+            params: {
+              blockId: block.id,
+              offset: 0
+            }
+          });
           for (let txn of blockTxns) {
             txnList.push(txn);
           }
@@ -330,10 +371,14 @@ describe('Functional tests', async () => {
 
         let [senderAccount, recipientAccount] = await Promise.all([
           chainModule.actions.getAccount.handler({
-            walletAddress: clientA.walletAddress
+            params: {
+              walletAddress: clientA.walletAddress
+            }
           }),
           chainModule.actions.getAccount.handler({
-            walletAddress: '772e25778a36dc33a7c00115471d270ead1458c170b222e9c63f17da588dd9edldpos'
+            params: {
+              walletAddress: '772e25778a36dc33a7c00115471d270ead1458c170b222e9c63f17da588dd9edldpos'
+            }
           })
         ]);
 
@@ -383,7 +428,9 @@ describe('Functional tests', async () => {
           multisigClient.attachMultisigTransactionSignature(preparedTxn, memberBSignature);
 
           await chainModule.actions.postTransaction.handler({
-            transaction: preparedTxn
+            params: {
+              transaction: preparedTxn
+            }
           });
         }
 
@@ -392,13 +439,23 @@ describe('Functional tests', async () => {
 
       it('should process all valid transactions within blocks and correctly update account balances', async () => {
         let newBlocks = chainChangeEvents.map(event => event.data.block);
-        let blockList = await chainModule.actions.getBlocksFromHeight.handler({ height: 1, limit: 100 });
+        let blockList = await chainModule.actions.getBlocksFromHeight.handler({
+          params: {
+            height: 1,
+            limit: 100
+          }
+        });
         let totalTxnCount = 0;
         let txnList = [];
 
         for (let block of blockList) {
           totalTxnCount += block.numberOfTransactions;
-          let blockTxns = await chainModule.actions.getTransactionsFromBlock.handler({ blockId: block.id, offset: 0 });
+          let blockTxns = await chainModule.actions.getTransactionsFromBlock.handler({
+            params: {
+              blockId: block.id,
+              offset: 0
+            }
+          });
           for (let txn of blockTxns) {
             txnList.push(txn);
           }
@@ -408,10 +465,14 @@ describe('Functional tests', async () => {
 
         let [senderAccount, recipientAccount] = await Promise.all([
           chainModule.actions.getAccount.handler({
-            walletAddress: multisigClient.walletAddress
+            params: {
+              walletAddress: multisigClient.walletAddress
+            }
           }),
           chainModule.actions.getAccount.handler({
-            walletAddress: '772e25778a36dc33a7c00115471d270ead1458c170b222e9c63f17da588dd9edldpos'
+            params: {
+              walletAddress: '772e25778a36dc33a7c00115471d270ead1458c170b222e9c63f17da588dd9edldpos'
+            }
           })
         ]);
 
@@ -471,7 +532,9 @@ describe('Functional tests', async () => {
           multisigClient.attachMultisigTransactionSignature(preparedTxn, memberBSignature);
 
           await chainModule.actions.postTransaction.handler({
-            transaction: preparedTxn
+            params: {
+              transaction: preparedTxn
+            }
           });
         }
 
@@ -484,7 +547,12 @@ describe('Functional tests', async () => {
 
       it('should update the state in an idempotent way', async () => {
         let newBlocks = chainChangeEvents.map(event => event.data.block);
-        let blockList = await chainModule.actions.getBlocksFromHeight.handler({ height: 1, limit: 100 });
+        let blockList = await chainModule.actions.getBlocksFromHeight.handler({
+          params: {
+            height: 1,
+            limit: 100
+          }
+        });
         let totalTxnCount = 0;
         let txnList = [];
 
@@ -495,7 +563,12 @@ describe('Functional tests', async () => {
 
         for (let block of blockList) {
           totalTxnCount += block.numberOfTransactions;
-          let blockTxns = await chainModule.actions.getTransactionsFromBlock.handler({ blockId: block.id, offset: 0 });
+          let blockTxns = await chainModule.actions.getTransactionsFromBlock.handler({
+            params: {
+              blockId: block.id,
+              offset: 0
+            }
+          });
           for (let txn of blockTxns) {
             txnList.push(txn);
           }
@@ -505,10 +578,14 @@ describe('Functional tests', async () => {
 
         let [senderAccount, recipientAccount] = await Promise.all([
           chainModule.actions.getAccount.handler({
-            walletAddress: multisigClient.walletAddress
+            params: {
+              walletAddress: multisigClient.walletAddress
+            }
           }),
           chainModule.actions.getAccount.handler({
-            walletAddress: '772e25778a36dc33a7c00115471d270ead1458c170b222e9c63f17da588dd9edldpos'
+            params: {
+              walletAddress: '772e25778a36dc33a7c00115471d270ead1458c170b222e9c63f17da588dd9edldpos'
+            }
           })
         ]);
 
@@ -568,7 +645,9 @@ describe('Functional tests', async () => {
           message: ''
         });
         await chainModule.actions.postTransaction.handler({
-          transaction: preparedTxn
+          params: {
+            transaction: preparedTxn
+          }
         });
 
         await wait(8000);
@@ -588,7 +667,9 @@ describe('Functional tests', async () => {
           message: ''
         });
         await chainModule.actions.postTransaction.handler({
-          transaction: firstRecipientPreparedTxn
+          params: {
+            transaction: firstRecipientPreparedTxn
+          }
         });
 
         await wait(8000);
@@ -597,13 +678,19 @@ describe('Functional tests', async () => {
       it('should update account balances', async () => {
         let [initialSenderAccount, firstRecipientAccount, secondRecipientAccount] = await Promise.all([
           chainModule.actions.getAccount.handler({
-            walletAddress: clientA.walletAddress
+            params: {
+              walletAddress: clientA.walletAddress
+            }
           }),
           chainModule.actions.getAccount.handler({
-            walletAddress: firstRecipientClient.walletAddress
+            params: {
+              walletAddress: firstRecipientClient.walletAddress
+            }
           }),
           chainModule.actions.getAccount.handler({
-            walletAddress: 'e8b4bf144b865240bb4ea92f5e281fbf931435f1db4698bb4328c535a8bb7351ldpos'
+            params: {
+              walletAddress: 'e8b4bf144b865240bb4ea92f5e281fbf931435f1db4698bb4328c535a8bb7351ldpos'
+            }
           })
         ]);
         assert.notEqual(initialSenderAccount, null);
@@ -633,7 +720,9 @@ describe('Functional tests', async () => {
         });
         try {
           await chainModule.actions.postTransaction.handler({
-            transaction: preparedTxn
+            params: {
+              transaction: preparedTxn
+            }
           });
         } catch (error) {
           caughtError = error;
@@ -691,7 +780,9 @@ describe('Functional tests', async () => {
           message: ''
         });
         await chainModule.actions.postTransaction.handler({
-          transaction: preparedTxn
+          params: {
+            transaction: preparedTxn
+          }
         });
 
         await wait(8000);
@@ -721,7 +812,9 @@ describe('Functional tests', async () => {
         });
         try {
           await chainModule.actions.postTransaction.handler({
-            transaction: preparedTxn
+            params: {
+              transaction: preparedTxn
+            }
           });
         } catch (error) {
           caughtError = error;
@@ -753,7 +846,9 @@ describe('Functional tests', async () => {
           message: ''
         });
         await chainModule.actions.postTransaction.handler({
-          transaction: preparedTxn
+          params: {
+            transaction: preparedTxn
+          }
         });
 
         let secondPreparedTxn = clientA.prepareTransaction({
@@ -765,7 +860,9 @@ describe('Functional tests', async () => {
         });
         try {
           await chainModule.actions.postTransaction.handler({
-            transaction: secondPreparedTxn
+            params: {
+              transaction: secondPreparedTxn
+            }
           });
         } catch (error) {
           caughtError = error;
@@ -830,14 +927,20 @@ describe('Functional tests', async () => {
         });
 
         await chainModule.actions.postTransaction.handler({
-          transaction: preparedTxn
+          params: {
+            transaction: preparedTxn
+          }
         });
 
         await wait(8000);
       });
 
       it('should update the top delegate list', async () => {
-        let account = await chainModule.actions.getAccount.handler({ walletAddress: clientA.walletAddress });
+        let account = await chainModule.actions.getAccount.handler({
+          params: {
+            walletAddress: clientA.walletAddress
+          }
+        });
         let activeDelegatesAfterList = await chainModule.actions.getForgingDelegates.handler();
         assert.equal(Array.isArray(activeDelegatesAfterList), true);
         assert.equal(activeDelegatesAfterList.length, 1);
@@ -864,7 +967,9 @@ describe('Functional tests', async () => {
 
         try {
           await chainModule.actions.postTransaction.handler({
-            transaction: preparedTxn
+            params: {
+              transaction: preparedTxn
+            }
           });
         } catch (error) {
           caughtError = error;
@@ -932,7 +1037,9 @@ describe('Functional tests', async () => {
         });
 
         await chainModule.actions.postTransaction.handler({
-          transaction: preparedTxn
+          params: {
+            transaction: preparedTxn
+          }
         });
 
         await wait(8000);
@@ -948,7 +1055,9 @@ describe('Functional tests', async () => {
         });
         try {
           await chainModule.actions.postTransaction.handler({
-            transaction: preparedTransferTxn
+            params: {
+              transaction: preparedTransferTxn
+            }
           });
         } catch (error) {
           caughtError = error;
@@ -958,7 +1067,11 @@ describe('Functional tests', async () => {
       });
 
       it('should convert sig account into multisig wallet', async () => {
-        let account = await chainModule.actions.getAccount.handler({ walletAddress: clientA.walletAddress });
+        let account = await chainModule.actions.getAccount.handler({
+          params: {
+            walletAddress: clientA.walletAddress
+          }
+        });
         assert.equal(account.type, 'multisig');
         assert.equal(account.balance, '99950000000');
         assert.notEqual(caughtError, null);
@@ -985,12 +1098,18 @@ describe('Functional tests', async () => {
         });
 
         await chainModule.actions.postTransaction.handler({
-          transaction: preparedTxn
+          params: {
+            transaction: preparedTxn
+          }
         });
 
         await wait(8000);
 
-        accountBefore = await chainModule.actions.getAccount.handler({ walletAddress: clientA.walletAddress });
+        accountBefore = await chainModule.actions.getAccount.handler({
+          params: {
+            walletAddress: clientA.walletAddress
+          }
+        });
 
         let preparedTxnB = clientA.prepareMultisigTransaction({
           type: 'registerMultisigWallet',
@@ -1010,12 +1129,18 @@ describe('Functional tests', async () => {
         clientA.attachMultisigTransactionSignature(preparedTxnB, signatureB);
 
         await chainModule.actions.postTransaction.handler({
-          transaction: preparedTxnB
+          params: {
+            transaction: preparedTxnB
+          }
         });
 
         await wait(8000);
 
-        accountAfter = await chainModule.actions.getAccount.handler({ walletAddress: clientA.walletAddress });
+        accountAfter = await chainModule.actions.getAccount.handler({
+          params: {
+            walletAddress: clientA.walletAddress
+          }
+        });
       });
 
       it('should support re-registering an existing multisig wallet with a different set of member addresses', async () => {
@@ -1045,7 +1170,9 @@ describe('Functional tests', async () => {
 
         try {
           await chainModule.actions.postTransaction.handler({
-            transaction: preparedTxn
+            params: {
+              transaction: preparedTxn
+            }
           });
         } catch (error) {
           caughtError = error;
@@ -1107,7 +1234,9 @@ describe('Functional tests', async () => {
         });
 
         await chainModule.actions.postTransaction.handler({
-          transaction: preparedTxn
+          params: {
+            transaction: preparedTxn
+          }
         });
 
         await wait(8000);
@@ -1127,7 +1256,9 @@ describe('Functional tests', async () => {
 
         try {
           await chainModule.actions.postTransaction.handler({
-            transaction: preparedTxnB
+            params: {
+              transaction: preparedTxnB
+            }
           });
         } catch (error) {
           caughtError = error;
@@ -1137,7 +1268,11 @@ describe('Functional tests', async () => {
       });
 
       it('should add all the necessary keys on the account', async () => {
-        let account = await chainModule.actions.getAccount.handler({ walletAddress: clientA.walletAddress });
+        let account = await chainModule.actions.getAccount.handler({
+          params: {
+            walletAddress: clientA.walletAddress
+          }
+        });
         assert.equal(caughtError, null);
         assert.equal(account.balance, '97980000000');
       });
@@ -1159,7 +1294,9 @@ describe('Functional tests', async () => {
 
         try {
           await chainModule.actions.postTransaction.handler({
-            transaction: preparedTxn
+            params: {
+              transaction: preparedTxn
+            }
           });
         } catch (error) {
           caughtError = error;
@@ -1221,14 +1358,20 @@ describe('Functional tests', async () => {
         });
 
         await chainModule.actions.postTransaction.handler({
-          transaction: preparedTxn
+          params: {
+            transaction: preparedTxn
+          }
         });
 
         await wait(8000);
       });
 
       it('should add all the necessary keys on the account', async () => {
-        let account = await chainModule.actions.getAccount.handler({ walletAddress: clientA.walletAddress });
+        let account = await chainModule.actions.getAccount.handler({
+          params: {
+            walletAddress: clientA.walletAddress
+          }
+        });
         assert.equal(caughtError, null);
         assert.equal(account.multisigPublicKey, clientForger.getMultisigPublicKey());
         assert.equal(account.nextMultisigPublicKey, clientForger.getNextMultisigPublicKey());
@@ -1252,7 +1395,9 @@ describe('Functional tests', async () => {
 
         try {
           await chainModule.actions.postTransaction.handler({
-            transaction: preparedTxn
+            params: {
+              transaction: preparedTxn
+            }
           });
         } catch (error) {
           caughtError = error;
@@ -1314,14 +1459,20 @@ describe('Functional tests', async () => {
         });
 
         await chainModule.actions.postTransaction.handler({
-          transaction: preparedTxn
+          params: {
+            transaction: preparedTxn
+          }
         });
 
         await wait(8000);
       });
 
       it('should add all the necessary keys on the account', async () => {
-        let account = await chainModule.actions.getAccount.handler({ walletAddress: clientA.walletAddress });
+        let account = await chainModule.actions.getAccount.handler({
+          params: {
+            walletAddress: clientA.walletAddress
+          }
+        });
         assert.equal(caughtError, null);
         assert.equal(account.forgingPublicKey, clientForger.getForgingPublicKey());
         assert.equal(account.nextForgingPublicKey, clientForger.getNextForgingPublicKey());
@@ -1345,7 +1496,9 @@ describe('Functional tests', async () => {
 
         try {
           await chainModule.actions.postTransaction.handler({
-            transaction: preparedTxn
+            params: {
+              transaction: preparedTxn
+            }
           });
         } catch (error) {
           caughtError = error;

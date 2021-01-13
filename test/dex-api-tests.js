@@ -45,10 +45,10 @@ describe('DEX API tests', async () => {
         return chainModule.actions.getNetworkSymbol.handler();
       },
       getAccount: async (walletAddress) => {
-        return chainModule.actions.getAccount.handler({ walletAddress });
+        return chainModule.actions.getAccount.handler({ params: { walletAddress } });
       },
       postTransaction: async (transaction) => {
-        return chainModule.actions.postTransaction.handler({ transaction });
+        return chainModule.actions.postTransaction.handler({ params: { transaction } });
       }
     };
 
@@ -293,7 +293,9 @@ describe('DEX API tests', async () => {
 
       it('should return an array of member addresses', async () => {
         let walletMembers = await chainModule.actions.getMultisigWalletMembers.handler({
-          walletAddress: multisigAccount.address
+          params: {
+            walletAddress: multisigAccount.address
+          }
         });
         // Must be an array of wallet address strings.
         assert.equal(JSON.stringify(walletMembers), JSON.stringify(memberAddessList));
@@ -303,7 +305,9 @@ describe('DEX API tests', async () => {
         let caughtError = null;
         try {
           await chainModule.actions.getMultisigWalletMembers.handler({
-            walletAddress: '1bbcb6922ca73d835a398fa09614054aecfaee465a31259bb6a845c9a37e2058ldpos'
+            params: {
+              walletAddress: '1bbcb6922ca73d835a398fa09614054aecfaee465a31259bb6a845c9a37e2058ldpos'
+            }
           });
         } catch (error) {
           caughtError = error;
@@ -319,7 +323,9 @@ describe('DEX API tests', async () => {
 
       it('should return the number of required signatures', async () => {
         let requiredSignatureCount = await chainModule.actions.getMinMultisigRequiredSignatures.handler({
-          walletAddress: multisigAccount.address
+          params: {
+            walletAddress: multisigAccount.address
+          }
         });
         assert.equal(requiredSignatureCount, 2);
       });
@@ -328,7 +334,9 @@ describe('DEX API tests', async () => {
         let caughtError = null;
         try {
           await chainModule.actions.getMinMultisigRequiredSignatures.handler({
-            walletAddress: '1bbcb6922ca73d835a398fa09614054aecfaee465a31259bb6a845c9a37e2058ldpos'
+            params: {
+              walletAddress: '1bbcb6922ca73d835a398fa09614054aecfaee465a31259bb6a845c9a37e2058ldpos'
+            }
           });
         } catch (error) {
           caughtError = error;
@@ -342,7 +350,9 @@ describe('DEX API tests', async () => {
         let caughtError = null;
         try {
           await chainModule.actions.getMinMultisigRequiredSignatures.handler({
-            walletAddress: '660c22683a6d466f66740042677ed1adc8bb723bd871c32c93f52eaa224a817fldpos'
+            params: {
+              walletAddress: '660c22683a6d466f66740042677ed1adc8bb723bd871c32c93f52eaa224a817fldpos'
+            }
           });
         } catch (error) {
           caughtError = error;
@@ -358,9 +368,11 @@ describe('DEX API tests', async () => {
 
       it('should return an array of transactions sent from the specified walletAddress', async () => {
         let transactions = await chainModule.actions.getOutboundTransactions.handler({
-          walletAddress: clientForger.walletAddress,
-          fromTimestamp: 0,
-          limit: 100
+          params: {
+            walletAddress: clientForger.walletAddress,
+            fromTimestamp: 0,
+            limit: 100
+          }
         });
         assert.equal(Array.isArray(transactions), true);
         assert.equal(transactions.length, 4);
@@ -384,9 +396,11 @@ describe('DEX API tests', async () => {
 
       it('should return transactions which are more recent than fromTimestamp', async () => {
         let transactions = await chainModule.actions.getOutboundTransactions.handler({
-          walletAddress: clientForger.walletAddress,
-          fromTimestamp: 15000,
-          limit: 100
+          params: {
+            walletAddress: clientForger.walletAddress,
+            fromTimestamp: 15000,
+            limit: 100
+          }
         });
         assert.equal(Array.isArray(transactions), true);
         assert.equal(transactions.length, 3);
@@ -400,9 +414,11 @@ describe('DEX API tests', async () => {
 
       it('should limit the number of transactions based on the specified limit', async () => {
         let transactions = await chainModule.actions.getOutboundTransactions.handler({
-          walletAddress: clientForger.walletAddress,
-          fromTimestamp: 0,
-          limit: 1
+          params: {
+            walletAddress: clientForger.walletAddress,
+            fromTimestamp: 0,
+            limit: 1
+          }
         });
         assert.equal(Array.isArray(transactions), true);
         assert.equal(transactions.length, 1);
@@ -412,9 +428,11 @@ describe('DEX API tests', async () => {
 
       it('should return an empty array if no transactions can be matched', async () => {
         let transactions = await chainModule.actions.getOutboundTransactions.handler({
-          walletAddress: '1bbcb6922ca73d835a398fa09614054aecfaee465a31259bb6a845c9a37e2058ldpos',
-          fromTimestamp: 0,
-          limit: 100
+          params: {
+            walletAddress: '1bbcb6922ca73d835a398fa09614054aecfaee465a31259bb6a845c9a37e2058ldpos',
+            fromTimestamp: 0,
+            limit: 100
+          }
         });
         assert.equal(Array.isArray(transactions), true);
         assert.equal(transactions.length, 0);
@@ -427,8 +445,10 @@ describe('DEX API tests', async () => {
       it('should return an array of transactions sent to the specified walletAddress', async () => {
         let recipientAddress = '660c22683a6d466f66740042677ed1adc8bb723bd871c32c93f52eaa224a817fldpos';
         let transactions = await chainModule.actions.getInboundTransactionsFromBlock.handler({
-          walletAddress: recipientAddress,
-          blockId: blockList[0].id
+          params: {
+            walletAddress: recipientAddress,
+            blockId: blockList[0].id
+          }
         });
         assert.equal(Array.isArray(transactions), true);
         assert.equal(transactions.length, 1);
@@ -449,8 +469,10 @@ describe('DEX API tests', async () => {
       it('should return an empty array if no transactions match the specified blockId', async () => {
         let recipientAddress = '660c22683a6d466f66740042677ed1adc8bb723bd871c32c93f52eaa224a817fldpos';
         let transactions = await chainModule.actions.getInboundTransactionsFromBlock.handler({
-          walletAddress: recipientAddress,
-          blockId: 'abc9f15e7de79cebc87d2c3f76ba39480ae5279a12e='
+          params: {
+            walletAddress: recipientAddress,
+            blockId: 'abc9f15e7de79cebc87d2c3f76ba39480ae5279a12e='
+          }
         });
         assert.equal(Array.isArray(transactions), true);
         assert.equal(transactions.length, 0);
@@ -459,8 +481,10 @@ describe('DEX API tests', async () => {
       it('should return an empty array if no transactions match the specified walletAddress', async () => {
         let recipientAddress = '660c22683a6d466f66740042677ed1adc8bb723bd871c32c93f52eaa224a817fldpos';
         let transactions = await chainModule.actions.getInboundTransactionsFromBlock.handler({
-          walletAddress: '1bbcb6922ca73d835a398fa09614054aecfaee465a31259bb6a845c9a37e2058ldpos',
-          blockId: 'dfa9f15e7fe79cebc88d2c3f76ba39680ae5279a14e='
+          params: {
+            walletAddress: '1bbcb6922ca73d835a398fa09614054aecfaee465a31259bb6a845c9a37e2058ldpos',
+            blockId: 'dfa9f15e7fe79cebc88d2c3f76ba39680ae5279a14e='
+          }
         });
         assert.equal(Array.isArray(transactions), true);
         assert.equal(transactions.length, 0);
@@ -472,8 +496,10 @@ describe('DEX API tests', async () => {
 
       it('should return an array of transactions sent to the specified walletAddress', async () => {
         let transactions = await chainModule.actions.getOutboundTransactionsFromBlock.handler({
-          walletAddress: clientForger.walletAddress,
-          blockId: blockList[0].id
+          params: {
+            walletAddress: clientForger.walletAddress,
+            blockId: blockList[0].id
+          }
         });
         assert.equal(Array.isArray(transactions), true);
         assert.equal(transactions.length, 2);
@@ -496,8 +522,10 @@ describe('DEX API tests', async () => {
 
       it('should return transactions with a valid signatures property if transaction is from a multisig wallet', async () => {
         let transactions = await chainModule.actions.getOutboundTransactionsFromBlock.handler({
-          walletAddress: clientForger.walletAddress,
-          blockId: blockList[2].id
+          params: {
+            walletAddress: clientForger.walletAddress,
+            blockId: blockList[2].id
+          }
         });
         assert.equal(Array.isArray(transactions), true);
         assert.equal(transactions.length, 1);
@@ -519,8 +547,10 @@ describe('DEX API tests', async () => {
 
       it('should return an empty array if no transactions match the specified blockId', async () => {
         let transactions = await chainModule.actions.getOutboundTransactionsFromBlock.handler({
-          walletAddress: clientForger.walletAddress,
-          blockId: 'abc9f15e7de79cebc87d2c3f76ba39480ae5279a12e='
+          params: {
+            walletAddress: clientForger.walletAddress,
+            blockId: 'abc9f15e7de79cebc87d2c3f76ba39480ae5279a12e='
+          }
         });
         assert.equal(Array.isArray(transactions), true);
         assert.equal(transactions.length, 0);
@@ -528,8 +558,10 @@ describe('DEX API tests', async () => {
 
       it('should return an empty array if no transactions match the specified walletAddress', async () => {
         let transactions = await chainModule.actions.getOutboundTransactionsFromBlock.handler({
-          walletAddress: '1bbcb6922ca73d835a398fa09614054aecfaee465a31259bb6a845c9a37e2058ldpos',
-          blockId: 'dfa9f15e7fe79cebc88d2c3f76ba39680ae5279a14e='
+          params: {
+            walletAddress: '1bbcb6922ca73d835a398fa09614054aecfaee465a31259bb6a845c9a37e2058ldpos',
+            blockId: 'dfa9f15e7fe79cebc88d2c3f76ba39680ae5279a14e='
+          }
         });
         assert.equal(Array.isArray(transactions), true);
         assert.equal(transactions.length, 0);
@@ -541,7 +573,9 @@ describe('DEX API tests', async () => {
 
       it('should return the highest block which is below the specified timestamp', async () => {
         let block = await chainModule.actions.getLastBlockAtTimestamp.handler({
-          timestamp: 31000
+          params: {
+            timestamp: 31000
+          }
         });
         assert.notEqual(block, null);
         assert.equal(block.height, 1);
@@ -551,7 +585,9 @@ describe('DEX API tests', async () => {
         let caughtError = null;
         try {
           await chainModule.actions.getLastBlockAtTimestamp.handler({
-            timestamp: 29000
+            params: {
+              timestamp: 29000
+            }
           });
         } catch (error) {
           caughtError = error;
@@ -576,9 +612,11 @@ describe('DEX API tests', async () => {
 
       it('should return blocks whose height is greater than fromHeight and less than or equal to toHeight', async () => {
         let blocks = await chainModule.actions.getBlocksBetweenHeights.handler({
-          fromHeight: 1,
-          toHeight: 2,
-          limit: 100
+          params: {
+            fromHeight: 1,
+            toHeight: 2,
+            limit: 100
+          }
         });
         assert.equal(Array.isArray(blocks), true);
         assert.equal(blocks.length, 1);
@@ -590,9 +628,11 @@ describe('DEX API tests', async () => {
 
       it('should return blocks whose height is greater than fromHeight and less than or equal to toHeight', async () => {
         let blocks = await chainModule.actions.getBlocksBetweenHeights.handler({
-          fromHeight: 0,
-          toHeight: 2,
-          limit: 1
+          params: {
+            fromHeight: 0,
+            toHeight: 2,
+            limit: 1
+          }
         });
         assert.equal(Array.isArray(blocks), true);
         assert.equal(blocks.length, 1);
@@ -601,9 +641,11 @@ describe('DEX API tests', async () => {
 
       it('should return an empty array if no blocks are matched', async () => {
         let blocks = await chainModule.actions.getBlocksBetweenHeights.handler({
-          fromHeight: 9,
-          toHeight: 10,
-          limit: 10
+          params: {
+            fromHeight: 9,
+            toHeight: 10,
+            limit: 10
+          }
         });
         assert.equal(Array.isArray(blocks), true);
         assert.equal(blocks.length, 0);
@@ -615,7 +657,9 @@ describe('DEX API tests', async () => {
 
       it('should expose a getBlockAtHeight action', async () => {
         let block = await chainModule.actions.getBlockAtHeight.handler({
-          height: 2
+          params: {
+            height: 2
+          }
         });
         assert.notEqual(block, null);
         assert.equal(block.height, 2);
@@ -626,7 +670,9 @@ describe('DEX API tests', async () => {
         let caughtError = null;
         try {
           await chainModule.actions.getBlockAtHeight.handler({
-            height: 9
+            params: {
+              height: 9
+            }
           });
         } catch (error) {
           caughtError = error;
@@ -657,7 +703,9 @@ describe('DEX API tests', async () => {
           message: ''
         });
         await chainModule.actions.postTransaction.handler({
-          transaction: preparedTxn
+          params: {
+            transaction: preparedTxn
+          }
         });
       });
 

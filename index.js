@@ -108,7 +108,7 @@ module.exports = class LDPoSChainModule {
       },
       postTransaction: {
         handler: async action => {
-          return this.postTransaction(action.transaction);
+          return this.postTransaction(action.params.transaction);
         },
         isPublic: true
       },
@@ -117,26 +117,26 @@ module.exports = class LDPoSChainModule {
       },
       getAccount: {
         handler: async action => {
-          let { walletAddress } = action;
+          let { walletAddress } = action.params;
           return this.dal.getAccount(walletAddress);
         },
         isPublic: true
       },
       getTransactionsFromBlock: {
         handler: async action => {
-          let { blockId, offset, limit } = action;
+          let { blockId, offset, limit } = action.params;
           return this.dal.getTransactionsFromBlock(blockId, offset, limit);
         }
       },
       getMultisigWalletMembers: {
         handler: async action => {
-          let { walletAddress } = action;
+          let { walletAddress } = action.params;
           return this.dal.getMultisigWalletMembers(walletAddress);
         }
       },
       getMinMultisigRequiredSignatures: {
         handler: async action => {
-          let { walletAddress } = action;
+          let { walletAddress } = action.params;
           let account = await this.getSanitizedAccount(walletAddress);
           if (account.type !== 'multisig') {
             let error = new Error(
@@ -151,25 +151,25 @@ module.exports = class LDPoSChainModule {
       },
       getOutboundTransactions: {
         handler: async action => {
-          let { walletAddress, fromTimestamp, limit } = action;
+          let { walletAddress, fromTimestamp, limit } = action.params;
           return this.dal.getOutboundTransactions(walletAddress, fromTimestamp, limit);
         }
       },
       getInboundTransactionsFromBlock: {
         handler: async action => {
-          let { walletAddress, blockId } = action;
+          let { walletAddress, blockId } = action.params;
           return this.dal.getInboundTransactionsFromBlock(walletAddress, blockId);
         }
       },
       getOutboundTransactionsFromBlock: {
         handler: async action => {
-          let { walletAddress, blockId } = action;
+          let { walletAddress, blockId } = action.params;
           return this.dal.getOutboundTransactionsFromBlock(walletAddress, blockId);
         }
       },
       getLastBlockAtTimestamp: {
         handler: async action => {
-          let { timestamp } = action;
+          let { timestamp } = action.params;
           let block = await this.dal.getLastBlockAtTimestamp(timestamp);
           return this.simplifyBlock(block);
         }
@@ -181,7 +181,7 @@ module.exports = class LDPoSChainModule {
       },
       getBlocksFromHeight: {
         handler: async action => {
-          let { height, limit } = action;
+          let { height, limit } = action.params;
           let blocks = await this.dal.getBlocksFromHeight(height, limit);
           return blocks.map((block) => {
             return this.simplifyBlock(block);
@@ -190,14 +190,14 @@ module.exports = class LDPoSChainModule {
       },
       getSignedBlocksFromHeight: {
         handler: async action => {
-          let { height, limit } = action;
+          let { height, limit } = action.params;
           return this.dal.getBlocksFromHeight(height, limit);
         },
         isPublic: true
       },
       getBlocksBetweenHeights: {
         handler: async action => {
-          let { fromHeight, toHeight, limit } = action;
+          let { fromHeight, toHeight, limit } = action.params;
           let blocks = await this.dal.getBlocksBetweenHeights(fromHeight, toHeight, limit);
           return blocks.map((block) => {
             return this.simplifyBlock(block);
@@ -206,7 +206,7 @@ module.exports = class LDPoSChainModule {
       },
       getBlockAtHeight: {
         handler: async action => {
-          let { height } = action;
+          let { height } = action.params;
           let block = await this.dal.getBlockAtHeight(height);
           return this.simplifyBlock(block);
         }

@@ -41,10 +41,10 @@ describe('Public API tests', async () => {
         return chainModule.actions.getNetworkSymbol.handler();
       },
       getAccount: async (walletAddress) => {
-        return chainModule.actions.getAccount.handler({ walletAddress });
+        return chainModule.actions.getAccount.handler({ params: { walletAddress } });
       },
       postTransaction: async (transaction) => {
-        return chainModule.actions.postTransaction.handler({ transaction });
+        return chainModule.actions.postTransaction.handler({ params: { transaction } });
       }
     };
 
