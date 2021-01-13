@@ -269,7 +269,13 @@ module.exports = class LDPoSChainModule {
           );
         }
       } catch (error) {
-        this.logger.warn(error);
+        this.logger.warn(
+          new Error(
+            `Failed to invoke getSignedBlocksFromHeight action on network because of error: ${
+              error.message
+            }`
+          )
+        );
         await this.wait(fetchBlockPause);
         continue;
       }
@@ -1348,19 +1354,31 @@ module.exports = class LDPoSChainModule {
   }
 
   async broadcastBlock(block) {
-    await this.channel.invoke('network:emit', {
-      event: `${this.alias}:block`,
-      data: block,
-      peerLimit: NO_PEER_LIMIT
-    });
+    try {
+      await this.channel.invoke('network:emit', {
+        event: `${this.alias}:block`,
+        data: block,
+        peerLimit: NO_PEER_LIMIT
+      });
+    } catch (error) {
+      throw new Error(
+        `Failed to emit block to network because of error: ${error.message}`
+      );
+    }
   }
 
   async broadcastBlockSignature(signature) {
-    await this.channel.invoke('network:emit', {
-      event: `${this.alias}:blockSignature`,
-      data: signature,
-      peerLimit: NO_PEER_LIMIT
-    });
+    try {
+      await this.channel.invoke('network:emit', {
+        event: `${this.alias}:blockSignature`,
+        data: signature,
+        peerLimit: NO_PEER_LIMIT
+      });
+    } catch (error) {
+      throw new Error(
+        `Failed to emit blockSignature to network because of error: ${error.message}`
+      );
+    }
   }
 
   async signBlock(block) {
@@ -1465,13 +1483,15 @@ module.exports = class LDPoSChainModule {
     if (options.forgingPassphrase) {
       ldposClient = await createClient({
         passphrase: options.forgingPassphrase,
-        adapter: this.dal
+        adapter: this.dal,
+        connect: true
       });
 
       forgingWalletAddress = ldposClient.getWalletAddress();
     } else {
       ldposClient = await createClient({
-        adapter: this.dal
+        adapter: this.dal,
+        connect: false
       });
     }
 
@@ -1684,15 +1704,21 @@ module.exports = class LDPoSChainModule {
         `Failed to post transaction because of error: ${error.message}`
       );
     }
-    return this.broadcastTransaction(transaction);
+    await this.broadcastTransaction(transaction);
   }
 
   async broadcastTransaction(transaction) {
-    return this.channel.invoke('network:emit', {
-      event: `${this.alias}:transaction`,
-      data: transaction,
-      peerLimit: NO_PEER_LIMIT
-    });
+    try {
+      await this.channel.invoke('network:emit', {
+        event: `${this.alias}:transaction`,
+        data: transaction,
+        peerLimit: NO_PEER_LIMIT
+      });
+    } catch (error) {
+      throw new Error(
+        `Failed to emit transaction to network because of error: ${error.message}`
+      );
+    }
   }
 
   async propagateTransaction(transaction) {
