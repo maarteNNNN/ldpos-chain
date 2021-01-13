@@ -35,6 +35,7 @@ const DEFAULT_MAX_SPENDABLE_DIGITS = 25;
 const DEFAULT_MAX_TRANSACTION_MESSAGE_LENGTH = 256;
 const DEFAULT_MAX_VOTES_PER_ACCOUNT = 21;
 const DEFAULT_MAX_PENDING_TRANSACTIONS_PER_ACCOUNT = 30;
+const DEFAULT_MAX_CONSECUTIVE_BLOCK_FETCH_FAILURES = 5;
 
 const DEFAULT_MIN_TRANSACTION_FEES = {
   transfer: '10000000',
@@ -234,7 +235,8 @@ module.exports = class LDPoSChainModule {
       fetchBlockEndConfirmations,
       fetchBlockLimit,
       fetchBlockPause,
-      blockSignerMajorityCount
+      blockSignerMajorityCount,
+      maxConsecutiveBlockFetchFailures
     } = options;
 
     let now = Date.now();
@@ -244,17 +246,26 @@ module.exports = class LDPoSChainModule {
       return this.lastProcessedBlock.height;
     }
 
+    this.logger.info('Attempting to catch up with the network');
+
+    let consecutiveFailureCounter = 0;
+
     while (true) {
       if (!this.isActive) {
         break;
       }
+
+      let nextBlockHeight = this.lastProcessedBlock.height + 1;
+      this.logger.info(
+        `Fetching new blocks from network starting at height ${nextBlockHeight}`
+      );
 
       let newBlocks;
       try {
         newBlocks = await this.channel.invoke('network:request', {
           procedure: `${this.alias}:getSignedBlocksFromHeight`,
           data: {
-            height: this.lastProcessedBlock.height + 1,
+            height: nextBlockHeight,
             limit: fetchBlockLimit
           }
         });
@@ -268,6 +279,7 @@ module.exports = class LDPoSChainModule {
             } blocks`
           );
         }
+        consecutiveFailureCounter = 0;
       } catch (error) {
         this.logger.warn(
           new Error(
@@ -276,6 +288,9 @@ module.exports = class LDPoSChainModule {
             }`
           )
         );
+        if (++consecutiveFailureCounter > maxConsecutiveBlockFetchFailures) {
+          break;
+        }
         await this.wait(fetchBlockPause);
         continue;
       }
@@ -306,6 +321,8 @@ module.exports = class LDPoSChainModule {
 
       await this.wait(fetchBlockPause);
     }
+
+    this.logger.info('Stopped catching up with the network');
     return this.lastProcessedBlock.height;
   }
 
@@ -803,7 +820,7 @@ module.exports = class LDPoSChainModule {
     });
 
     this.lastProcessedBlock = block;
-    this.logger.info(`Finished processing block ${block.id}`);
+    this.logger.info(`Finished processing block ${block.id} at height ${block.height}`);
   }
 
   async verifyTransactionDoesNotAlreadyExist(transaction) {
@@ -1465,7 +1482,8 @@ module.exports = class LDPoSChainModule {
       maxTransactionsPerBlock,
       minMultisigMembers,
       maxMultisigMembers,
-      minTransactionFees
+      minTransactionFees,
+      maxConsecutiveBlockFetchFailures
     } = options;
 
     this.delegateCount = delegateCount;
@@ -1541,7 +1559,8 @@ module.exports = class LDPoSChainModule {
         fetchBlockLimit,
         fetchBlockPause,
         fetchBlockEndConfirmations,
-        blockSignerMajorityCount
+        blockSignerMajorityCount,
+        maxConsecutiveBlockFetchFailures
       });
       this.nodeHeight = this.networkHeight;
       let nextHeight = this.networkHeight + 1;
@@ -1634,9 +1653,11 @@ module.exports = class LDPoSChainModule {
           let blockTransactions = pendingTransactions.slice(0, maxTransactionsPerBlock).map(txn => this.simplifyTransaction(txn));
           let blockTimestamp = this.getCurrentBlockTimeSlot(forgingInterval);
           let forgedBlock = this.forgeBlock(nextHeight, blockTimestamp, blockTransactions);
+          this.logger.info(`Forged block ${forgedBlock.id} at height ${forgedBlock.height}`);
           await this.wait(forgingBlockBroadcastDelay);
           try {
             await this.broadcastBlock(forgedBlock);
+            this.logger.info(`Broadcasted block ${forgedBlock.id}`);
           } catch (error) {
             this.logger.error(error);
           }
@@ -1646,6 +1667,7 @@ module.exports = class LDPoSChainModule {
       try {
         // Will throw if block is not received in time.
         let { block, senderAccountDetails } = await this.receiveLastBlockInfo(forgingBlockBroadcastDelay + propagationTimeout);
+        this.logger.info(`Received block ${block.id} at height ${block.height}`);
 
         if (forgingWalletAddress && !isCurrentForgingDelegate) {
           (async () => {
@@ -1670,6 +1692,7 @@ module.exports = class LDPoSChainModule {
         }
         // Will throw if the required number of valid signatures cannot be gathered in time.
         await this.receiveLastBlockSignatures(block, blockSignerMajorityCount, forgingSignatureBroadcastDelay + propagationTimeout);
+        this.logger.info(`Received a sufficient number of valid delegate signatures for block ${block.id}`);
         await this.processBlock(block, senderAccountDetails, false);
         this.lastFullySignedBlock = block;
 
@@ -2140,7 +2163,8 @@ module.exports = class LDPoSChainModule {
       maxSpendableDigits: DEFAULT_MAX_SPENDABLE_DIGITS,
       maxTransactionMessageLength: DEFAULT_MAX_TRANSACTION_MESSAGE_LENGTH,
       maxVotesPerAccount: DEFAULT_MAX_VOTES_PER_ACCOUNT,
-      maxPendingTransactionsPerAccount: DEFAULT_MAX_PENDING_TRANSACTIONS_PER_ACCOUNT
+      maxPendingTransactionsPerAccount: DEFAULT_MAX_PENDING_TRANSACTIONS_PER_ACCOUNT,
+      maxConsecutiveBlockFetchFailures: DEFAULT_MAX_CONSECUTIVE_BLOCK_FETCH_FAILURES
     };
     this.options = {...defaultOptions, ...options};
 
