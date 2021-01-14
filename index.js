@@ -46,6 +46,7 @@ const DEFAULT_MAX_TRANSACTION_MESSAGE_LENGTH = 256;
 const DEFAULT_MAX_VOTES_PER_ACCOUNT = 21;
 const DEFAULT_MAX_PENDING_TRANSACTIONS_PER_ACCOUNT = 30;
 const DEFAULT_MAX_CONSECUTIVE_BLOCK_FETCH_FAILURES = 5;
+const DEFAULT_API_LIMIT = 100;
 const DEFAULT_MAX_API_LIMIT = 100;
 
 const DEFAULT_MIN_TRANSACTION_FEES = {
@@ -137,6 +138,9 @@ module.exports = class LDPoSChainModule {
           validateLimit('limit', action.params, this.maxAPILimit);
           validateSortOrder('order', action.params);
           let { offset, limit, order } = action.params;
+          offset = this.sanitizeOffset(offset);
+          limit = this.sanitizeLimit(limit);
+          order = this.sanitizeOrder(order);
           return this.dal.getAccountsByBalance(offset, limit, order);
         },
         isPublic: true
@@ -186,6 +190,9 @@ module.exports = class LDPoSChainModule {
           validateLimit('limit', action.params, this.maxAPILimit);
           validateSortOrder('order', action.params);
           let { offset, limit, order } = action.params;
+          offset = this.sanitizeOffset(offset);
+          limit = this.sanitizeLimit(limit);
+          order = this.sanitizeOrder(order);
           return this.dal.getTransactionsByTimestamp(offset, limit, order);
         },
         isPublic: true
@@ -195,6 +202,7 @@ module.exports = class LDPoSChainModule {
           validateWalletAddress('walletAddress', action.params, this.networkSymbol);
           validateTimestamp('fromTimestamp', action.params);
           validateLimit('limit', action.params, this.maxAPILimit);
+          limit = this.sanitizeLimit(limit);
           let { walletAddress, fromTimestamp, limit } = action.params;
           return this.dal.getOutboundTransactions(walletAddress, fromTimestamp, limit);
         },
@@ -206,6 +214,8 @@ module.exports = class LDPoSChainModule {
           validateOffset('offset', action.params);
           validateLimit('limit', action.params, this.maxAPILimit);
           let { blockId, offset, limit } = action.params;
+          offset = this.sanitizeOffset(offset);
+          limit = this.sanitizeLimit(limit);
           return this.dal.getTransactionsFromBlock(blockId, offset, limit);
         },
         isPublic: true
@@ -248,6 +258,7 @@ module.exports = class LDPoSChainModule {
           validateBlockHeight('height', action.params);
           validateLimit('limit', action.params, this.maxAPILimit);
           let { height, limit } = action.params;
+          limit = this.sanitizeLimit(limit);
           let blocks = await this.dal.getBlocksFromHeight(height, limit);
           return blocks.map((block) => {
             return this.simplifyBlock(block);
@@ -260,6 +271,7 @@ module.exports = class LDPoSChainModule {
           validateBlockHeight('height', action.params);
           validateLimit('limit', action.params, this.maxAPILimit);
           let { height, limit } = action.params;
+          limit = this.sanitizeLimit(limit);
           return this.dal.getBlocksFromHeight(height, limit);
         },
         isPublic: true
@@ -270,6 +282,7 @@ module.exports = class LDPoSChainModule {
           validateBlockHeight('toHeight', action.params);
           validateLimit('limit', action.params, this.maxAPILimit);
           let { fromHeight, toHeight, limit } = action.params;
+          limit = this.sanitizeLimit(limit);
           let blocks = await this.dal.getBlocksBetweenHeights(fromHeight, toHeight, limit);
           return blocks.map((block) => {
             return this.simplifyBlock(block);
@@ -300,6 +313,9 @@ module.exports = class LDPoSChainModule {
           validateLimit('limit', action.params, this.maxAPILimit);
           validateSortOrder('order', action.params);
           let { offset, limit, order } = action.params;
+          offset = this.sanitizeOffset(offset);
+          limit = this.sanitizeLimit(limit);
+          order = this.sanitizeOrder(order);
           return this.dal.getBlocksByTimestamp(offset, limit, order)
             .map((block) => {
               return this.simplifyBlock(block);
@@ -316,6 +332,9 @@ module.exports = class LDPoSChainModule {
           validateLimit('limit', action.params, this.maxAPILimit);
           validateSortOrder('order', action.params);
           let { offset, limit, order } = action.params;
+          offset = this.sanitizeOffset(offset);
+          limit = this.sanitizeLimit(limit);
+          order = this.sanitizeOrder(order);
           return this.dal.getDelegatesByVoteWeight(offset, limit, order);
         },
         isPublic: true
@@ -333,6 +352,27 @@ module.exports = class LDPoSChainModule {
     let { transactions, forgerSignature, signatures, ...simpleBlock } = signedBlock;
     simpleBlock.numberOfTransactions = transactions.length;
     return simpleBlock;
+  }
+
+  sanitizeOffset(offset) {
+    if (offset == null) {
+      return 0;
+    }
+    return offset;
+  }
+
+  sanitizeLimit(limit) {
+    if (limit == null) {
+      return this.apiLimit;
+    }
+    return limit;
+  }
+
+  sanitizeSortOrder(order) {
+    if (order == null) {
+      return 'desc';
+    }
+    return order;
   }
 
   async catchUpWithNetwork(options) {
@@ -2285,6 +2325,7 @@ module.exports = class LDPoSChainModule {
       maxVotesPerAccount: DEFAULT_MAX_VOTES_PER_ACCOUNT,
       maxPendingTransactionsPerAccount: DEFAULT_MAX_PENDING_TRANSACTIONS_PER_ACCOUNT,
       maxConsecutiveBlockFetchFailures: DEFAULT_MAX_CONSECUTIVE_BLOCK_FETCH_FAILURES,
+      apiLimit: DEFAULT_API_LIMIT,
       maxAPILimit: DEFAULT_MAX_API_LIMIT
     };
     this.options = {...defaultOptions, ...options};
@@ -2310,6 +2351,7 @@ module.exports = class LDPoSChainModule {
     this.maxVotesPerAccount = this.options.maxVotesPerAccount;
     this.maxPendingTransactionsPerAccount = this.options.maxPendingTransactionsPerAccount;
     this.maxExtraBlockSignaturesToStore = this.options.maxExtraBlockSignaturesToStore;
+    this.apiLimit = this.options.apiLimit;
     this.maxAPILimit = this.options.maxAPILimit;
 
     let delegateSignerMajorityCount = Math.floor(this.delegateCount / 2);

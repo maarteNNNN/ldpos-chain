@@ -36,9 +36,9 @@ function validatePublicKey(propertyName, packet) {
 
 function validateOffset(propertyName, packet) {
   let offset = packet[propertyName];
-  if (!Number.isInteger(offset) || offset < 0 || offset > Number.MAX_SAFE_INTEGER) {
+  if (offset != null && !Number.isInteger(offset) || offset < 0 || offset > Number.MAX_SAFE_INTEGER) {
     throw new Error(
-      `Offset in ${
+      `If specified, offset in ${
         propertyName
       } must be an integer number between 0 and ${
         Number.MAX_SAFE_INTEGER
@@ -54,9 +54,9 @@ function validateLimit(propertyName, packet, maxLimit) {
     );
   }
   let limit = packet[propertyName];
-  if (!Number.isInteger(limit) || limit < 0 || limit > maxLimit) {
+  if (limit != null && !Number.isInteger(limit) || limit < 0 || limit > maxLimit) {
     throw new Error(
-      `Limit in ${
+      `If specified, limit in ${
         propertyName
       } must be an integer number between 0 and ${
         maxLimit
