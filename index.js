@@ -202,8 +202,8 @@ module.exports = class LDPoSChainModule {
           validateWalletAddress('walletAddress', action.params, this.networkSymbol);
           validateTimestamp('fromTimestamp', action.params);
           validateLimit('limit', action.params, this.maxAPILimit);
-          limit = this.sanitizeLimit(limit);
           let { walletAddress, fromTimestamp, limit } = action.params;
+          limit = this.sanitizeLimit(limit);
           return this.dal.getOutboundTransactions(walletAddress, fromTimestamp, limit);
         },
         isPublic: true
