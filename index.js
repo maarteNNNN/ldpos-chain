@@ -128,11 +128,12 @@ module.exports = class LDPoSChainModule {
         },
         isPublic: true
       },
-      getTransactionsFromBlock: {
+      getAccountsByBalance: {
         handler: async action => {
-          let { blockId, offset, limit } = action.params;
-          return this.dal.getTransactionsFromBlock(blockId, offset, limit);
-        }
+          let { order, offset, limit } = actions.params;
+          return this.dal.getAccountsByBalance(order, offset, limit);
+        },
+        isPublic: true
       },
       getMultisigWalletMembers: {
         handler: async action => {
@@ -154,6 +155,26 @@ module.exports = class LDPoSChainModule {
           }
           return account.requiredSignatureCount;
         }
+      },
+      getTransactionsFromBlock: {
+        handler: async action => {
+          let { blockId, offset, limit } = action.params;
+          return this.dal.getTransactionsFromBlock(blockId, offset, limit);
+        }
+      },
+      getTransaction: {
+        handler: async action => {
+          let { id } = action.params;
+          return this.dal.getTransaction(id);
+        },
+        isPublic: true
+      },
+      getTransactionsByTimestamp: {
+        handler: async action => {
+          let { order, offset, limit } = actions.params;
+          return this.dal.getTransactionsByTimestamp(order, offset, limit);
+        },
+        isPublic: true
       },
       getOutboundTransactions: {
         handler: async action => {
@@ -217,8 +238,29 @@ module.exports = class LDPoSChainModule {
           return this.simplifyBlock(block);
         }
       },
+      getBlock: {
+        handler: async action => {
+          let { id } = actions.params;
+          return this.dal.getBlock(id);
+        },
+        isPublic: true
+      },
+      getBlocksByTimestamp: {
+        handler: async action => {
+          let { order, offset, limit } = actions.params;
+          return this.dal.getBlocksByTimestamp(order, offset, limit);
+        },
+        isPublic: true
+      },
       getModuleOptions: {
         handler: async action => this.options
+      },
+      getDelegatesByVoteWeight: {
+        handler: async action => {
+          let { order, offset, limit } = actions.params;
+          return this.dal.getDelegatesByVoteWeight(order, offset, limit);
+        },
+        isPublic: true
       },
       getForgingDelegates: {
         handler: async action => {
@@ -445,7 +487,7 @@ module.exports = class LDPoSChainModule {
   }
 
   async fetchTopActiveDelegates() {
-    this.topActiveDelegates = await this.dal.getTopActiveDelegates(this.delegateCount);
+    this.topActiveDelegates = await this.dal.getDelegatesByVoteWeight('desc', 0, this.delegateCount);
     this.topActiveDelegateAddressSet = new Set(this.topActiveDelegates.map(delegate => delegate.address));
   }
 
@@ -866,6 +908,18 @@ module.exports = class LDPoSChainModule {
     }
   }
 
+  verifyTransactionIsNotInFuture(transaction) {
+    let { timestamp } = transaction;
+
+    if (timestamp > Date.now()) {
+      throw new Error(
+        `Transaction timestamp ${
+          timestamp
+        } is in the future`
+      );
+    }
+  }
+
   verifySigTransactionAuthentication(senderAccount, transaction, fullCheck) {
     validateSigTransactionSchema(transaction, fullCheck);
 
@@ -1111,6 +1165,7 @@ module.exports = class LDPoSChainModule {
 
   async verifySigTransactionAuthorization(senderAccount, transaction, fullCheck) {
     let txnTotal = this.verifyAccountMeetsRequirements(senderAccount, transaction);
+    this.verifyTransactionIsNotInFuture(transaction);
 
     if (fullCheck) {
       this.verifyTransactionOffersMinFee(transaction);
@@ -1137,6 +1192,7 @@ module.exports = class LDPoSChainModule {
 
   async verifyMultisigTransactionAuthorization(senderAccount, multisigMemberAccounts, transaction, fullCheck) {
     let txnTotal = this.verifyAccountMeetsRequirements(senderAccount, transaction);
+    this.verifyTransactionIsNotInFuture(transaction);
 
     if (fullCheck) {
       this.verifyTransactionOffersMinFee(transaction);
