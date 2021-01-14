@@ -25,8 +25,10 @@ describe('Functional tests', async () => {
   beforeEach(async () => {
     chainModule = new LDPoSChainModule({
       config: {
-        dal: {
-          libPath: './test/utils/dal'
+        components: {
+          dal: {
+            libPath: './test/utils/dal'
+          }
         }
       },
       logger: {

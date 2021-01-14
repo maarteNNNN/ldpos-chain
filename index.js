@@ -55,11 +55,17 @@ module.exports = class LDPoSChainModule {
     this.alias = options.alias || DEFAULT_MODULE_ALIAS;
     this.logger = options.logger || console;
     let { config } = options;
-    let dalConfig = config.dal || {};
+    let components = config.components || {};
+    let dalConfig = components.dal || {};
 
+    if (!dalConfig) {
+      throw new Error(
+        `The ${this.alias} module config needs to have a components.dal property`
+      );
+    }
     if (!dalConfig.libPath) {
       throw new Error(
-        'The LDPoSChainModule config needs to have a dal.libPath property'
+        `The ${this.alias} module config needs to have a components.dal.libPath property`
       );
     }
     const DAL = require(dalConfig.libPath);

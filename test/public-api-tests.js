@@ -22,8 +22,10 @@ describe('Public API tests', async () => {
   beforeEach(async () => {
     chainModule = new LDPoSChainModule({
       config: {
-        dal: {
-          libPath: './test/utils/dal'
+        components: {
+          dal: {
+            libPath: './test/utils/dal'
+          }
         }
       },
       logger: {
