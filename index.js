@@ -10,6 +10,16 @@ const { validateTransactionSchema } = require('./schemas/transaction-schema');
 const { validateBlockSignatureSchema } = require('./schemas/block-signature-schema');
 const { validateMultisigTransactionSchema } = require('./schemas/multisig-transaction-schema');
 const { validateSigTransactionSchema } = require('./schemas/sig-transaction-schema');
+const {
+  validateWalletAddress,
+  validateBlockId,
+  validateBlockHeight,
+  validateTransactionId,
+  validateTimestamp,
+  validateOffset,
+  validateLimit,
+  validateSortOrder
+} = require('./schemas/primitives');
 
 const DEFAULT_MODULE_ALIAS = 'ldpos_chain';
 const DEFAULT_GENESIS_PATH = './genesis/mainnet/genesis.json';
@@ -36,6 +46,7 @@ const DEFAULT_MAX_TRANSACTION_MESSAGE_LENGTH = 256;
 const DEFAULT_MAX_VOTES_PER_ACCOUNT = 21;
 const DEFAULT_MAX_PENDING_TRANSACTIONS_PER_ACCOUNT = 30;
 const DEFAULT_MAX_CONSECUTIVE_BLOCK_FETCH_FAILURES = 5;
+const DEFAULT_MAX_API_LIMIT = 100;
 
 const DEFAULT_MIN_TRANSACTION_FEES = {
   transfer: '10000000',
@@ -112,17 +123,9 @@ module.exports = class LDPoSChainModule {
         },
         isPublic: true
       },
-      postTransaction: {
-        handler: async action => {
-          return this.postTransaction(action.params.transaction);
-        },
-        isPublic: true
-      },
-      getNodeStatus: {
-        handler: async () => {}
-      },
       getAccount: {
         handler: async action => {
+          validateWalletAddress('walletAddress', action.params, this.networkSymbol);
           let { walletAddress } = action.params;
           return this.dal.getAccount(walletAddress);
         },
@@ -130,19 +133,25 @@ module.exports = class LDPoSChainModule {
       },
       getAccountsByBalance: {
         handler: async action => {
-          let { order, offset, limit } = actions.params;
-          return this.dal.getAccountsByBalance(order, offset, limit);
+          validateOffset('offset', action.params);
+          validateLimit('limit', action.params, this.maxAPILimit);
+          validateSortOrder('order', action.params);
+          let { offset, limit, order } = action.params;
+          return this.dal.getAccountsByBalance(offset, limit, order);
         },
         isPublic: true
       },
       getMultisigWalletMembers: {
         handler: async action => {
+          validateWalletAddress('walletAddress', action.params, this.networkSymbol);
           let { walletAddress } = action.params;
           return this.dal.getMultisigWalletMembers(walletAddress);
-        }
+        },
+        isPublic: true
       },
       getMinMultisigRequiredSignatures: {
         handler: async action => {
+          validateWalletAddress('walletAddress', action.params, this.networkSymbol);
           let { walletAddress } = action.params;
           let account = await this.getSanitizedAccount(walletAddress);
           if (account.type !== 'multisig') {
@@ -154,69 +163,102 @@ module.exports = class LDPoSChainModule {
             throw error;
           }
           return account.requiredSignatureCount;
-        }
+        },
+        isPublic: true
       },
-      getTransactionsFromBlock: {
+      postTransaction: {
         handler: async action => {
-          let { blockId, offset, limit } = action.params;
-          return this.dal.getTransactionsFromBlock(blockId, offset, limit);
-        }
+          return this.postTransaction(action.params.transaction);
+        },
+        isPublic: true
       },
       getTransaction: {
         handler: async action => {
-          let { id } = action.params;
-          return this.dal.getTransaction(id);
+          validateTransactionId('transactionId', action.params);
+          let { transactionId } = action.params;
+          return this.dal.getTransaction(transactionId);
         },
         isPublic: true
       },
       getTransactionsByTimestamp: {
         handler: async action => {
-          let { order, offset, limit } = actions.params;
-          return this.dal.getTransactionsByTimestamp(order, offset, limit);
+          validateOffset('offset', action.params);
+          validateLimit('limit', action.params, this.maxAPILimit);
+          validateSortOrder('order', action.params);
+          let { offset, limit, order } = action.params;
+          return this.dal.getTransactionsByTimestamp(offset, limit, order);
         },
         isPublic: true
       },
       getOutboundTransactions: {
         handler: async action => {
+          validateWalletAddress('walletAddress', action.params, this.networkSymbol);
+          validateTimestamp('fromTimestamp', action.params);
+          validateLimit('limit', action.params, this.maxAPILimit);
           let { walletAddress, fromTimestamp, limit } = action.params;
           return this.dal.getOutboundTransactions(walletAddress, fromTimestamp, limit);
-        }
+        },
+        isPublic: true
+      },
+      getTransactionsFromBlock: {
+        handler: async action => {
+          validateBlockId('blockId', action.params);
+          validateOffset('offset', action.params);
+          validateLimit('limit', action.params, this.maxAPILimit);
+          let { blockId, offset, limit } = action.params;
+          return this.dal.getTransactionsFromBlock(blockId, offset, limit);
+        },
+        isPublic: true
       },
       getInboundTransactionsFromBlock: {
         handler: async action => {
+          validateWalletAddress('walletAddress', action.params, this.networkSymbol);
+          validateBlockId('blockId', action.params);
           let { walletAddress, blockId } = action.params;
           return this.dal.getInboundTransactionsFromBlock(walletAddress, blockId);
-        }
+        },
+        isPublic: true
       },
       getOutboundTransactionsFromBlock: {
         handler: async action => {
+          validateWalletAddress('walletAddress', action.params, this.networkSymbol);
+          validateBlockId('blockId', action.params);
           let { walletAddress, blockId } = action.params;
           return this.dal.getOutboundTransactionsFromBlock(walletAddress, blockId);
-        }
+        },
+        isPublic: true
       },
       getLastBlockAtTimestamp: {
         handler: async action => {
+          validateTimestamp('timestamp', action.params);
           let { timestamp } = action.params;
           let block = await this.dal.getLastBlockAtTimestamp(timestamp);
           return this.simplifyBlock(block);
-        }
+        },
+        isPublic: true
       },
       getMaxBlockHeight: {
         handler: async action => {
           return this.dal.getMaxBlockHeight();
-        }
+        },
+        isPublic: true
       },
       getBlocksFromHeight: {
         handler: async action => {
+          validateBlockHeight('height', action.params);
+          validateLimit('limit', action.params, this.maxAPILimit);
           let { height, limit } = action.params;
           let blocks = await this.dal.getBlocksFromHeight(height, limit);
           return blocks.map((block) => {
             return this.simplifyBlock(block);
           });
-        }
+        },
+        isPublic: true
       },
       getSignedBlocksFromHeight: {
         handler: async action => {
+          validateBlockHeight('height', action.params);
+          validateLimit('limit', action.params, this.maxAPILimit);
           let { height, limit } = action.params;
           return this.dal.getBlocksFromHeight(height, limit);
         },
@@ -224,31 +266,41 @@ module.exports = class LDPoSChainModule {
       },
       getBlocksBetweenHeights: {
         handler: async action => {
+          validateBlockHeight('fromHeight', action.params);
+          validateBlockHeight('toHeight', action.params);
+          validateLimit('limit', action.params, this.maxAPILimit);
           let { fromHeight, toHeight, limit } = action.params;
           let blocks = await this.dal.getBlocksBetweenHeights(fromHeight, toHeight, limit);
           return blocks.map((block) => {
             return this.simplifyBlock(block);
           });
-        }
+        },
+        isPublic: true
       },
       getBlockAtHeight: {
         handler: async action => {
+          validateBlockHeight('height', action.params);
           let { height } = action.params;
           let block = await this.dal.getBlockAtHeight(height);
           return this.simplifyBlock(block);
-        }
+        },
+        isPublic: true
       },
       getBlock: {
         handler: async action => {
-          let { id } = actions.params;
-          return this.dal.getBlock(id);
+          validateBlockId('blockId', action.params);
+          let { blockId } = action.params;
+          return this.dal.getBlock(blockId);
         },
         isPublic: true
       },
       getBlocksByTimestamp: {
         handler: async action => {
-          let { order, offset, limit } = actions.params;
-          return this.dal.getBlocksByTimestamp(order, offset, limit)
+          validateOffset('offset', action.params);
+          validateLimit('limit', action.params, this.maxAPILimit);
+          validateSortOrder('order', action.params);
+          let { offset, limit, order } = action.params;
+          return this.dal.getBlocksByTimestamp(offset, limit, order)
             .map((block) => {
               return this.simplifyBlock(block);
             });
@@ -260,8 +312,11 @@ module.exports = class LDPoSChainModule {
       },
       getDelegatesByVoteWeight: {
         handler: async action => {
-          let { order, offset, limit } = actions.params;
-          return this.dal.getDelegatesByVoteWeight(order, offset, limit);
+          validateOffset('offset', action.params);
+          validateLimit('limit', action.params, this.maxAPILimit);
+          validateSortOrder('order', action.params);
+          let { offset, limit, order } = action.params;
+          return this.dal.getDelegatesByVoteWeight(offset, limit, order);
         },
         isPublic: true
       },
@@ -2229,7 +2284,8 @@ module.exports = class LDPoSChainModule {
       maxTransactionMessageLength: DEFAULT_MAX_TRANSACTION_MESSAGE_LENGTH,
       maxVotesPerAccount: DEFAULT_MAX_VOTES_PER_ACCOUNT,
       maxPendingTransactionsPerAccount: DEFAULT_MAX_PENDING_TRANSACTIONS_PER_ACCOUNT,
-      maxConsecutiveBlockFetchFailures: DEFAULT_MAX_CONSECUTIVE_BLOCK_FETCH_FAILURES
+      maxConsecutiveBlockFetchFailures: DEFAULT_MAX_CONSECUTIVE_BLOCK_FETCH_FAILURES,
+      maxAPILimit: DEFAULT_MAX_API_LIMIT
     };
     this.options = {...defaultOptions, ...options};
 
@@ -2254,6 +2310,7 @@ module.exports = class LDPoSChainModule {
     this.maxVotesPerAccount = this.options.maxVotesPerAccount;
     this.maxPendingTransactionsPerAccount = this.options.maxPendingTransactionsPerAccount;
     this.maxExtraBlockSignaturesToStore = this.options.maxExtraBlockSignaturesToStore;
+    this.maxAPILimit = this.options.maxAPILimit;
 
     let delegateSignerMajorityCount = Math.floor(this.delegateCount / 2);
 

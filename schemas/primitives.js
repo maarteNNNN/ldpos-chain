@@ -11,8 +11,12 @@ function isValidWalletAddress(walletAddress, networkSymbol) {
 }
 
 function validateWalletAddress(propertyName, packet, networkSymbol) {
+  if (networkSymbol == null) {
+    throw new Error(
+      'Failed to validate wallet address because the network symbol could not be determined'
+    );
+  }
   let walletAddress = packet[propertyName];
-
   if (!isValidWalletAddress(walletAddress, networkSymbol)) {
     throw new Error(
       `Wallet address in ${propertyName} must be a string with a length of ${walletAddressLength} characters`
@@ -27,6 +31,48 @@ function validatePublicKey(propertyName, packet) {
   }
   if (publicKey.length !== 44) {
     throw new Error(`Public key in ${propertyName} must have a length of 44 characters`);
+  }
+}
+
+function validateOffset(propertyName, packet) {
+  let offset = packet[propertyName];
+  if (!Number.isInteger(offset) || offset < 0 || offset > Number.MAX_SAFE_INTEGER) {
+    throw new Error(
+      `Offset in ${
+        propertyName
+      } must be an integer number between 0 and ${
+        Number.MAX_SAFE_INTEGER
+      } inclusive`
+    );
+  }
+}
+
+function validateLimit(propertyName, packet, maxLimit) {
+  if (maxLimit == null) {
+    throw new Error(
+      'Failed to validate limit because the max limit could not be determined'
+    );
+  }
+  let limit = packet[propertyName];
+  if (!Number.isInteger(limit) || limit < 0 || limit > maxLimit) {
+    throw new Error(
+      `Limit in ${
+        propertyName
+      } must be an integer number between 0 and ${
+        maxLimit
+      } inclusive`
+    );
+  }
+}
+
+function validateSortOrder(propertyName, packet) {
+  let order = packet[propertyName];
+  if (order != null && order !== 'asc' && order !== 'desc') {
+    throw new Error(
+      `If specified, the sort order in ${
+        propertyName
+      } must be either asc or desc`
+    );
   }
 }
 
@@ -75,8 +121,8 @@ function validateBlockId(propertyName, packet) {
 
 function validateBlockHeight(propertyName, packet) {
   let height = packet[propertyName];
-  if (!Number.isInteger(height) || height < 1) {
-    throw new Error(`Block height in ${propertyName} must be an integer number greater than 0`);
+  if (!Number.isInteger(height) || height < 0) {
+    throw new Error(`Block height in ${propertyName} must be a positive integer number`);
   }
 }
 
@@ -142,5 +188,8 @@ module.exports = {
   validateTransactionMessage,
   validateTransactionAmount,
   validateTransactionFee,
+  validateOffset,
+  validateLimit,
+  validateSortOrder,
   validateTimestamp
 };

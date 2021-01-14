@@ -79,7 +79,7 @@ class DAL {
     }
   }
 
-  async getAccountsByBalance(order, offset, limit) {
+  async getAccountsByBalance(offset, limit, order) {
     return this.sortByProperty(Object.values(this.accounts), 'balance', order, BigInt)
       .slice(offset, offset + limit);
   }
@@ -299,7 +299,7 @@ class DAL {
     return block;
   }
 
-  async getBlocksByTimestamp(order, offset, limit) {
+  async getBlocksByTimestamp(offset, limit, order) {
     return this.sortByProperty(this.blocks, 'timestamp', order)
       .slice(offset, offset + limit);
   }
@@ -344,7 +344,7 @@ class DAL {
     };
   }
 
-  async getTransactionsByTimestamp(order, offset, limit) {
+  async getTransactionsByTimestamp(offset, limit, order) {
     return this.sortByProperty(Object.values(this.transactions), 'timestamp', order)
       .slice(offset, offset + limit);
   }
@@ -391,7 +391,7 @@ class DAL {
     );
   }
 
-  async getDelegatesByVoteWeight(order, offset, limit) {
+  async getDelegatesByVoteWeight(offset, limit, order) {
     let delegateList = [];
     let delegateAddressList = Object.keys(this.votes);
     for (let delegateAddress of delegateAddressList) {
