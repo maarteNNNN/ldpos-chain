@@ -417,17 +417,45 @@ class DAL {
   }
 
   sortAsc(list, property, typeCastFunction) {
-    if (typeCastFunction) {
-      return list.sort((a, b) => typeCastFunction(a[property]) - typeCastFunction(b[property]));
-    }
-    return list.sort((a, b) => a[property] - b[property]);
+    return list.sort((a, b) => {
+      let itemA;
+      let itemB;
+      if (typeCastFunction) {
+        itemA = typeCastFunction(a[property]);
+        itemB = typeCastFunction(b[property]);
+      } else {
+        itemA = a[property];
+        itemB = b[property];
+      }
+      if (itemA > itemB) {
+        return 1;
+      }
+      if (itemA < itemB) {
+        return -1;
+      }
+      return 0;
+    });
   }
 
   sortDesc(list, property, typeCastFunction) {
-    if (typeCastFunction) {
-      return list.sort((a, b) => typeCastFunction(b[property]) - typeCastFunction(a[property]));
-    }
-    return list.sort((a, b) => b[property] - a[property]);
+    return list.sort((a, b) => {
+      let itemA;
+      let itemB;
+      if (typeCastFunction) {
+        itemA = typeCastFunction(a[property]);
+        itemB = typeCastFunction(b[property]);
+      } else {
+        itemA = a[property];
+        itemB = b[property];
+      }
+      if (itemA > itemB) {
+        return -1;
+      }
+      if (itemA < itemB) {
+        return 1;
+      }
+      return 0;
+    });
   }
 
   sortByProperty(list, property, order, typeCastFunction) {
