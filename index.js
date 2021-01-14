@@ -545,7 +545,7 @@ module.exports = class LDPoSChainModule {
   }
 
   async fetchTopActiveDelegates() {
-    this.topActiveDelegates = await this.dal.getDelegatesByVoteWeight('desc', 0, this.delegateCount);
+    this.topActiveDelegates = await this.dal.getDelegatesByVoteWeight(0, this.delegateCount, 'desc');
     this.topActiveDelegateAddressSet = new Set(this.topActiveDelegates.map(delegate => delegate.address));
   }
 
