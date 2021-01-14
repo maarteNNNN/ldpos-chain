@@ -248,7 +248,10 @@ module.exports = class LDPoSChainModule {
       getBlocksByTimestamp: {
         handler: async action => {
           let { order, offset, limit } = actions.params;
-          return this.dal.getBlocksByTimestamp(order, offset, limit);
+          return this.dal.getBlocksByTimestamp(order, offset, limit)
+            .map((block) => {
+              return this.simplifyBlock(block);
+            });
         },
         isPublic: true
       },
