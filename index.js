@@ -1539,7 +1539,7 @@ module.exports = class LDPoSChainModule {
       });
     } catch (error) {
       throw new Error(
-        `Failed to emit block to network because of error: ${error.message}`
+        `Failed to emit block to the network because of error: ${error.message}`
       );
     }
   }
@@ -1553,7 +1553,7 @@ module.exports = class LDPoSChainModule {
       });
     } catch (error) {
       throw new Error(
-        `Failed to emit blockSignature to network because of error: ${error.message}`
+        `Failed to emit blockSignature to the network because of error: ${error.message}`
       );
     }
   }
@@ -1876,7 +1876,7 @@ module.exports = class LDPoSChainModule {
   }
 
   async broadcastTransaction(transaction) {
-    this.logger.info(`Broadcasting transaction ${transaction.id} to network`);
+    this.logger.info(`Broadcasting transaction ${transaction.id} to the network`);
     try {
       await this.channel.invoke('network:emit', {
         event: `${this.alias}:transaction`,
@@ -1885,7 +1885,7 @@ module.exports = class LDPoSChainModule {
       });
     } catch (error) {
       throw new Error(
-        `Failed to emit transaction to network because of error: ${error.message}`
+        `Failed to emit transaction to the network because of error: ${error.message}`
       );
     }
   }
