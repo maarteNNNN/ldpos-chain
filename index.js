@@ -368,7 +368,7 @@ module.exports = class LDPoSChainModule {
     return limit;
   }
 
-  sanitizeSortOrder(order) {
+  sanitizeOrder(order) {
     if (order == null) {
       return 'desc';
     }
