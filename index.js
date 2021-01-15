@@ -1867,30 +1867,16 @@ module.exports = class LDPoSChainModule {
   }
 
   async postTransaction(transaction) {
-    try {
-      validateTransactionSchema(
-        transaction,
-        this.maxSpendableDigits,
-        this.networkSymbol,
-        this.maxTransactionMessageLength,
-        this.minMultisigMembers,
-        this.maxMultisigMembers
-      );
-      let { senderAccount, multisigMemberAccounts } = await this.getTransactionSenderAccountDetails(transaction.senderAddress);
-      if (multisigMemberAccounts) {
-        await this.verifyMultisigTransactionAuth(senderAccount, multisigMemberAccounts, transaction, true);
-      } else {
-        await this.verifySigTransactionAuth(senderAccount, transaction, true);
-      }
-    } catch (error) {
-      throw new Error(
-        `Failed to post transaction because of error: ${error.message}`
-      );
+    let { senderAccount, multisigMemberAccounts } = await this.processReceivedTransaction(transaction, false);
+    if (multisigMemberAccounts) {
+      await this.verifyMultisigTransactionAuthorization(senderAccount, multisigMemberAccounts, transaction, true);
+    } else {
+      await this.verifySigTransactionAuthorization(senderAccount, transaction, true);
     }
-    await this.broadcastTransaction(transaction);
   }
 
   async broadcastTransaction(transaction) {
+    this.logger.info(`Broadcasting transaction ${transaction.id} to network`);
     try {
       await this.channel.invoke('network:emit', {
         event: `${this.alias}:transaction`,
@@ -1904,12 +1890,13 @@ module.exports = class LDPoSChainModule {
     }
   }
 
-  async propagateTransaction(transaction) {
-    // This is a performance optimization to ensure that peers
-    // will not receive multiple instances of the same transaction at the same time.
-    let randomPropagationDelay = Math.round(Math.random() * this.propagationRandomness);
-    await this.wait(randomPropagationDelay);
-
+  async propagateTransaction(transaction, delayPropagation) {
+    if (delayPropagation) {
+      // This is a performance optimization to ensure that peers
+      // will not receive multiple instances of the same transaction at the same time.
+      let randomPropagationDelay = Math.round(Math.random() * this.propagationRandomness);
+      await this.wait(randomPropagationDelay);
+    }
     try {
       await this.broadcastTransaction(transaction);
     } catch (error) {
@@ -1976,86 +1963,43 @@ module.exports = class LDPoSChainModule {
     return !!(accountStream.pendingTransactionVerificationCount || accountStream.transactionInfoMap.size);
   }
 
-  async startTransactionPropagationLoop() {
-    this.channel.subscribe(`network:event:${this.alias}:transaction`, async (event) => {
-      let transaction = event.data;
+  async processReceivedTransaction(transaction, delayPropagation) {
+    try {
+      validateTransactionSchema(
+        transaction,
+        this.maxSpendableDigits,
+        this.networkSymbol,
+        this.maxTransactionMessageLength,
+        this.minMultisigMembers,
+        this.maxMultisigMembers
+      );
+    } catch (error) {
+      throw new Error(`Received invalid transaction ${transaction.id} - ${error.message}`);
+    }
 
-      try {
-        validateTransactionSchema(
-          transaction,
-          this.maxSpendableDigits,
-          this.networkSymbol,
-          this.maxTransactionMessageLength,
-          this.minMultisigMembers,
-          this.maxMultisigMembers
+    let { senderAddress } = transaction;
+
+    // This ensures that transactions sent from the same account are processed serially but
+    // transactions sent from different accounts can be verified in parallel.
+
+    if (this.pendingTransactionStreams[senderAddress]) {
+      let accountStream = this.pendingTransactionStreams[senderAddress];
+
+      let backpressure = accountStream.getBackpressure();
+
+      if (backpressure >= this.maxPendingTransactionsPerAccount) {
+        throw new Error(
+          `Transaction ${
+            transaction.id
+          } was rejected because account ${
+            senderAddress
+          } has exceeded the maximum allowed pending transaction backpressure of ${
+            this.maxPendingTransactionsPerAccount
+          }`
         );
-      } catch (error) {
-        this.logger.warn(
-          new Error(`Received invalid transaction ${transaction.id} from network - ${error.message}`)
-        );
-        return;
       }
 
-      let { senderAddress } = transaction;
-
-      // This ensures that transactions sent from the same account are processed serially but
-      // transactions sent from different accounts can be verified in parallel.
-
-      if (this.pendingTransactionStreams[senderAddress]) {
-        let accountStream = this.pendingTransactionStreams[senderAddress];
-
-        let backpressure = accountStream.getBackpressure();
-
-        if (backpressure >= this.maxPendingTransactionsPerAccount) {
-          this.logger.warn(
-            new Error(
-              `Transaction ${
-                transaction.id
-              } was rejected because account ${
-                senderAddress
-              } has exceeded the maximum allowed pending transaction backpressure of ${
-                this.maxPendingTransactionsPerAccount
-              }`
-            )
-          );
-          return;
-        }
-
-        accountStream.pendingTransactionVerificationCount++;
-
-        let { senderAccount, multisigMemberAccounts } = await accountStream.senderAccountPromise;
-        try {
-          if (multisigMemberAccounts) {
-            this.verifyMultisigTransactionAuthentication(senderAccount, multisigMemberAccounts, transaction, true);
-          } else {
-            this.verifySigTransactionAuthentication(senderAccount, transaction, true);
-          }
-          accountStream.write(transaction);
-        } catch (error) {
-          this.logger.warn(
-            new Error(
-              `Received unauthorized transaction ${transaction.id} from network - ${error.message}`
-            )
-          );
-          accountStream.pendingTransactionVerificationCount--;
-          if (!this.isAccountStreamBusy(accountStream)) {
-            accountStream.close();
-            delete this.pendingTransactionStreams[senderAddress];
-          }
-        }
-
-        return;
-      }
-
-      let accountStream = new WritableConsumableStream();
-      accountStream.transactionInfoMap = new Map();
-      accountStream.pendingTransactionVerificationCount = 1;
-      this.pendingTransactionStreams[senderAddress] = accountStream;
-
-      let accountStreamConsumer = accountStream.createConsumer();
-
-      accountStream.senderAccountPromise = this.getTransactionSenderAccountDetails(senderAddress);
-
+      accountStream.pendingTransactionVerificationCount++;
       let { senderAccount, multisigMemberAccounts } = await accountStream.senderAccountPromise;
       try {
         if (multisigMemberAccounts) {
@@ -2065,20 +2009,46 @@ module.exports = class LDPoSChainModule {
         }
         accountStream.write(transaction);
       } catch (error) {
-        this.logger.warn(
-          new Error(
-            `Received invalid transaction from network - ${error.message}`
-          )
-        );
-
         accountStream.pendingTransactionVerificationCount--;
         if (!this.isAccountStreamBusy(accountStream)) {
           accountStream.close();
           delete this.pendingTransactionStreams[senderAddress];
-          return;
         }
+        throw new Error(
+          `Received unauthorized transaction ${transaction.id} - ${error.message}`
+        );
       }
 
+      return { senderAccount, multisigMemberAccounts };
+    }
+
+    let accountStream = new WritableConsumableStream();
+    accountStream.transactionInfoMap = new Map();
+    accountStream.pendingTransactionVerificationCount = 1;
+    this.pendingTransactionStreams[senderAddress] = accountStream;
+
+    let accountStreamConsumer = accountStream.createConsumer();
+
+    accountStream.senderAccountPromise = this.getTransactionSenderAccountDetails(senderAddress);
+    let { senderAccount, multisigMemberAccounts } = await accountStream.senderAccountPromise;
+
+    try {
+      if (multisigMemberAccounts) {
+        this.verifyMultisigTransactionAuthentication(senderAccount, multisigMemberAccounts, transaction, true);
+      } else {
+        this.verifySigTransactionAuthentication(senderAccount, transaction, true);
+      }
+      accountStream.write(transaction);
+    } catch (error) {
+      accountStream.pendingTransactionVerificationCount--;
+      if (!this.isAccountStreamBusy(accountStream)) {
+        accountStream.close();
+        delete this.pendingTransactionStreams[senderAddress];
+      }
+      throw new Error(`Received invalid transaction - ${error.message}`);
+    }
+
+    (async () => {
       for await (let accountTxn of accountStreamConsumer) {
         try {
           let txnTotal;
@@ -2089,32 +2059,45 @@ module.exports = class LDPoSChainModule {
           }
 
           if (accountStream.transactionInfoMap.has(accountTxn.id)) {
-            throw new Error(`Transaction ${accountTxn.id} has already been received before`);
+            this.logger.debug(
+              new Error(`Transaction ${accountTxn.id} has already been received before`)
+            );
+          } else {
+            // Subtract valid transaction total from the in-memory senderAccount balance since it
+            // may affect the verification of the next transaction in the stream.
+            senderAccount.balance -= txnTotal;
+
+            accountStream.transactionInfoMap.set(accountTxn.id, {
+              transaction: accountTxn,
+              receivedTimestamp: Date.now()
+            });
+
+            this.propagateTransaction(accountTxn, delayPropagation);
           }
-
-          // Subtract valid transaction total from the in-memory senderAccount balance since it
-          // may affect the verification of the next transaction in the stream.
-          senderAccount.balance -= txnTotal;
-
-          accountStream.transactionInfoMap.set(accountTxn.id, {
-            transaction: accountTxn,
-            receivedTimestamp: Date.now()
-          });
-
-          this.propagateTransaction(accountTxn);
-
         } catch (error) {
           this.logger.warn(
             new Error(
-              `Received invalid transaction from network - ${error.message}`
+              `Received invalid transaction - ${error.message}`
             )
           );
         }
         accountStream.pendingTransactionVerificationCount--;
         if (!this.isAccountStreamBusy(accountStream)) {
           delete this.pendingTransactionStreams[senderAddress];
-          return;
+          break;
         }
+      }
+    })();
+
+    return { senderAccount, multisigMemberAccounts };
+  }
+
+  async startTransactionPropagationLoop() {
+    this.channel.subscribe(`network:event:${this.alias}:transaction`, async (event) => {
+      try {
+        await this.processReceivedTransaction(event.data, true);
+      } catch (error) {
+        this.logger.warn(error);
       }
     });
   }

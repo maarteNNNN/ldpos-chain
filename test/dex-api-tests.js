@@ -35,6 +35,8 @@ describe('DEX API tests', async () => {
       logger: {
         info: () => {},
         // info: (...args) => console.info.apply(console, args),
+        debug: () => {},
+        // debug: (...args) => console.debug.apply(console, args),
         warn: (...args) => console.warn.apply(console, args),
         error: (...args) => console.error.apply(console, args)
       }
