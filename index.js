@@ -473,7 +473,13 @@ module.exports = class LDPoSChainModule {
   }
 
   async receiveLastBlockInfo(timeout) {
-    return this.verifiedBlockInfoStream.once(timeout);
+    try {
+      return await this.verifiedBlockInfoStream.once(timeout);
+    } catch (error) {
+      throw new Error(
+        `Timed out while waiting to receive the latest block from the network`
+      );
+    }
   }
 
   async receiveLastBlockSignatures(lastBlock, requiredSignatureCount, timeout) {
