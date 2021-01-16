@@ -205,7 +205,7 @@ module.exports = class LDPoSChainModule {
           validateSortOrder('order', action.params);
           let { walletAddress, fromTimestamp, limit, order } = action.params;
           limit = this.sanitizeLimit(limit);
-          order = this.sanitizeOrder(order);
+          order = this.sanitizeOrder(order, 'asc');
           return this.dal.getInboundTransactions(walletAddress, fromTimestamp, limit, order);
         },
         isPublic: true
@@ -218,7 +218,7 @@ module.exports = class LDPoSChainModule {
           validateSortOrder('order', action.params);
           let { walletAddress, fromTimestamp, limit, order } = action.params;
           limit = this.sanitizeLimit(limit);
-          order = this.sanitizeOrder(order);
+          order = this.sanitizeOrder(order, 'asc');
           return this.dal.getOutboundTransactions(walletAddress, fromTimestamp, limit, order);
         },
         isPublic: true
@@ -383,9 +383,9 @@ module.exports = class LDPoSChainModule {
     return limit;
   }
 
-  sanitizeOrder(order) {
+  sanitizeOrder(order, defaultOrder) {
     if (order == null) {
-      return 'desc';
+      return defaultOrder || 'desc';
     }
     return order;
   }

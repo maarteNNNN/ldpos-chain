@@ -368,6 +368,82 @@ describe('DEX API tests', async () => {
 
     });
 
+    describe.skip('getInboundTransactions action', async () => {
+
+      it('should return an array of transactions sent from the specified walletAddress', async () => {
+        let transactions = await chainModule.actions.getInboundTransactions.handler({
+          params: {
+            walletAddress: clientForger.walletAddress,
+            fromTimestamp: 0,
+            limit: 100
+          }
+        });
+        assert.equal(Array.isArray(transactions), true);
+        assert.equal(transactions.length, 4);
+        assert.equal(transactions[0].senderAddress, clientForger.walletAddress);
+        assert.equal(transactions[0].id, 'o9vq17lJ6cbVPf6uewUSVpF1JSDR9CpvDM2SCCI2QOc=');
+        assert.equal(transactions[1].senderAddress, clientForger.walletAddress);
+        assert.equal(transactions[1].id, 'rXe8wVRFSOLpSQNNMnHJ2yNH683iiZMrjRJil6WcjK0=');
+        assert.equal(transactions[2].senderAddress, clientForger.walletAddress);
+        assert.equal(transactions[2].id, 'sb7YWN5BKuDDnnVkjRUepH4kLcdQdVd4KUIqxW7uMqY=');
+        assert.equal(transactions[3].senderAddress, clientForger.walletAddress);
+        assert.equal(transactions[3].id, 'z5acncVaKKI+ppwN95zT0Qhv971EZVOXdEhGZ5NbR6Y=');
+
+        for (let txn of transactions) {
+          assert.equal(typeof txn.id, 'string');
+          assert.equal(typeof txn.message, 'string');
+          assert.equal(typeof txn.amount, 'string');
+          assert.equal(Number.isNaN(Number(txn.amount)), false);
+          assert.equal(Number.isInteger(txn.timestamp), true);
+        }
+      });
+
+      it('should return transactions which are more recent than fromTimestamp', async () => {
+        let transactions = await chainModule.actions.getInboundTransactions.handler({
+          params: {
+            walletAddress: clientForger.walletAddress,
+            fromTimestamp: 15000,
+            limit: 100
+          }
+        });
+        assert.equal(Array.isArray(transactions), true);
+        assert.equal(transactions.length, 3);
+        assert.equal(transactions[0].senderAddress, clientForger.walletAddress);
+        assert.equal(transactions[0].id, 'rXe8wVRFSOLpSQNNMnHJ2yNH683iiZMrjRJil6WcjK0=');
+        assert.equal(transactions[1].senderAddress, clientForger.walletAddress);
+        assert.equal(transactions[1].id, 'sb7YWN5BKuDDnnVkjRUepH4kLcdQdVd4KUIqxW7uMqY=');
+        assert.equal(transactions[2].senderAddress, clientForger.walletAddress);
+        assert.equal(transactions[2].id, 'z5acncVaKKI+ppwN95zT0Qhv971EZVOXdEhGZ5NbR6Y=');
+      });
+
+      it('should limit the number of transactions based on the specified limit', async () => {
+        let transactions = await chainModule.actions.getInboundTransactions.handler({
+          params: {
+            walletAddress: clientForger.walletAddress,
+            fromTimestamp: 0,
+            limit: 1
+          }
+        });
+        assert.equal(Array.isArray(transactions), true);
+        assert.equal(transactions.length, 1);
+        assert.equal(transactions[0].senderAddress, clientForger.walletAddress);
+        assert.equal(transactions[0].id, 'o9vq17lJ6cbVPf6uewUSVpF1JSDR9CpvDM2SCCI2QOc=');
+      });
+
+      it('should return an empty array if no transactions can be matched', async () => {
+        let transactions = await chainModule.actions.getInboundTransactions.handler({
+          params: {
+            walletAddress: '1bbcb6922ca73d835a398fa09614054aecfaee465a31259bb6a845c9a37e2058ldpos',
+            fromTimestamp: 0,
+            limit: 100
+          }
+        });
+        assert.equal(Array.isArray(transactions), true);
+        assert.equal(transactions.length, 0);
+      });
+
+    });
+
     describe('getOutboundTransactions action', async () => {
 
       it('should return an array of transactions sent from the specified walletAddress', async () => {
