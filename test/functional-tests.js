@@ -1246,6 +1246,7 @@ describe('Functional tests', async () => {
         await wait(8000);
 
         // Should allow control of an account to be transferred to a different user.
+        clientForger.walletAddress = '660c22683a6d466f66740042677ed1adc8bb723bd871c32c93f52eaa224a817fldpos';
 
         // Recipient passphrase: genius shoulder into daring armor proof cycle bench patrol paper grant picture
         let preparedTxnB = clientForger.prepareTransaction({
@@ -1254,8 +1255,7 @@ describe('Functional tests', async () => {
           amount: '2000000000',
           fee: '10000000',
           timestamp: 100000,
-          message: '',
-          senderAddress: '660c22683a6d466f66740042677ed1adc8bb723bd871c32c93f52eaa224a817fldpos'
+          message: ''
         });
 
         try {
