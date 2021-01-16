@@ -363,8 +363,23 @@ class DAL {
     return blockTxns.slice(0, limit);
   }
 
-  async getOutboundTransactions(walletAddress, fromTimestamp, limit) {
-    let transactionList = Object.values(this.transactions);
+  async getInboundTransactions(walletAddress, fromTimestamp, limit, order) {
+    let transactionList = this.sortByProperty(Object.values(this.transactions), 'timestamp', order);
+
+    let inboundTransactions = [];
+    for (let transaction of transactionList) {
+      if (transaction.recipientAddress === walletAddress && transaction.timestamp >= fromTimestamp) {
+        inboundTransactions.push(transaction);
+        if (inboundTransactions.length >= limit) {
+          break;
+        }
+      }
+    }
+    return inboundTransactions;
+  }
+
+  async getOutboundTransactions(walletAddress, fromTimestamp, limit, order) {
+    let transactionList = this.sortByProperty(Object.values(this.transactions), 'timestamp', order);
     let outboundTransactions = [];
     for (let transaction of transactionList) {
       if (transaction.senderAddress === walletAddress && transaction.timestamp >= fromTimestamp) {

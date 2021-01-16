@@ -197,14 +197,29 @@ module.exports = class LDPoSChainModule {
         },
         isPublic: true
       },
+      getInboundTransactions: {
+        handler: async action => {
+          validateWalletAddress('walletAddress', action.params, this.networkSymbol);
+          validateTimestamp('fromTimestamp', action.params);
+          validateLimit('limit', action.params, this.maxAPILimit);
+          validateSortOrder('order', action.params);
+          let { walletAddress, fromTimestamp, limit, order } = action.params;
+          limit = this.sanitizeLimit(limit);
+          order = this.sanitizeOrder(order);
+          return this.dal.getInboundTransactions(walletAddress, fromTimestamp, limit, order);
+        },
+        isPublic: true
+      },
       getOutboundTransactions: {
         handler: async action => {
           validateWalletAddress('walletAddress', action.params, this.networkSymbol);
           validateTimestamp('fromTimestamp', action.params);
           validateLimit('limit', action.params, this.maxAPILimit);
-          let { walletAddress, fromTimestamp, limit } = action.params;
+          validateSortOrder('order', action.params);
+          let { walletAddress, fromTimestamp, limit, order } = action.params;
           limit = this.sanitizeLimit(limit);
-          return this.dal.getOutboundTransactions(walletAddress, fromTimestamp, limit);
+          order = this.sanitizeOrder(order);
+          return this.dal.getOutboundTransactions(walletAddress, fromTimestamp, limit, order);
         },
         isPublic: true
       },
