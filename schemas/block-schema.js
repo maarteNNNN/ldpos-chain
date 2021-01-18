@@ -8,6 +8,7 @@ const {
   validateSignature
 } = require('./primitives');
 
+const { validateBlockSignatureSchema } = require('./block-signature-schema');
 const { findInvalidProperty } = require('./find-invalid-property');
 
 const validPropertyList = [

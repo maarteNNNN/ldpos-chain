@@ -9,6 +9,7 @@ const {
 const { findInvalidProperty } = require('./find-invalid-property');
 
 const validPropertyList = [
+  'blockId',
   'signerAddress',
   'forgingPublicKey',
   'nextForgingPublicKey',
@@ -22,6 +23,7 @@ function validateBlockSignatureSchema(blockSignature, networkSymbol) {
       'Block signature was not specified'
     );
   }
+  validateBlockId('blockId', blockSignature);
   validateWalletAddress('signerAddress', blockSignature, networkSymbol);
   validatePublicKey('forgingPublicKey', blockSignature);
   validatePublicKey('nextForgingPublicKey', blockSignature);

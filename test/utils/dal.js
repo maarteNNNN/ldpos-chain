@@ -305,7 +305,7 @@ class DAL {
   }
 
   async upsertBlock(block, synched) {
-    this.blocks[block.height - 1] = block;
+    this.blocks[block.height - 1] = { ...block };
     let { transactions } = block;
     let len = transactions.length;
     for (let i = 0; i < len; i++) {

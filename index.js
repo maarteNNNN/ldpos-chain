@@ -33,7 +33,7 @@ const DEFAULT_FETCH_BLOCK_END_CONFIRMATIONS = 10;
 const DEFAULT_FORGING_BLOCK_BROADCAST_DELAY = 2000;
 const DEFAULT_FORGING_SIGNATURE_BROADCAST_DELAY = 5000;
 const DEFAULT_PROPAGATION_TIMEOUT = 5000;
-const DEFAULT_PROPAGATION_RANDOMNESS = 10000;
+const DEFAULT_PROPAGATION_RANDOMNESS = 3000;
 const DEFAULT_TIME_POLL_INTERVAL = 200;
 const DEFAULT_MIN_TRANSACTIONS_PER_BLOCK = 1;
 const DEFAULT_MAX_TRANSACTIONS_PER_BLOCK = 300;
@@ -90,6 +90,7 @@ module.exports = class LDPoSChainModule {
     this.lastFullySignedBlock = null;
     this.lastProcessedBlock = null;
     this.lastReceivedBlock = this.lastProcessedBlock;
+    this.lastReceivedSignerAddressSet = new Set();
 
     this.verifiedBlockInfoStream = new WritableConsumableStream();
     this.verifiedBlockSignatureStream = new WritableConsumableStream();
@@ -466,8 +467,8 @@ module.exports = class LDPoSChainModule {
         break;
       }
 
-      try {
-        for (let block of newBlocks) {
+      for (let block of newBlocks) {
+        try {
           validateBlockSchema(
             block,
             this.minTransactionsPerBlock,
@@ -478,11 +479,16 @@ module.exports = class LDPoSChainModule {
           );
           let senderAccountDetails = await this.verifyFullySignedBlock(block, this.lastProcessedBlock);
           await this.processBlock(block, senderAccountDetails, true);
+        } catch (error) {
+          this.logger.warn(
+            `Failed to process block ${
+              block.id
+            } while catching up with the network because of error: ${
+              error.message
+            }`
+          );
+          break;
         }
-      } catch (error) {
-        this.logger.warn(
-          `Failed to process block while catching up with the network - ${error.message}`
-        );
       }
 
       await this.wait(fetchBlockPause);
@@ -503,10 +509,12 @@ module.exports = class LDPoSChainModule {
   }
 
   async receiveLastBlockSignatures(lastBlock, requiredSignatureCount, timeout) {
-    if (!requiredSignatureCount) {
+    let signerSet = new Set(
+      lastBlock.signatures.map(blockSignature => blockSignature.signerAddress)
+    );
+    if (signerSet.size >= requiredSignatureCount) {
       return;
     }
-    let signerSet = new Set();
     while (true) {
       let startTime = Date.now();
       let blockSignature;
@@ -514,7 +522,7 @@ module.exports = class LDPoSChainModule {
         blockSignature = await this.verifiedBlockSignatureStream.once(timeout);
       } catch (error) {
         throw new Error(
-          `Failed to receive enough block signatures before timeout - Only received ${
+          `Failed to receive enough block signatures before timeout - Received ${
             signerSet.size
           } out of ${
             requiredSignatureCount
@@ -522,12 +530,12 @@ module.exports = class LDPoSChainModule {
         );
       }
       let { blockId } = blockSignature;
-      if (blockId === lastBlock.id) {
-        lastBlock.signatures[blockSignature.signerAddress] = blockSignature;
+      if (blockId === lastBlock.id && !signerSet.has(blockSignature.signerAddress)) {
+        lastBlock.signatures.push(blockSignature);
         signerSet.add(blockSignature.signerAddress);
-      }
-      if (signerSet.size >= requiredSignatureCount) {
-        break;
+        if (signerSet.size >= requiredSignatureCount) {
+          break;
+        }
       }
       let timeDiff = Date.now() - startTime;
       timeout -= timeDiff;
@@ -1768,6 +1776,8 @@ module.exports = class LDPoSChainModule {
         this.nodeHeight = this.networkHeight;
         let nextHeight = this.networkHeight + 1;
 
+        this.lastReceivedSignerAddressSet.clear();
+
         await this.waitUntilNextBlockTimeSlot({
           forgingInterval,
           timePollInterval
@@ -1924,7 +1934,7 @@ module.exports = class LDPoSChainModule {
             (async () => {
               try {
                 let selfSignature = await this.signBlock(block);
-                block.signatures[selfSignature.signerAddress] = selfSignature;
+                this.lastReceivedSignerAddressSet.add(selfSignature.signerAddress);
                 await this.wait(forgingSignatureBroadcastDelay);
                 if (this.lastDoubleForgedBlockTimestamp === block.timestamp) {
                   throw new Error(
@@ -1935,6 +1945,7 @@ module.exports = class LDPoSChainModule {
                     } tried to double-forge`
                   );
                 }
+                this.verifiedBlockSignatureStream.write(selfSignature);
                 await this.broadcastBlockSignature(selfSignature);
               } catch (error) {
                 this.logger.error(error);
@@ -2314,14 +2325,7 @@ module.exports = class LDPoSChainModule {
       this.logger.info(`Received block signature from signer ${blockSignature.signerAddress}`);
 
       let lastReceivedBlock = this.lastReceivedBlock;
-      let { forgerAddress, signatures } = lastReceivedBlock;
-
-      if (signatures[blockSignature.signerAddress]) {
-        this.logger.warn(
-          new Error(`Block signature of delegate ${blockSignature.signerAddress} has already been received before`)
-        );
-        return;
-      }
+      let { forgerAddress } = lastReceivedBlock;
 
       if (blockSignature.signerAddress === forgerAddress) {
         this.logger.warn(
@@ -2339,6 +2343,14 @@ module.exports = class LDPoSChainModule {
         return;
       }
 
+      if (this.lastReceivedSignerAddressSet.has(blockSignature.signerAddress)) {
+        this.logger.warn(
+          new Error(`Block signature of delegate ${blockSignature.signerAddress} has already been received before`)
+        );
+        return;
+      }
+
+      this.lastReceivedSignerAddressSet.add(blockSignature.signerAddress)
       this.verifiedBlockSignatureStream.write(blockSignature);
 
       // This is a performance optimization to ensure that peers
