@@ -421,17 +421,22 @@ module.exports = class LDPoSChainModule {
         `Fetching new blocks from network starting at height ${nextBlockHeight}`
       );
 
-      let newBlocks;
+      let newBlocks
+      let response;
       try {
-        newBlocks = await this.channel.invoke('network:request', {
+        response = await this.channel.invoke('network:request', {
           procedure: `${this.alias}:getSignedBlocksFromHeight`,
           data: {
             height: nextBlockHeight,
             limit: fetchBlockLimit
           }
         });
+        if (!response) {
+          throw new Error('Response from getSignedBlocksFromHeight was not specified');
+        }
+        newBlocks = response.data;
         if (!Array.isArray(newBlocks)) {
-          throw new Error('Response to getBlocksFromHeight action must be an array');
+          throw new Error('Response data from getSignedBlocksFromHeight action must be an array');
         }
         if (newBlocks.length > fetchBlockLimit) {
           throw new Error(
