@@ -1697,6 +1697,7 @@ module.exports = class LDPoSChainModule {
       try {
         ldposClient = await createClient({
           passphrase: options.forgingPassphrase,
+          walletAddress: options.forgingWalletAddress,
           adapter: this.dal,
           connect: true
         });
