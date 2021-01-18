@@ -84,6 +84,7 @@ module.exports = class LDPoSChainModule {
     this.dal = new DAL(dalConfig);
 
     this.pendingTransactionStreams = {};
+    this.pendingTransactionMap = new Map();
     this.pendingBlocks = [];
     this.topActiveDelegates = [];
     this.topActiveDelegateAddressSet = new Set();
@@ -168,6 +169,42 @@ module.exports = class LDPoSChainModule {
             throw error;
           }
           return account.requiredSignatureCount;
+        },
+        isPublic: true
+      },
+      getSignedPendingTransaction: {
+        handler: async action => {
+          validateTransactionId('transactionId', action.params);
+          let { transactionId } = action.params;
+          let transaction = this.pendingTransactionMap.get(transactionId);
+          if (!transaction) {
+            let error = new Error(
+              `No pending transaction existed with ID ${transactionId}`
+            );
+            error.name = 'PendingTransactionDidNotExistError';
+            error.type = 'InvalidActionError';
+            throw error;
+          }
+          return transaction;
+        },
+        isPublic: true
+      },
+      getOutboundSignedPendingTransactions: {
+        handler: async action => {
+          validateTransactionId('walletAddress', action.params);
+          validateOffset('offset', action.params);
+          validateLimit('limit', action.params, this.maxAPILimit);
+          let { walletAddress, offset, limit } = action.params;
+          offset = this.sanitizeOffset(offset);
+          limit = this.sanitizeLimit(limit);
+          let senderTxnStream = this.pendingTransactionStreams[walletAddress];
+          if (!senderTxnStream) {
+            return [];
+          }
+          let transactionInfoList = [...senderTxnStream.transactionInfoMap.values()];
+          return transactionInfoList
+            .slice(offset, offset + limit)
+            .map(txnInfo => txnInfo.transaction);
         },
         isPublic: true
       },
@@ -900,6 +937,7 @@ module.exports = class LDPoSChainModule {
         continue;
       }
       senderTxnStream.transactionInfoMap.delete(txn.id);
+      this.pendingTransactionMap.delete(txn.id);
     }
 
     // Remove transactions which are relying on outdated keys from pending transaction maps.
@@ -942,6 +980,7 @@ module.exports = class LDPoSChainModule {
           // remaining based on the requiredSignatureCount property of the wallet.
           if (validMemberKeyCount < senderMultisigRequiredSignatureCount) {
             senderTxnStream.transactionInfoMap.delete(remainingTxn.id);
+            this.pendingTransactionMap.delete(remainingTxn.id);
           }
         }
       } else {
@@ -959,6 +998,7 @@ module.exports = class LDPoSChainModule {
             remainingTxn.sigPublicKey !== senderNextSigPublicKey
           ) {
             senderTxnStream.transactionInfoMap.delete(remainingTxn.id);
+            this.pendingTransactionMap.delete(remainingTxn.id);
           }
         }
       }
@@ -986,6 +1026,7 @@ module.exports = class LDPoSChainModule {
       for (let { transaction: remainingTxn } of senderTxnStream.transactionInfoMap.values()) {
         if (remainingTxn.timestamp < latestTxnTimestamp) {
           senderTxnStream.transactionInfoMap.delete(remainingTxn.id);
+          this.pendingTransactionMap.delete(remainingTxn.id);
         }
       }
       if (!this.isAccountStreamBusy(senderTxnStream)) {
@@ -2178,6 +2219,7 @@ module.exports = class LDPoSChainModule {
               transaction: accountTxn,
               receivedTimestamp: Date.now()
             });
+            this.pendingTransactionMap.set(accountTxn.id, accountTxn);
 
             this.propagateTransaction(accountTxn, delayPropagation);
           }
