@@ -194,7 +194,7 @@ module.exports = class LDPoSChainModule {
         },
         isPublic: true
       },
-      getOutboundSignedPendingTransactions: {
+      getOutboundPendingTransactions: {
         handler: async action => {
           validateTransactionId('walletAddress', action.params);
           validateOffset('offset', action.params);
@@ -209,7 +209,7 @@ module.exports = class LDPoSChainModule {
           let transactionInfoList = [...senderTxnStream.transactionInfoMap.values()];
           return transactionInfoList
             .slice(offset, offset + limit)
-            .map(txnInfo => txnInfo.transaction);
+            .map(txnInfo => this.simplifyTransaction(txnInfo.transaction, false));
         },
         isPublic: true
       },
@@ -631,8 +631,11 @@ module.exports = class LDPoSChainModule {
     };
   }
 
-  simplifyTransaction(transaction) {
+  simplifyTransaction(transaction, withSignatureHashes) {
     let { senderSignature, signatures, ...txnWithoutSignatures} = transaction;
+    if (!withSignatureHashes) {
+      return txnWithoutSignatures;
+    }
     if (signatures) {
       // If multisig transaction
       return {
@@ -1927,7 +1930,7 @@ module.exports = class LDPoSChainModule {
           }
 
           let pendingTransactions = this.sortPendingTransactions(validTransactions);
-          let blockTransactions = pendingTransactions.slice(0, maxTransactionsPerBlock).map(txn => this.simplifyTransaction(txn));
+          let blockTransactions = pendingTransactions.slice(0, maxTransactionsPerBlock).map(txn => this.simplifyTransaction(txn, true));
           block = this.forgeBlock(nextHeight, blockTimestamp, blockTransactions);
           this.lastReceivedBlock = block;
           this.logger.info(`Forged block ${block.id} at height ${block.height}`);
