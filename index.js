@@ -474,9 +474,6 @@ module.exports = class LDPoSChainModule {
             limit: fetchBlockLimit
           }
         });
-        if (!response) {
-          throw new Error('Response from getSignedBlocksFromHeight was not specified');
-        }
         newBlocks = response.data;
         if (!Array.isArray(newBlocks)) {
           throw new Error('Response data from getSignedBlocksFromHeight action must be an array');
@@ -2255,24 +2252,21 @@ module.exports = class LDPoSChainModule {
         } catch (error) {
           verificationError = new Error(`Received invalid transaction - ${error.message}`);
         }
-        accountStream.pendingTransactionVerificationCount--;
-        if (!this.isAccountStreamBusy(accountStream)) {
-          delete this.pendingTransactionStreams[senderAddress];
-          break;
-        }
         if (verificationError) {
           rejectTxn(verificationError);
         } else {
           resolveTxn();
         }
+
+        accountStream.pendingTransactionVerificationCount--;
+        if (!this.isAccountStreamBusy(accountStream)) {
+          delete this.pendingTransactionStreams[senderAddress];
+          break;
+        }
       }
     })();
 
-    try {
-      await txnAuthorizedPromise;
-    } catch (error) {
-      this.logger.debug(error);
-    }
+    await txnAuthorizedPromise;
 
     return { senderAccount, multisigMemberAccounts };
   }
@@ -2294,9 +2288,9 @@ module.exports = class LDPoSChainModule {
         transactionId
       }
     });
-    if (!response || !response.data) {
+    if (!response.data) {
       throw new Error(
-        `Response to getSignedPendingTransaction action was invalid`
+        `Response to getSignedPendingTransaction action was missing a data property`
       );
     }
     return response.data;

@@ -28,7 +28,9 @@ class Channel {
     if (!targetFunction) {
       throw new Error(`The channel ${actionName} action did not exist on the ${moduleName} module`);
     }
-    return targetFunction(data);
+    return {
+      data: await targetFunction(data)
+    };
   }
 }
 
