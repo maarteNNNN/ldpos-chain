@@ -213,6 +213,12 @@ module.exports = class LDPoSChainModule {
         },
         isPublic: true
       },
+      getPendingTransactionCount: {
+        handler: async action => {
+          return this.pendingTransactionMap.size;
+        },
+        isPublic: true
+      },
       postTransaction: {
         handler: async action => {
           return this.postTransaction(action.params.transaction);
