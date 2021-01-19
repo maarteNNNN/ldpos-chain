@@ -31,7 +31,7 @@ const DEFAULT_FETCH_BLOCK_LIMIT = 10;
 const DEFAULT_FETCH_BLOCK_PAUSE = 100;
 const DEFAULT_FETCH_BLOCK_END_CONFIRMATIONS = 10;
 const DEFAULT_FORGING_BLOCK_BROADCAST_DELAY = 2000;
-const DEFAULT_FORGING_SIGNATURE_BROADCAST_DELAY = 5000;
+const DEFAULT_FORGING_SIGNATURE_BROADCAST_DELAY = 10000;
 const DEFAULT_PROPAGATION_TIMEOUT = 5000;
 const DEFAULT_PROPAGATION_RANDOMNESS = 3000;
 const DEFAULT_TIME_POLL_INTERVAL = 200;
@@ -44,10 +44,15 @@ const DEFAULT_PENDING_TRANSACTION_EXPIRY_CHECK_INTERVAL = 3600000; // 1 hour
 const DEFAULT_MAX_SPENDABLE_DIGITS = 25;
 const DEFAULT_MAX_TRANSACTION_MESSAGE_LENGTH = 256;
 const DEFAULT_MAX_VOTES_PER_ACCOUNT = 21;
-const DEFAULT_MAX_PENDING_TRANSACTIONS_PER_ACCOUNT = 30;
+const DEFAULT_MAX_TRANSACTION_BACKPRESSURE_PER_ACCOUNT = 30;
 const DEFAULT_MAX_CONSECUTIVE_BLOCK_FETCH_FAILURES = 5;
+const DEFAULT_MAX_CONSECUTIVE_TRANSACTION_FETCH_FAILURES = 3;
 const DEFAULT_API_LIMIT = 100;
 const DEFAULT_MAX_API_LIMIT = 100;
+
+const PROPAGATION_MODE_DELAYED = 'delayed';
+const PROPAGATION_MODE_IMMEDIATE = 'immediate';
+const PROPAGATION_MODE_NONE = 'none';
 
 const DEFAULT_MIN_TRANSACTION_FEES = {
   transfer: '10000000',
@@ -2011,12 +2016,7 @@ module.exports = class LDPoSChainModule {
   }
 
   async postTransaction(transaction) {
-    let { senderAccount, multisigMemberAccounts } = await this.processReceivedTransaction(transaction, false);
-    if (multisigMemberAccounts) {
-      await this.verifyMultisigTransactionAuthorization(senderAccount, multisigMemberAccounts, transaction, true);
-    } else {
-      await this.verifySigTransactionAuthorization(senderAccount, transaction, true);
-    }
+    await this.processReceivedTransaction(transaction, PROPAGATION_MODE_IMMEDIATE);
   }
 
   async broadcastTransaction(transaction) {
@@ -2107,7 +2107,7 @@ module.exports = class LDPoSChainModule {
     return !!(accountStream.pendingTransactionVerificationCount || accountStream.transactionInfoMap.size);
   }
 
-  async processReceivedTransaction(transaction, delayPropagation) {
+  async processReceivedTransaction(transaction, propagationMode) {
     try {
       validateTransactionSchema(
         transaction,
@@ -2127,6 +2127,13 @@ module.exports = class LDPoSChainModule {
 
     let { senderAddress } = transaction;
 
+    let resolveTransaction;
+    let rejectTransaction;
+    let txnAuthorizedPromise = new Promise((resolve, reject) => {
+      resolveTransaction = resolve;
+      rejectTransaction = reject;
+    });
+
     // This ensures that transactions sent from the same account are processed serially but
     // transactions sent from different accounts can be verified in parallel.
 
@@ -2135,14 +2142,14 @@ module.exports = class LDPoSChainModule {
 
       let backpressure = accountStream.getBackpressure();
 
-      if (backpressure >= this.maxPendingTransactionsPerAccount) {
+      if (backpressure >= this.maxTransactionBackpressurePerAccount) {
         throw new Error(
           `Transaction ${
             transaction.id
           } was rejected because account ${
             senderAddress
           } has exceeded the maximum allowed pending transaction backpressure of ${
-            this.maxPendingTransactionsPerAccount
+            this.maxTransactionBackpressurePerAccount
           }`
         );
       }
@@ -2155,7 +2162,11 @@ module.exports = class LDPoSChainModule {
         } else {
           this.verifySigTransactionAuthentication(senderAccount, transaction, true);
         }
-        accountStream.write(transaction);
+        accountStream.write({
+          transaction,
+          resolveTransaction,
+          rejectTransaction
+        });
       } catch (error) {
         accountStream.pendingTransactionVerificationCount--;
         if (!this.isAccountStreamBusy(accountStream)) {
@@ -2165,6 +2176,12 @@ module.exports = class LDPoSChainModule {
         throw new Error(
           `Received unauthorized transaction ${transaction.id} - ${error.message}`
         );
+      }
+
+      try {
+        await txnAuthorizedPromise;
+      } catch (error) {
+        this.logger.debug(error);
       }
 
       return { senderAccount, multisigMemberAccounts };
@@ -2186,7 +2203,11 @@ module.exports = class LDPoSChainModule {
       } else {
         this.verifySigTransactionAuthentication(senderAccount, transaction, true);
       }
-      accountStream.write(transaction);
+      accountStream.write({
+        transaction,
+        resolveTransaction,
+        rejectTransaction
+      });
     } catch (error) {
       accountStream.pendingTransactionVerificationCount--;
       if (!this.isAccountStreamBusy(accountStream)) {
@@ -2197,7 +2218,15 @@ module.exports = class LDPoSChainModule {
     }
 
     (async () => {
-      for await (let accountTxn of accountStreamConsumer) {
+      for await (let txnInfo of accountStreamConsumer) {
+        let {
+          transaction: accountTxn,
+          resolveTransaction: resolveTxn,
+          rejectTransaction: rejectTxn
+        } = txnInfo;
+
+        let verificationError;
+
         try {
           let txnTotal;
           if (multisigMemberAccounts) {
@@ -2207,9 +2236,7 @@ module.exports = class LDPoSChainModule {
           }
 
           if (accountStream.transactionInfoMap.has(accountTxn.id)) {
-            this.logger.debug(
-              new Error(`Transaction ${accountTxn.id} has already been received before`)
-            );
+            verificationError = new Error(`Transaction ${accountTxn.id} has already been received before`);
           } else {
             // Subtract valid transaction total from the in-memory senderAccount balance since it
             // may affect the verification of the next transaction in the stream.
@@ -2221,22 +2248,31 @@ module.exports = class LDPoSChainModule {
             });
             this.pendingTransactionMap.set(accountTxn.id, accountTxn);
 
-            this.propagateTransaction(accountTxn, delayPropagation);
+            if (propagationMode !== PROPAGATION_MODE_NONE) {
+              this.propagateTransaction(accountTxn, propagationMode === PROPAGATION_MODE_DELAYED);
+            }
           }
         } catch (error) {
-          this.logger.warn(
-            new Error(
-              `Received invalid transaction - ${error.message}`
-            )
-          );
+          verificationError = new Error(`Received invalid transaction - ${error.message}`);
         }
         accountStream.pendingTransactionVerificationCount--;
         if (!this.isAccountStreamBusy(accountStream)) {
           delete this.pendingTransactionStreams[senderAddress];
           break;
         }
+        if (verificationError) {
+          rejectTxn(verificationError);
+        } else {
+          resolveTxn();
+        }
       }
     })();
+
+    try {
+      await txnAuthorizedPromise;
+    } catch (error) {
+      this.logger.debug(error);
+    }
 
     return { senderAccount, multisigMemberAccounts };
   }
@@ -2244,11 +2280,46 @@ module.exports = class LDPoSChainModule {
   async startTransactionPropagationLoop() {
     this.channel.subscribe(`network:event:${this.alias}:transaction`, async (event) => {
       try {
-        await this.processReceivedTransaction(event.data, true);
+        await this.processReceivedTransaction(event.data, PROPAGATION_MODE_DELAYED);
       } catch (error) {
         this.logger.warn(error);
       }
     });
+  }
+
+  async getSignedPendingTransaction(transactionId) {
+    let response = await this.channel.invoke('network:request', {
+      procedure: `${this.alias}:getSignedPendingTransaction`,
+      data: {
+        transactionId
+      }
+    });
+    if (!response || !response.data) {
+      throw new Error(
+        `Response to getSignedPendingTransaction action was invalid`
+      );
+    }
+    return response.data;
+  }
+
+  async fetchSignedPendingTransaction(transactionId, maxAttempts) {
+    for (let i = 0; i < maxAttempts; i++) {
+      this.logger.info(
+        `Attempting to fetch pending transaction ${transactionId} from the network - Attempt #${i + 1}`
+      );
+      try {
+        let transaction = await this.getSignedPendingTransaction(transactionId);
+        await this.processReceivedTransaction(transaction, PROPAGATION_MODE_NONE);
+        return;
+      } catch (error) {
+        this.logger.debug(
+          `Failed to fetch pending transaction ${transactionId} from the network because of error: ${error.message}`
+        );
+      }
+    }
+    throw new Error(
+      `Failed to fetch pending transaction ${transactionId} from the network after ${maxAttempts} attempts`
+    );
   }
 
   async startBlockPropagationLoop() {
@@ -2287,22 +2358,57 @@ module.exports = class LDPoSChainModule {
       if (block.timestamp === this.lastReceivedBlock.timestamp) {
         this.lastDoubleForgedBlockTimestamp = this.lastReceivedBlock.timestamp;
         this.logger.warn(
-          new Error(`Block ${block.id} was forged with the same timestamp as the last block ${this.lastReceivedBlock.id}`)
+          new Error(
+            `Block ${block.id} was forged with the same timestamp as the last block ${this.lastReceivedBlock.id}`
+          )
         );
         return;
       }
 
       let { transactions } = block;
+      let senderTransactions = {};
+      for (let txn of transactions) {
+        if (!senderTransactions[txn.senderAddress]) {
+          senderTransactions[txn.senderAddress] = [];
+        }
+        senderTransactions[txn.senderAddress].push(txn);
+      }
+
+      try {
+        await Promise.all(
+          Object.values(senderTransactions).map(async (senderTxnList) => {
+            await Promise.all(
+              senderTxnList.map(async (txn) => {
+                let pendingTxnStream = this.pendingTransactionStreams[txn.senderAddress];
+                if (pendingTxnStream && pendingTxnStream.transactionInfoMap.has(txn.id)) {
+                  return;
+                }
+                try {
+                  await this.fetchSignedPendingTransaction(txn.id, this.maxConsecutiveTransactionFetchFailures);
+                } catch (error) {
+                  throw new Error(
+                    `Block ${block.id} contained an unrecognized transaction ${txn.id} - ${error.message}`
+                  );
+                }
+              })
+            );
+          })
+        );
+      } catch (error) {
+        this.logger.warn(error);
+        return;
+      }
+
       for (let txn of transactions) {
         let pendingTxnStream = this.pendingTransactionStreams[txn.senderAddress];
-        if (!pendingTxnStream || !pendingTxnStream.transactionInfoMap.has(txn.id)) {
+        if (!pendingTxnStream) {
           this.logger.warn(
             new Error(`Block ${block.id} contained an unrecognized transaction ${txn.id}`)
           );
           return;
         }
-
         let pendingTxn = pendingTxnStream.transactionInfoMap.get(txn.id).transaction;
+
         if (txn.signatures) {
           // For multisig transaction.
           let pendingTxnSignatures = {};
@@ -2460,8 +2566,9 @@ module.exports = class LDPoSChainModule {
       maxSpendableDigits: DEFAULT_MAX_SPENDABLE_DIGITS,
       maxTransactionMessageLength: DEFAULT_MAX_TRANSACTION_MESSAGE_LENGTH,
       maxVotesPerAccount: DEFAULT_MAX_VOTES_PER_ACCOUNT,
-      maxPendingTransactionsPerAccount: DEFAULT_MAX_PENDING_TRANSACTIONS_PER_ACCOUNT,
+      maxTransactionBackpressurePerAccount: DEFAULT_MAX_TRANSACTION_BACKPRESSURE_PER_ACCOUNT,
       maxConsecutiveBlockFetchFailures: DEFAULT_MAX_CONSECUTIVE_BLOCK_FETCH_FAILURES,
+      maxConsecutiveTransactionFetchFailures: DEFAULT_MAX_CONSECUTIVE_TRANSACTION_FETCH_FAILURES,
       apiLimit: DEFAULT_API_LIMIT,
       maxAPILimit: DEFAULT_MAX_API_LIMIT
     };
@@ -2486,8 +2593,9 @@ module.exports = class LDPoSChainModule {
     this.maxSpendableDigits = this.options.maxSpendableDigits;
     this.maxTransactionMessageLength = this.options.maxTransactionMessageLength;
     this.maxVotesPerAccount = this.options.maxVotesPerAccount;
-    this.maxPendingTransactionsPerAccount = this.options.maxPendingTransactionsPerAccount;
+    this.maxTransactionBackpressurePerAccount = this.options.maxTransactionBackpressurePerAccount;
     this.maxExtraBlockSignaturesToStore = this.options.maxExtraBlockSignaturesToStore;
+    this.maxConsecutiveTransactionFetchFailures = this.options.maxConsecutiveTransactionFetchFailures;
     this.apiLimit = this.options.apiLimit;
     this.maxAPILimit = this.options.maxAPILimit;
 
