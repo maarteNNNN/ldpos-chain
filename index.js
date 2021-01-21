@@ -25,7 +25,7 @@ const DEFAULT_MODULE_ALIAS = 'ldpos_chain';
 const DEFAULT_GENESIS_PATH = './genesis/mainnet/genesis.json';
 const DEFAULT_CRYPTO_CLIENT_LIB_PATH = 'ldpos-client';
 const DEFAULT_DELEGATE_COUNT = 11;
-const DEFAULT_MIN_DELEGATE_BLOCK_SIGNATURE_RATIO = .5;
+const DEFAULT_MIN_DELEGATE_BLOCK_SIGNATURE_RATIO = .6;
 const DEFAULT_MAX_EXTRA_BLOCK_SIGNATURES_TO_STORE = 5;
 const DEFAULT_FORGING_INTERVAL = 30000;
 const DEFAULT_FETCH_BLOCK_LIMIT = 10;
@@ -2035,6 +2035,20 @@ module.exports = class LDPoSChainModule {
     }
   }
 
+  async propagateBlock(block, delayPropagation) {
+    if (delayPropagation) {
+      // This is a performance optimization to ensure that peers
+      // will not receive multiple instances of the same block at the same time.
+      let randomPropagationDelay = Math.round(Math.random() * this.propagationRandomness);
+      await this.wait(randomPropagationDelay);
+    }
+    try {
+      await this.broadcastBlock(block);
+    } catch (error) {
+      this.logger.error(error);
+    }
+  }
+
   async propagateTransaction(transaction, delayPropagation) {
     if (delayPropagation) {
       // This is a performance optimization to ensure that peers
@@ -2354,7 +2368,12 @@ module.exports = class LDPoSChainModule {
 
       // If double-forged block was received.
       if (block.timestamp === this.lastReceivedBlock.timestamp) {
-        this.lastDoubleForgedBlockTimestamp = this.lastReceivedBlock.timestamp;
+        if (this.lastDoubleForgedBlockTimestamp !== this.lastReceivedBlock.timestamp) {
+          this.lastDoubleForgedBlockTimestamp = this.lastReceivedBlock.timestamp;
+          // The first time a double-forged block is received, propagate it to ensure that other nodes in the
+          // network can verify for themselves that double-forging has taken place.
+          await this.propagateBlock(block, true);
+        }
         this.logger.warn(
           new Error(
             `Block ${block.id} was forged with the same timestamp as the last block ${this.lastReceivedBlock.id}`
@@ -2448,16 +2467,7 @@ module.exports = class LDPoSChainModule {
         senderAccountDetails
       });
 
-      // This is a performance optimization to ensure that peers
-      // will not receive multiple instances of the same block at the same time.
-      let randomPropagationDelay = Math.round(Math.random() * this.propagationRandomness);
-      await this.wait(randomPropagationDelay);
-
-      try {
-        await this.broadcastBlock(block);
-      } catch (error) {
-        this.logger.error(error);
-      }
+      await this.propagateBlock(block, true);
     });
   }
 
