@@ -1623,7 +1623,6 @@ module.exports = class LDPoSChainModule {
   }
 
   async broadcastBlock(block) {
-    this.logger.info(`Broadcasting block ${block.id} to the network`);
     try {
       await this.channel.invoke('network:emit', {
         event: `${this.alias}:block`,
@@ -1635,12 +1634,10 @@ module.exports = class LDPoSChainModule {
         `Failed to emit block to the network because of error: ${error.message}`
       );
     }
+    this.logger.info(`Broadcasted block ${block.id} to the network`);
   }
 
   async broadcastBlockSignature(signature) {
-    this.logger.info(
-      `Broadcasting block signature from signer ${signature.signerAddress} to the network`
-    );
     try {
       await this.channel.invoke('network:emit', {
         event: `${this.alias}:blockSignature`,
@@ -1652,6 +1649,9 @@ module.exports = class LDPoSChainModule {
         `Failed to emit blockSignature to the network because of error: ${error.message}`
       );
     }
+    this.logger.info(
+      `Broadcasted block signature from signer ${signature.signerAddress} to the network`
+    );
   }
 
   async signBlock(block) {
@@ -1823,8 +1823,6 @@ module.exports = class LDPoSChainModule {
         this.nodeHeight = this.networkHeight;
         let nextHeight = this.networkHeight + 1;
 
-        this.lastReceivedSignerAddressSet.clear();
-
         await this.waitUntilNextBlockTimeSlot({
           forgingInterval,
           timePollInterval
@@ -1933,13 +1931,13 @@ module.exports = class LDPoSChainModule {
           let pendingTransactions = this.sortPendingTransactions(validTransactions);
           let blockTransactions = pendingTransactions.slice(0, maxTransactionsPerBlock).map(txn => this.simplifyTransaction(txn, true));
           block = this.forgeBlock(nextHeight, blockTimestamp, blockTransactions);
+          this.lastReceivedSignerAddressSet.clear();
           this.lastReceivedBlock = block;
           this.logger.info(`Forged block ${block.id} at height ${block.height}`);
 
           await this.wait(forgingBlockBroadcastDelay);
           try {
             await this.broadcastBlock(block);
-            this.logger.info(`Broadcasted block ${block.id}`);
           } catch (error) {
             this.logger.error(error);
           }
@@ -2021,7 +2019,6 @@ module.exports = class LDPoSChainModule {
   }
 
   async broadcastTransaction(transaction) {
-    this.logger.info(`Broadcasting transaction ${transaction.id} to the network`);
     try {
       await this.channel.invoke('network:emit', {
         event: `${this.alias}:transaction`,
@@ -2033,6 +2030,7 @@ module.exports = class LDPoSChainModule {
         `Failed to emit transaction to the network because of error: ${error.message}`
       );
     }
+    this.logger.info(`Broadcasted transaction ${transaction.id} to the network`);
   }
 
   async propagateBlock(block, delayPropagation) {
@@ -2461,6 +2459,7 @@ module.exports = class LDPoSChainModule {
         }
       }
 
+      this.lastReceivedSignerAddressSet.clear();
       this.lastReceivedBlock = block;
       this.verifiedBlockInfoStream.write({
         block: this.lastReceivedBlock,
