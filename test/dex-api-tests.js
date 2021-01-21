@@ -271,7 +271,7 @@ describe('DEX API tests', async () => {
               let signatureA = clientA.signMultisigTransaction(multisigTxn);
               let signatureB = clientB.signMultisigTransaction(multisigTxn);
               multisigTxn.signatures = [signatureA, signatureB];
-              return chainModule.simplifyTransaction(multisigTxn);
+              return chainModule.simplifyTransaction(multisigTxn, true);
             }),
             ...preparedBlockWithoutTxns
           };
@@ -282,7 +282,7 @@ describe('DEX API tests', async () => {
           timestamp: preparedBlockWithoutTxns.timestamp,
           previousBlockId: preparedBlockWithoutTxns.previousBlockId,
           transactions: transactions.map(
-            txn => chainModule.simplifyTransaction(clientForger.prepareTransaction(txn))
+            txn => chainModule.simplifyTransaction(clientForger.prepareTransaction(txn), true)
           ),
           ...preparedBlockWithoutTxns
         };
