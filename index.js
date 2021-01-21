@@ -25,6 +25,7 @@ const DEFAULT_MODULE_ALIAS = 'ldpos_chain';
 const DEFAULT_GENESIS_PATH = './genesis/mainnet/genesis.json';
 const DEFAULT_CRYPTO_CLIENT_LIB_PATH = 'ldpos-client';
 const DEFAULT_DELEGATE_COUNT = 11;
+const DEFAULT_MIN_DELEGATE_BLOCK_SIGNATURE_RATIO = .5;
 const DEFAULT_MAX_EXTRA_BLOCK_SIGNATURES_TO_STORE = 5;
 const DEFAULT_FORGING_INTERVAL = 30000;
 const DEFAULT_FETCH_BLOCK_LIMIT = 10;
@@ -1741,12 +1742,6 @@ module.exports = class LDPoSChainModule {
       maxConsecutiveBlockFetchFailures
     } = options;
 
-    this.delegateCount = delegateCount;
-    this.forgingInterval = forgingInterval;
-    this.propagationRandomness = propagationRandomness;
-    this.minMultisigMembers = minMultisigMembers;
-    this.maxMultisigMembers = maxMultisigMembers;
-
     let ldposClient;
     let forgingWalletAddress;
 
@@ -1814,7 +1809,7 @@ module.exports = class LDPoSChainModule {
     (async () => {
       while (true) {
         let activeDelegateCount = Math.min(this.topActiveDelegates.length, delegateCount);
-        let blockSignerMajorityCount = Math.floor(activeDelegateCount / 2);
+        let blockSignerMajorityCount = Math.floor(activeDelegateCount * this.minDelegateBlockSignatureRatio);
 
         // If the node is already on the latest network height, it will just return it.
         this.networkHeight = await this.catchUpWithNetwork({
@@ -2551,6 +2546,7 @@ module.exports = class LDPoSChainModule {
     let defaultOptions = {
       forgingInterval: DEFAULT_FORGING_INTERVAL,
       delegateCount: DEFAULT_DELEGATE_COUNT,
+      minDelegateBlockSignatureRatio: DEFAULT_MIN_DELEGATE_BLOCK_SIGNATURE_RATIO,
       maxExtraBlockSignaturesToStore: DEFAULT_MAX_EXTRA_BLOCK_SIGNATURES_TO_STORE,
       fetchBlockLimit: DEFAULT_FETCH_BLOCK_LIMIT,
       fetchBlockPause: DEFAULT_FETCH_BLOCK_PAUSE,
@@ -2601,14 +2597,26 @@ module.exports = class LDPoSChainModule {
     this.maxConsecutiveTransactionFetchFailures = this.options.maxConsecutiveTransactionFetchFailures;
     this.apiLimit = this.options.apiLimit;
     this.maxAPILimit = this.options.maxAPILimit;
+    this.delegateCount = this.options.delegateCount;
+    this.minDelegateBlockSignatureRatio = this.options.minDelegateBlockSignatureRatio;
+    this.forgingInterval = this.options.forgingInterval;
+    this.propagationRandomness = this.options.propagationRandomness;
+    this.minMultisigMembers = this.options.minMultisigMembers;
+    this.maxMultisigMembers = this.options.maxMultisigMembers;
 
-    let delegateSignerMajorityCount = Math.floor(this.delegateCount / 2);
+    if (this.minDelegateBlockSignatureRatio < 0.5) {
+      throw new Error(
+        `The minDelegateBlockSignatureRatio option cannot be less than 0.5`
+      );
+    }
 
-    if (this.maxExtraBlockSignaturesToStore < delegateSignerMajorityCount) {
+    let requiredBlockSignatureCount = Math.floor(this.delegateCount * this.minDelegateBlockSignatureRatio);
+
+    if (this.maxExtraBlockSignaturesToStore < requiredBlockSignatureCount) {
       throw new Error(
         `The maxExtraBlockSignaturesToStore option cannot be less than ${
-          delegateSignerMajorityCount
-        }`
+          requiredBlockSignatureCount
+        } based on the current minDelegateBlockSignatureRatio`
       );
     }
 
