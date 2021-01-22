@@ -26,7 +26,9 @@ const DEFAULT_GENESIS_PATH = './genesis/mainnet/genesis.json';
 const DEFAULT_CRYPTO_CLIENT_LIB_PATH = 'ldpos-client';
 const DEFAULT_DELEGATE_COUNT = 11;
 const DEFAULT_MIN_DELEGATE_BLOCK_SIGNATURE_RATIO = .6;
-const DEFAULT_MAX_EXTRA_BLOCK_SIGNATURES_TO_STORE = 6;
+const DEFAULT_BLOCK_SIGNATURES_TO_PROVIDE = 6;
+const DEFAULT_BLOCK_SIGNATURES_TO_FETCH = 6;
+const DEFAULT_BLOCK_SIGNATURES_INDICATOR = 'bsi';
 const DEFAULT_FORGING_INTERVAL = 30000;
 const DEFAULT_FETCH_BLOCK_LIMIT = 10;
 const DEFAULT_FETCH_BLOCK_PAUSE = 100;
@@ -473,9 +475,14 @@ module.exports = class LDPoSChainModule {
 
       let newBlocks
       let response;
+
+      // The query parameter will ensure that this request will be routed to a peer which
+      // stores a sufficient number of block signatures.
+      let actionRouteString =
+        `${this.alias}?${this.blockSignaturesIndicator}${this.blockSignaturesToFetch}=1`;
       try {
         response = await this.channel.invoke('network:request', {
-          procedure: `${this.alias}:getSignedBlocksFromHeight`,
+          procedure: `${actionRouteString}:getSignedBlocksFromHeight`,
           data: {
             height: nextBlockHeight,
             limit: fetchBlockLimit
@@ -929,9 +936,9 @@ module.exports = class LDPoSChainModule {
     }
 
     let blockSignaturesToStore;
-    if (blockSignatureList.length > this.maxExtraBlockSignaturesToStore) {
+    if (blockSignatureList.length > this.blockSignaturesToFetch) {
       blockSignaturesToStore = shuffle(blockSignatureList)
-        .slice(0, this.maxExtraBlockSignaturesToStore);
+        .slice(0, this.blockSignaturesToFetch);
     } else {
       blockSignaturesToStore = blockSignatureList;
     }
@@ -1781,7 +1788,16 @@ module.exports = class LDPoSChainModule {
         );
       }
     }
-    if (!this.lastProcessedBlock) {
+    if (this.lastProcessedBlock) {
+      let existingSignatureCount = this.lastProcessedBlock.signatures.length;
+      if (this.blockSignaturesToProvide > existingSignatureCount) {
+        throw new Error(
+          `The blockSignaturesToProvide option was greater than ${
+            existingSignatureCount
+          } - It cannot be greater than the number of signatures currently stored per block`
+        );
+      }
+    } else {
       this.lastProcessedBlock = {
         height: 0,
         timestamp: 0,
@@ -2556,7 +2572,9 @@ module.exports = class LDPoSChainModule {
       forgingInterval: DEFAULT_FORGING_INTERVAL,
       delegateCount: DEFAULT_DELEGATE_COUNT,
       minDelegateBlockSignatureRatio: DEFAULT_MIN_DELEGATE_BLOCK_SIGNATURE_RATIO,
-      maxExtraBlockSignaturesToStore: DEFAULT_MAX_EXTRA_BLOCK_SIGNATURES_TO_STORE,
+      blockSignaturesToProvide: DEFAULT_BLOCK_SIGNATURES_TO_PROVIDE,
+      blockSignaturesToFetch: DEFAULT_BLOCK_SIGNATURES_TO_FETCH,
+      blockSignaturesIndicator: DEFAULT_BLOCK_SIGNATURES_INDICATOR,
       fetchBlockLimit: DEFAULT_FETCH_BLOCK_LIMIT,
       fetchBlockPause: DEFAULT_FETCH_BLOCK_PAUSE,
       fetchBlockEndConfirmations: DEFAULT_FETCH_BLOCK_END_CONFIRMATIONS,
@@ -2594,6 +2612,15 @@ module.exports = class LDPoSChainModule {
     this.options.minTransactionFees = minTransactionFees;
     this.minTransactionFees = minTransactionFees;
 
+    this.forgingInterval = this.options.forgingInterval;
+    this.delegateCount = this.options.delegateCount;
+    this.minDelegateBlockSignatureRatio = this.options.minDelegateBlockSignatureRatio;
+    this.blockSignaturesToProvide = this.options.blockSignaturesToProvide;
+    this.blockSignaturesToFetch = this.options.blockSignaturesToFetch;
+    this.blockSignaturesIndicator = this.options.blockSignaturesIndicator;
+    this.propagationRandomness = this.options.propagationRandomness;
+    this.minMultisigMembers = this.options.minMultisigMembers;
+    this.maxMultisigMembers = this.options.maxMultisigMembers;
     this.minTransactionsPerBlock = this.options.minTransactionsPerBlock;
     this.maxTransactionsPerBlock = this.options.maxTransactionsPerBlock;
     this.pendingTransactionExpiry = this.options.pendingTransactionExpiry;
@@ -2602,30 +2629,13 @@ module.exports = class LDPoSChainModule {
     this.maxTransactionMessageLength = this.options.maxTransactionMessageLength;
     this.maxVotesPerAccount = this.options.maxVotesPerAccount;
     this.maxTransactionBackpressurePerAccount = this.options.maxTransactionBackpressurePerAccount;
-    this.maxExtraBlockSignaturesToStore = this.options.maxExtraBlockSignaturesToStore;
     this.maxConsecutiveTransactionFetchFailures = this.options.maxConsecutiveTransactionFetchFailures;
     this.apiLimit = this.options.apiLimit;
     this.maxAPILimit = this.options.maxAPILimit;
-    this.delegateCount = this.options.delegateCount;
-    this.minDelegateBlockSignatureRatio = this.options.minDelegateBlockSignatureRatio;
-    this.forgingInterval = this.options.forgingInterval;
-    this.propagationRandomness = this.options.propagationRandomness;
-    this.minMultisigMembers = this.options.minMultisigMembers;
-    this.maxMultisigMembers = this.options.maxMultisigMembers;
 
     if (this.minDelegateBlockSignatureRatio < 0.5) {
       throw new Error(
         `The minDelegateBlockSignatureRatio option cannot be less than 0.5`
-      );
-    }
-
-    let requiredBlockSignatureCount = Math.floor(this.delegateCount * this.minDelegateBlockSignatureRatio);
-
-    if (this.maxExtraBlockSignaturesToStore < requiredBlockSignatureCount) {
-      throw new Error(
-        `The maxExtraBlockSignaturesToStore option cannot be less than ${
-          requiredBlockSignatureCount
-        } based on the current minDelegateBlockSignatureRatio`
       );
     }
 
@@ -2640,9 +2650,50 @@ module.exports = class LDPoSChainModule {
       );
     }
 
+    if (!Number.isInteger(this.blockSignaturesToProvide) || this.blockSignaturesToProvide < 0) {
+      throw new Error(
+        'The blockSignaturesToProvide option must be an integer greater than or equal to 0'
+      );
+    }
+
+    if (!Number.isInteger(this.blockSignaturesToFetch)) {
+      throw new Error(
+        'The blockSignaturesToFetch option must be an integer'
+      );
+    }
+    if (this.blockSignaturesToFetch < this.blockSignaturesToProvide) {
+      throw new Error(
+        `The blockSignaturesToFetch option was less than ${
+          this.blockSignaturesToProvide
+        } - It cannot be less than the blockSignaturesToProvide option`
+      );
+    }
+
     let moduleState = {};
-    if (this.maxExtraBlockSignaturesToStore >= this.delegateCount - 1) {
-      moduleState.keepsAllBlockSignatures = true;
+
+    // Create an entry for each key index so that other peers can route requests to us based
+    // on how many block signatures we keep.
+    for (let i = 0; i <= this.blockSignaturesToProvide; i++) {
+      moduleState[`${this.blockSignaturesIndicator}${i}`] = 1;
+    }
+
+    let majorityBlockSignatureCount = Math.floor(this.delegateCount * this.minDelegateBlockSignatureRatio);
+
+    if (this.blockSignaturesToProvide >= majorityBlockSignatureCount) {
+      moduleState.providesMostBlockSignatures = true;
+    } else {
+      this.logger.warn(
+        new Error(
+          `The blockSignaturesToProvide option was ${
+            this.blockSignaturesToProvide
+          } which is less than the delegate majority of ${
+            majorityBlockSignatureCount
+          } - Node will operate in lite mode`
+        )
+      );
+    }
+    if (this.blockSignaturesToProvide >= this.delegateCount - 1) {
+      moduleState.providesAllBlockSignatures = true;
     }
 
     await this.channel.invoke('app:updateModuleState', {
@@ -2659,7 +2710,7 @@ module.exports = class LDPoSChainModule {
       await this.startBlockProcessingLoop();
     } catch (error) {
       throw new Error(
-        `Failed to start block processing loop because of error: ${error.message}`
+        `Failed to start the block processing loop because of error: ${error.message}`
       );
     }
 
