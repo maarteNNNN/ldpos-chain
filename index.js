@@ -51,7 +51,7 @@ const DEFAULT_PENDING_TRANSACTION_EXPIRY = 604800000; // 1 week
 const DEFAULT_PENDING_TRANSACTION_EXPIRY_CHECK_INTERVAL = 3600000; // 1 hour
 const DEFAULT_MAX_SPENDABLE_DIGITS = 25;
 const DEFAULT_MAX_TRANSACTION_MESSAGE_LENGTH = 256;
-const DEFAULT_MAX_VOTES_PER_ACCOUNT = 21;
+const DEFAULT_MAX_VOTES_PER_ACCOUNT = 11;
 const DEFAULT_MAX_TRANSACTION_BACKPRESSURE_PER_ACCOUNT = 30;
 const DEFAULT_MAX_CONSECUTIVE_BLOCK_FETCH_FAILURES = 5;
 const DEFAULT_MAX_CONSECUTIVE_TRANSACTION_FETCH_FAILURES = 3;
@@ -81,20 +81,20 @@ module.exports = class LDPoSChainModule {
     this.logger = options.logger || console;
     let { config } = options;
     let components = config.components || {};
-    let dalConfig = components.dal || {};
+    this.dalConfig = components.dal || {};
 
-    if (!dalConfig) {
+    if (!this.dalConfig) {
       throw new Error(
         `The ${this.alias} module config needs to have a components.dal property`
       );
     }
-    if (!dalConfig.libPath) {
+    if (!this.dalConfig.libPath) {
       throw new Error(
         `The ${this.alias} module config needs to have a components.dal.libPath property`
       );
     }
-    const DAL = require(dalConfig.libPath);
-    this.dal = new DAL(dalConfig);
+    const DAL = require(this.dalConfig.libPath);
+    this.dal = new DAL();
 
     this.pendingTransactionStreams = {};
     this.pendingTransactionMap = new Map();
@@ -314,8 +314,7 @@ module.exports = class LDPoSChainModule {
         handler: async action => {
           validateTimestamp('timestamp', action.params);
           let { timestamp } = action.params;
-          let block = await this.dal.getLastBlockAtTimestamp(timestamp);
-          return this.simplifyBlock(block);
+          return this.dal.getLastBlockAtTimestamp(timestamp);
         },
         isPublic: true
       },
@@ -331,10 +330,7 @@ module.exports = class LDPoSChainModule {
           validateLimit('limit', action.params, this.maxAPILimit);
           let { height, limit } = action.params;
           limit = this.sanitizeLimit(limit);
-          let blocks = await this.dal.getBlocksFromHeight(height, limit);
-          return blocks.map((block) => {
-            return this.simplifyBlock(block);
-          });
+          return this.dal.getBlocksFromHeight(height, limit);
         },
         isPublic: true
       },
@@ -344,7 +340,7 @@ module.exports = class LDPoSChainModule {
           validateLimit('limit', action.params, this.maxAPILimit);
           let { height, limit } = action.params;
           limit = this.sanitizeLimit(limit);
-          return this.dal.getBlocksFromHeight(height, limit);
+          return this.dal.getSignedBlocksFromHeight(height, limit);
         },
         isPublic: true
       },
@@ -355,10 +351,7 @@ module.exports = class LDPoSChainModule {
           validateLimit('limit', action.params, this.maxAPILimit);
           let { fromHeight, toHeight, limit } = action.params;
           limit = this.sanitizeLimit(limit);
-          let blocks = await this.dal.getBlocksBetweenHeights(fromHeight, toHeight, limit);
-          return blocks.map((block) => {
-            return this.simplifyBlock(block);
-          });
+          return this.dal.getBlocksBetweenHeights(fromHeight, toHeight, limit);
         },
         isPublic: true
       },
@@ -366,8 +359,7 @@ module.exports = class LDPoSChainModule {
         handler: async action => {
           validateBlockHeight('height', action.params);
           let { height } = action.params;
-          let block = await this.dal.getBlockAtHeight(height);
-          return this.simplifyBlock(block);
+          return this.dal.getBlockAtHeight(height);
         },
         isPublic: true
       },
@@ -388,10 +380,7 @@ module.exports = class LDPoSChainModule {
           offset = this.sanitizeOffset(offset);
           limit = this.sanitizeLimit(limit);
           order = this.sanitizeOrder(order);
-          return this.dal.getBlocksByTimestamp(offset, limit, order)
-            .map((block) => {
-              return this.simplifyBlock(block);
-            });
+          return this.dal.getBlocksByTimestamp(offset, limit, order);
         },
         isPublic: true
       },
@@ -612,6 +601,9 @@ module.exports = class LDPoSChainModule {
     let activeDelegates = this.topActiveDelegates;
     let slotIndex = Math.floor(timestamp / this.forgingInterval);
     let targetIndex = slotIndex % activeDelegates.length;
+    if (!activeDelegates.length) {
+      throw new Error('Could not find any active delegates');
+    }
     return activeDelegates[targetIndex].address;
   }
 
@@ -715,8 +707,10 @@ module.exports = class LDPoSChainModule {
       block.forgerAddress
     ]);
 
+    let affectedAddressList = [...affectedAddressSet];
+
     let affectedAccountList = await Promise.all(
-      [...affectedAddressSet].map(async (address) => {
+      affectedAddressList.map(async (address) => {
         if (senderAccountDetails[address]) {
           return senderAccountDetails[address].senderAccount;
         }
@@ -748,7 +742,8 @@ module.exports = class LDPoSChainModule {
         account,
         changes: {
           balance: account.balance
-        }
+        },
+        balanceDelta: 0n
       };
     }
 
@@ -765,6 +760,7 @@ module.exports = class LDPoSChainModule {
     }
 
     let voteChangeList = [];
+    let delegateRegistrationList = [];
     let multisigRegistrationList = [];
     let totalBlockFees = 0n;
 
@@ -811,6 +807,7 @@ module.exports = class LDPoSChainModule {
         senderAccountChanges.lastTransactionTimestamp = timestamp;
         if (type === 'vote' || type === 'unvote') {
           voteChangeList.push({
+            id: txn.id,
             type,
             voterAddress: senderAddress,
             delegateAddress: txn.delegateAddress
@@ -842,6 +839,9 @@ module.exports = class LDPoSChainModule {
           senderAccountChanges.forgingPublicKey = newForgingPublicKey;
           senderAccountChanges.nextForgingPublicKey = newNextForgingPublicKey;
           senderAccountChanges.nextForgingKeyIndex = newNextForgingKeyIndex;
+          delegateRegistrationList.push({
+            delegateAddress: senderAddress
+          });
         } else if (type === 'registerMultisigWallet') {
           multisigRegistrationList.push({
             multisigAddress: senderAddress,
@@ -856,10 +856,11 @@ module.exports = class LDPoSChainModule {
     forgerAccountChanges.balance += totalBlockFees;
 
     await Promise.all(
-      [...affectedAddressSet].map(async (affectedAddress) => {
+      affectedAddressList.map(async (affectedAddress) => {
         let accountInfo = affectedAccountDetails[affectedAddress];
         let { account } = accountInfo;
         let accountChanges = accountInfo.changes;
+        accountInfo.balanceDelta = accountChanges.balance - account.balance;
         let accountUpdatePacket = {
           ...accountChanges,
           balance: accountChanges.balance.toString(),
@@ -887,42 +888,152 @@ module.exports = class LDPoSChainModule {
       })
     );
 
+    await Promise.all(
+      delegateRegistrationList.map(async (delegateRegistration) => {
+        let { delegateAddress } = delegateRegistration;
+        let hasDelegate = await this.dal.hasDelegate(delegateAddress);
+        if (!hasDelegate) {
+          await this.dal.upsertDelegate({
+            delegateAddress,
+            voteWeight: '0'
+          });
+        }
+      })
+    );
+
+    let accountVotes = {};
+    let delegateVoters = {};
+
+    await Promise.all(
+      affectedAddressList.map(async (voterAddress) => {
+        let delegateAddressList = await this.dal.getAccountVotes(voterAddress);
+        accountVotes[voterAddress] = new Set(delegateAddressList);
+        for (let delegateAddress in delegateAddressList) {
+          if (!delegateVoters[delegateAddress]) {
+            delegateVoters[delegateAddress] = new Set();
+          }
+          delegateVoters[delegateAddress].add(voterAddress);
+        }
+      })
+    );
+
+    let affectedDelegateDetails = {};
+    let voteChangeDelegateAddressList = [...new Set(voteChangeList.map(voteChange => voteChange.delegateAddress))];
+    let affectedDelegateAddressSet = new Set([
+      ...Object.keys(delegateVoters),
+      ...voteChangeDelegateAddressList
+    ]);
+    let affectedDelegateAddressList = [...affectedDelegateAddressSet];
+
+    await Promise.all(
+      affectedDelegateAddressList.map(async (delegateAddress) => {
+        let delegate;
+        try {
+          delegate = await this.dal.getDelegate(delegateAddress);
+        } catch (error) {
+          throw new Error(
+            `Failed to fetch delegate during block processing because of error: ${
+              error.message
+            }`
+          );
+        }
+
+        let voteWeightDelta = 0n;
+        let currentDelegateVoters = delegateVoters[delegateAddress];
+        if (currentDelegateVoters) {
+          for (let voterAddress of currentDelegateVoters) {
+            let accountInfo = affectedAccountDetails[voterAddress];
+            voteWeightDelta += accountInfo.balanceDelta;
+          }
+        }
+        affectedDelegateDetails[delegateAddress] = {
+          delegate,
+          voteWeightDelta
+        };
+      })
+    );
+
+    let voterVoteChanges = {};
+
     for (let voteChange of voteChangeList) {
-      try {
-        if (voteChange.type === 'vote') {
-          let accountVotes;
+      if (!voterVoteChanges[voteChange.voterAddress]) {
+        voterVoteChanges[voteChange.voterAddress] = [];
+      }
+      voterVoteChanges[voteChange.voterAddress].push(voteChange);
+    }
+
+    await Promise.all(
+      Object.keys(voterVoteChanges).map(async (voterAddress) => {
+        let currentVoteChangeList = voterVoteChanges[voterAddress];
+        for (let voteChange of currentVoteChangeList) {
+          let voterInfo = affectedAccountDetails[voterAddress];
+          let { changes: voterChanges } = voterInfo;
+          let delegateInfo = affectedDelegateDetails[voteChange.delegateAddress];
           try {
-            accountVotes = await this.dal.getAccountVotes(voteChange.voterAddress);
+            if (voteChange.type === 'vote') {
+              let accountVotes;
+              try {
+                accountVotes = await this.dal.getAccountVotes(voterAddress);
+              } catch (error) {
+                if (error.name !== 'VoterAccountDidNotExistError') {
+                  throw error;
+                }
+                accountVotes = [];
+              }
+              if (accountVotes.length >= this.maxVotesPerAccount) {
+                let error = new Error(
+                  `Voter ${
+                    voterAddress
+                  } exceeded the maximum amount of ${
+                    this.maxVotesPerAccount
+                  } votes`
+                );
+                error.name = 'VoterAccountExceededMaxVotesError';
+                error.type = 'InvalidActionError';
+                throw error;
+              }
+              await this.dal.vote(voteChange);
+              delegateInfo.voteWeightDelta += voterChanges.balance;
+            } else if (voteChange.type === 'unvote') {
+              await this.dal.unvote(voteChange);
+              delegateInfo.voteWeightDelta -= voterChanges.balance;
+            }
           } catch (error) {
-            if (error.name !== 'VoterAccountDidNotExistError') {
+            if (error.type === 'InvalidActionError') {
+              this.logger.warn(error);
+            } else {
               throw error;
             }
-            accountVotes = [];
           }
-          if (accountVotes.length >= this.maxVotesPerAccount) {
-            let error = new Error(
-              `Voter ${
-                voteChange.voterAddress
-              } exceeded the maximum amount of ${
-                this.maxVotesPerAccount
-              } votes`
+        }
+      })
+    );
+
+    await Promise.all(
+      affectedDelegateAddressList.map(async (delegateAddress) => {
+        let delegateInfo = affectedDelegateDetails[voteChange.delegateAddress];
+        let { delegate } = delegateInfo;
+        let updatedVoteWeight = BigInt(delegate.voteWeight) + delegateInfo.voteWeightDelta;
+        let delegateUpdatePacket = {
+          voteWeight: updatedVoteWeight.toString(),
+          updateHeight: height
+        };
+        try {
+          if (delegate.updateHeight == null || delegate.updateHeight < height) {
+            await this.dal.updateDelegate(
+              delegate.address,
+              delegateUpdatePacket
             );
-            error.name = 'VoterAccountExceededMaxVotesError';
-            error.type = 'InvalidActionError';
+          }
+        } catch (error) {
+          if (error.type === 'InvalidActionError') {
+            this.logger.warn(error);
+          } else {
             throw error;
           }
-          await this.dal.upsertVote(voteChange.voterAddress, voteChange.delegateAddress);
-        } else if (voteChange.type === 'unvote') {
-          await this.dal.removeVote(voteChange.voterAddress, voteChange.delegateAddress);
         }
-      } catch (error) {
-        if (error.type === 'InvalidActionError') {
-          this.logger.warn(error);
-        } else {
-          throw error;
-        }
-      }
-    }
+      })
+    );
 
     for (let multisigRegistration of multisigRegistrationList) {
       let { multisigAddress, memberAddresses, requiredSignatureCount } = multisigRegistration;
@@ -1219,23 +1330,17 @@ module.exports = class LDPoSChainModule {
 
   async verifyVoteTransaction(transaction) {
     let { senderAddress, delegateAddress } = transaction;
-    let delegateAccount;
+    let hasDelegate;
     try {
-      delegateAccount = await this.getSanitizedAccount(delegateAddress);
+      hasDelegate = await this.dal.hasDelegate(delegateAddress);
     } catch (error) {
-      if (error.name === 'AccountDidNotExistError') {
-        throw new Error(
-          `Delegate account ${delegateAddress} did not exist to vote for`
-        );
-      } else {
-        throw new Error(
-          `Failed to fetch delegate account ${delegateAddress} for voting because of error: ${error.message}`
-        );
-      }
-    }
-    if (!delegateAccount.forgingPublicKey) {
       throw new Error(
-        `Delegate account was not registered for forging so it could not be voted for`
+        `Failed to verify delegate account ${delegateAddress} for voting because of error: ${error.message}`
+      );
+    }
+    if (!hasDelegate) {
+      throw new Error(
+        `Delegate ${delegateAddress} did not exist to vote for`
       );
     }
 
@@ -1264,35 +1369,34 @@ module.exports = class LDPoSChainModule {
 
   async verifyUnvoteTransaction(transaction) {
     let { senderAddress, delegateAddress } = transaction;
-    let delegateAccount;
+    let hasDelegate;
     try {
-      delegateAccount = await this.getSanitizedAccount(delegateAddress);
-    } catch (error) {
-      if (error.name === 'AccountDidNotExistError') {
-        throw new Error(
-          `Delegate account ${delegateAddress} did not exist to unvote`
-        );
-      } else {
-        throw new Error(
-          `Failed to fetch delegate account ${delegateAddress} for unvoting because of error: ${error.message}`
-        );
-      }
-    }
-    let voteExists;
-    try {
-      voteExists = await this.dal.hasVote(senderAddress, delegateAddress);
+      hasDelegate = await this.dal.hasDelegate(delegateAddress);
     } catch (error) {
       throw new Error(
-        `Failed to fetch vote from ${senderAddress} for unvoting because of error: ${error.message}`
+        `Failed to verify delegate ${delegateAddress} for unvoting because of error: ${error.message}`
       );
     }
-    if (!voteExists) {
+    if (!hasDelegate) {
       throw new Error(
-        `Unvote transaction cannot remove vote which does not exist from voter ${
-          senderAddress
-        } to delegate ${
+        `Delegate ${delegateAddress} did not exist to unvote`
+      );
+    }
+    let hasExistingVote;
+    try {
+      hasExistingVote = await this.dal.hasVoteForDelegate(senderAddress, delegateAddress);
+    } catch (error) {
+      throw new Error(
+        `Failed to verify vote from ${senderAddress} for unvoting because of error: ${error.message}`
+      );
+    }
+    if (!hasExistingVote) {
+      throw new Error(
+        `Unvote transaction could not unvote delegate ${
           delegateAddress
-        }`
+        } because the sender ${
+          senderAddress
+        } was not voting for it`
       );
     }
   }
@@ -1824,7 +1928,7 @@ module.exports = class LDPoSChainModule {
     this.ldposClient = ldposClient;
     this.nodeHeight = await this.dal.getMaxBlockHeight();
     try {
-      this.lastProcessedBlock = await this.dal.getBlockAtHeight(this.nodeHeight);
+      this.lastProcessedBlock = await this.dal.getSignedBlockAtHeight(this.nodeHeight);
     } catch (error) {
       if (error.name !== 'BlockDidNotExistError') {
         throw new Error(
@@ -1867,209 +1971,213 @@ module.exports = class LDPoSChainModule {
     }
 
     (async () => {
-      while (true) {
-        let activeDelegateCount = Math.min(this.topActiveDelegates.length, delegateCount);
-        let blockSignerMajorityCount = Math.floor(activeDelegateCount * this.minDelegateBlockSignatureRatio);
+      try {
+        while (true) {
+          let activeDelegateCount = Math.min(this.topActiveDelegates.length, delegateCount);
+          let blockSignerMajorityCount = Math.floor(activeDelegateCount * this.minDelegateBlockSignatureRatio);
 
-        // If the node is already on the latest network height, it will just return it.
-        this.networkHeight = await this.catchUpWithNetwork({
-          forgingInterval,
-          fetchBlockLimit,
-          fetchBlockPause,
-          fetchBlockEndConfirmations,
-          blockSignerMajorityCount,
-          maxConsecutiveBlockFetchFailures
-        });
-        this.nodeHeight = this.networkHeight;
-        let nextHeight = this.networkHeight + 1;
+          // If the node is already on the latest network height, it will just return it.
+          this.networkHeight = await this.catchUpWithNetwork({
+            forgingInterval,
+            fetchBlockLimit,
+            fetchBlockPause,
+            fetchBlockEndConfirmations,
+            blockSignerMajorityCount,
+            maxConsecutiveBlockFetchFailures
+          });
+          this.nodeHeight = this.networkHeight;
+          let nextHeight = this.networkHeight + 1;
 
-        await this.waitUntilNextBlockTimeSlot({
-          forgingInterval,
-          timePollInterval
-        });
+          await this.waitUntilNextBlockTimeSlot({
+            forgingInterval,
+            timePollInterval
+          });
 
-        if (!this.isActive) {
-          break;
-        }
+          if (!this.isActive) {
+            break;
+          }
 
-        let blockTimestamp = this.getCurrentBlockTimeSlot(forgingInterval);
-        let currentForgingDelegateAddress = this.getCurrentForgingDelegateAddress();
-        let isCurrentForgingDelegate = forgingWalletAddress && forgingWalletAddress === currentForgingDelegateAddress;
-        let block;
-        let senderAccountDetails;
+          let blockTimestamp = this.getCurrentBlockTimeSlot(forgingInterval);
+          let currentForgingDelegateAddress = this.getCurrentForgingDelegateAddress();
+          let isCurrentForgingDelegate = forgingWalletAddress && forgingWalletAddress === currentForgingDelegateAddress;
+          let block;
+          let senderAccountDetails;
 
-        if (isCurrentForgingDelegate) {
-          let validTransactions = [];
+          if (isCurrentForgingDelegate) {
+            let validTransactions = [];
 
-          let senderAddressList = Object.keys(this.pendingTransactionStreams);
+            let senderAddressList = Object.keys(this.pendingTransactionStreams);
 
-          let senderAccountDetailsResultList = await Promise.all(
-            senderAddressList.map(async (senderAddress) => {
-              let senderAccountInfo;
-              let senderAccount;
-              let multisigMemberAccounts;
-              try {
-                let result = await this.getTransactionSenderAccountDetails(senderAddress);
-                senderAccount = result.senderAccount;
-                multisigMemberAccounts = result.multisigMemberAccounts;
-                senderAccountInfo = {
-                  senderAccount: {
-                    ...senderAccount
-                  },
-                  multisigMemberAccounts: {
-                    ...multisigMemberAccounts
-                  }
-                };
-              } catch (err) {
-                let error = new Error(
-                  `Failed to fetch sender account ${
-                    senderAddress
-                  } for transaction verification as part of block forging because of error: ${
-                    err.message
-                  }`
-                );
-                this.logger.error(error);
-                return null;
-              }
-
-              let senderTxnStream = this.pendingTransactionStreams[senderAddress];
-              if (!senderTxnStream) {
-                return null;
-              }
-              let pendingTxnInfoMap = senderTxnStream.transactionInfoMap;
-              let pendingTxnList = [...pendingTxnInfoMap.values()].map(txnPacket => txnPacket.transaction);
-
-              for (let pendingTxn of pendingTxnList) {
+            let senderAccountDetailsResultList = await Promise.all(
+              senderAddressList.map(async (senderAddress) => {
+                let senderAccountInfo;
+                let senderAccount;
+                let multisigMemberAccounts;
                 try {
-                  let txnTotal;
-                  if (multisigMemberAccounts) {
-                    txnTotal = await this.verifyMultisigTransactionAuth(senderAccount, multisigMemberAccounts, pendingTxn, true);
-                  } else {
-                    txnTotal = await this.verifySigTransactionAuth(senderAccount, pendingTxn, true);
-                  }
-
-                  // Subtract valid transaction total from the in-memory senderAccount balance since it
-                  // may affect the verification of the next transaction in the stream.
-                  senderAccount.balance -= txnTotal;
-                  validTransactions.push(pendingTxn);
-                } catch (error) {
-                  this.logger.debug(
-                    `Excluded transaction ${
-                      pendingTxn.id
-                    } from block because of error: ${
-                      error.message
+                  let result = await this.getTransactionSenderAccountDetails(senderAddress);
+                  senderAccount = result.senderAccount;
+                  multisigMemberAccounts = result.multisigMemberAccounts;
+                  senderAccountInfo = {
+                    senderAccount: {
+                      ...senderAccount
+                    },
+                    multisigMemberAccounts: {
+                      ...multisigMemberAccounts
+                    }
+                  };
+                } catch (err) {
+                  let error = new Error(
+                    `Failed to fetch sender account ${
+                      senderAddress
+                    } for transaction verification as part of block forging because of error: ${
+                      err.message
                     }`
                   );
-                  pendingTxnInfoMap.delete(pendingTxn.id);
-                  if (!pendingTxnInfoMap.size) {
-                    senderTxnStream.close();
-                    delete this.pendingTransactionStreams[senderAddress];
+                  this.logger.error(error);
+                  return null;
+                }
+
+                let senderTxnStream = this.pendingTransactionStreams[senderAddress];
+                if (!senderTxnStream) {
+                  return null;
+                }
+                let pendingTxnInfoMap = senderTxnStream.transactionInfoMap;
+                let pendingTxnList = [...pendingTxnInfoMap.values()].map(txnPacket => txnPacket.transaction);
+
+                for (let pendingTxn of pendingTxnList) {
+                  try {
+                    let txnTotal;
+                    if (multisigMemberAccounts) {
+                      txnTotal = await this.verifyMultisigTransactionAuth(senderAccount, multisigMemberAccounts, pendingTxn, true);
+                    } else {
+                      txnTotal = await this.verifySigTransactionAuth(senderAccount, pendingTxn, true);
+                    }
+
+                    // Subtract valid transaction total from the in-memory senderAccount balance since it
+                    // may affect the verification of the next transaction in the stream.
+                    senderAccount.balance -= txnTotal;
+                    validTransactions.push(pendingTxn);
+                  } catch (error) {
+                    this.logger.debug(
+                      `Excluded transaction ${
+                        pendingTxn.id
+                      } from block because of error: ${
+                        error.message
+                      }`
+                    );
+                    pendingTxnInfoMap.delete(pendingTxn.id);
+                    if (!pendingTxnInfoMap.size) {
+                      senderTxnStream.close();
+                      delete this.pendingTransactionStreams[senderAddress];
+                    }
                   }
                 }
-              }
-              return senderAccountInfo;
-            })
-          );
-          if (validTransactions.length < this.minTransactionsPerBlock) {
-            this.logger.debug(
-              `Skipped forging block which contained less than the minimum amount of ${
-                this.minTransactionsPerBlock
-              } transactions`
+                return senderAccountInfo;
+              })
             );
-            continue;
-          }
-
-          let senderAccountDetailsList = senderAccountDetailsResultList.filter(senderAccountDetails => senderAccountDetails);
-          senderAccountDetails = {};
-          for (let { senderAccount, multisigMemberAccounts } of senderAccountDetailsList) {
-            senderAccountDetails[senderAccount.address] = {
-              senderAccount,
-              multisigMemberAccounts
-            };
-          }
-
-          let pendingTransactions = this.sortPendingTransactions(validTransactions);
-          let blockTransactions = pendingTransactions.slice(0, maxTransactionsPerBlock).map(txn => this.simplifyTransaction(txn, true));
-          block = this.forgeBlock(nextHeight, blockTimestamp, blockTransactions);
-          this.lastReceivedSignerAddressSet.clear();
-          this.lastReceivedBlock = block;
-          this.logger.info(`Forged block ${block.id} at height ${block.height}`);
-
-          await this.wait(forgingBlockBroadcastDelay);
-          try {
-            await this.broadcastBlock(block);
-          } catch (error) {
-            this.logger.error(error);
-          }
-        }
-
-        try {
-          if (!block) {
-            // Will throw if block is not received in time.
-            try {
-              let blockInfo = await this.receiveLastBlockInfo(forgingBlockBroadcastDelay + propagationTimeout);
-              block = blockInfo.block;
-              senderAccountDetails = blockInfo.senderAccountDetails;
-              this.logger.info(
-                `Received valid block ${
-                  block.id
-                } from delegate ${
-                  block.forgerAddress
-                } with timestamp ${
-                  block.timestamp
-                } and height ${
-                  block.height
-                }`
-              );
-            } catch (error) {
+            if (validTransactions.length < this.minTransactionsPerBlock) {
               this.logger.debug(
-                `No valid block was received from delegate ${
-                  currentForgingDelegateAddress
-                } with timestamp ${
-                  blockTimestamp
-                } and height ${
-                  nextHeight
-                }`
+                `Skipped forging block which contained less than the minimum amount of ${
+                  this.minTransactionsPerBlock
+                } transactions`
               );
               continue;
             }
+
+            let senderAccountDetailsList = senderAccountDetailsResultList.filter(senderAccountDetails => senderAccountDetails);
+            senderAccountDetails = {};
+            for (let { senderAccount, multisigMemberAccounts } of senderAccountDetailsList) {
+              senderAccountDetails[senderAccount.address] = {
+                senderAccount,
+                multisigMemberAccounts
+              };
+            }
+
+            let pendingTransactions = this.sortPendingTransactions(validTransactions);
+            let blockTransactions = pendingTransactions.slice(0, maxTransactionsPerBlock).map(txn => this.simplifyTransaction(txn, true));
+            block = this.forgeBlock(nextHeight, blockTimestamp, blockTransactions);
+            this.lastReceivedSignerAddressSet.clear();
+            this.lastReceivedBlock = block;
+            this.logger.info(`Forged block ${block.id} at height ${block.height}`);
+
+            await this.wait(forgingBlockBroadcastDelay);
+            try {
+              await this.broadcastBlock(block);
+            } catch (error) {
+              this.logger.error(error);
+            }
           }
 
-          if (forgingWalletAddress && !isCurrentForgingDelegate) {
-            (async () => {
+          try {
+            if (!block) {
+              // Will throw if block is not received in time.
               try {
-                let selfSignature = await this.signBlock(block);
-                this.lastReceivedSignerAddressSet.add(selfSignature.signerAddress);
-                await this.wait(forgingSignatureBroadcastDelay);
-                if (this.lastDoubleForgedBlockTimestamp === block.timestamp) {
-                  throw new Error(
-                    `Refused to send signature for block ${
-                      block.id
-                    } because delegate ${
-                      block.forgerAddress
-                    } tried to double-forge`
-                  );
-                }
-                this.verifiedBlockSignatureStream.write(selfSignature);
-                await this.broadcastBlockSignature(selfSignature);
+                let blockInfo = await this.receiveLastBlockInfo(forgingBlockBroadcastDelay + propagationTimeout);
+                block = blockInfo.block;
+                senderAccountDetails = blockInfo.senderAccountDetails;
+                this.logger.info(
+                  `Received valid block ${
+                    block.id
+                  } from delegate ${
+                    block.forgerAddress
+                  } with timestamp ${
+                    block.timestamp
+                  } and height ${
+                    block.height
+                  }`
+                );
               } catch (error) {
-                this.logger.error(error);
+                this.logger.debug(
+                  `No valid block was received from delegate ${
+                    currentForgingDelegateAddress
+                  } with timestamp ${
+                    blockTimestamp
+                  } and height ${
+                    nextHeight
+                  }`
+                );
+                continue;
               }
-            })();
-          }
-          // Will throw if the required number of valid signatures cannot be gathered in time.
-          await this.receiveLastBlockSignatures(block, blockSignerMajorityCount, forgingSignatureBroadcastDelay + propagationTimeout);
-          this.logger.info(`Received a sufficient number of valid delegate signatures for block ${block.id}`);
-          await this.processBlock(block, senderAccountDetails, false);
-          this.lastFullySignedBlock = block;
+            }
 
-          this.nodeHeight = nextHeight;
-          this.networkHeight = nextHeight;
-        } catch (error) {
-          if (this.isActive) {
-            this.logger.error(error);
+            if (forgingWalletAddress && !isCurrentForgingDelegate) {
+              (async () => {
+                try {
+                  let selfSignature = await this.signBlock(block);
+                  this.lastReceivedSignerAddressSet.add(selfSignature.signerAddress);
+                  await this.wait(forgingSignatureBroadcastDelay);
+                  if (this.lastDoubleForgedBlockTimestamp === block.timestamp) {
+                    throw new Error(
+                      `Refused to send signature for block ${
+                        block.id
+                      } because delegate ${
+                        block.forgerAddress
+                      } tried to double-forge`
+                    );
+                  }
+                  this.verifiedBlockSignatureStream.write(selfSignature);
+                  await this.broadcastBlockSignature(selfSignature);
+                } catch (error) {
+                  this.logger.error(error);
+                }
+              })();
+            }
+            // Will throw if the required number of valid signatures cannot be gathered in time.
+            await this.receiveLastBlockSignatures(block, blockSignerMajorityCount, forgingSignatureBroadcastDelay + propagationTimeout);
+            this.logger.info(`Received a sufficient number of valid delegate signatures for block ${block.id}`);
+            await this.processBlock(block, senderAccountDetails, false);
+            this.lastFullySignedBlock = block;
+
+            this.nodeHeight = nextHeight;
+            this.networkHeight = nextHeight;
+          } catch (error) {
+            if (this.isActive) {
+              this.logger.error(error);
+            }
           }
         }
+      } catch (error) {
+        this.logger.error(error);
       }
     })();
   }
@@ -2686,6 +2794,7 @@ module.exports = class LDPoSChainModule {
     this.genesis = require(options.genesisPath || DEFAULT_GENESIS_PATH);
     try {
       await this.dal.init({
+        ...this.dalConfig,
         genesis: this.genesis
       });
     } catch (error) {

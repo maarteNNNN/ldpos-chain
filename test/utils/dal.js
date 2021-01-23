@@ -3,7 +3,9 @@ const DEFAULT_NETWORK_SYMBOL = 'ldpos';
 class DAL {
   constructor() {
     this.accounts = {};
+    this.delegates = {};
     this.votes = {};
+    this.ballots = {};
     this.blocks = [];
     this.transactions = {};
     this.multisigMembers = {};
@@ -23,8 +25,21 @@ class DAL {
           updateHeight: 0
         };
         await this.upsertAccount(account);
+        if (account.forgingPublicKey) {
+          await this.upsertDelegate({
+            address: account.address,
+            voteWeight: '0'
+          });
+        }
         await Promise.all(
-          votes.map((delegateAddress) => this.upsertVote(account.address, delegateAddress))
+          votes.map(async (delegateAddress) => {
+            await this.vote(account.address, delegateAddress);
+            let delegate = await this.getDelegate(delegateAddress);
+            let updatedVoteWeight = BigInt(delegate.voteWeight) + BigInt(account.balance);
+            await this.updateDelegate(delegateAddress, {
+              voteWeight: updatedVoteWeight.toString()
+            });
+          })
         );
       })
     );
@@ -93,79 +108,80 @@ class DAL {
       throw error;
     }
     let voteSet = new Set();
-    let delegateAddressList = Object.keys(this.votes);
-    for (let delegateAddress of delegateAddressList) {
-      let delegateVoters = this.votes[delegateAddress];
-      if (delegateVoters.has(voterAddress)) {
-        voteSet.add(delegateAddress);
+    let voteList = Object.values(this.votes);
+    for (let vote of voteList) {
+      if (vote.voterAddress === voterAddress) {
+        voteSet.add(vote.delegateAddress);
       }
     }
     return [...voteSet];
   }
 
-  async hasVote(voterAddress, delegateAddress) {
-    return this.votes[delegateAddress] && this.votes[delegateAddress].has(voterAddress);
+  async hasVoteForDelegate(voterAddress, delegateAddress) {
+    return Object.values(this.votes).some(
+      vote => vote.voterAddress === voterAddress && vote.delegateAddress === delegateAddress
+    );
   }
 
-  async upsertVote(voterAddress, delegateAddress) {
-    let delegateAccount = this.accounts[delegateAddress];
-    if (!delegateAccount) {
-      let error = new Error(`Delegate ${delegateAddress} did not exist`);
-      error.name = 'DelegateAccountDidNotExistError';
-      error.type = 'InvalidActionError';
-      throw error;
-    }
-    if (!delegateAccount.forgingPublicKey) {
+  async getVoteForDelegate(voterAddress, delegateAddress) {
+    let delegateVote = Object.values(this.votes).find(
+      vote => vote.voterAddress === voterAddress && vote.delegateAddress === delegateAddress
+    );
+    if (!delegateVote) {
       let error = new Error(
-        `Delegate account ${delegateAddress} was not registered for forging and so it cannot receive votes`
+        `Vote from voter ${voterAddress} for delegate ${delegateAddress} did not exist`
       );
-      error.name = 'DelegateAccountWasNotRegisteredError';
+      error.name = 'DelegateVoteDidNotExistError';
       error.type = 'InvalidActionError';
       throw error;
     }
-    if (!this.accounts[voterAddress]) {
-      let error = new Error(`Voter ${voterAddress} did not exist`);
-      error.name = 'VoterAccountDidNotExistError';
-      error.type = 'InvalidActionError';
-      throw error;
+    return delegateVote;
+  }
+
+  async vote(ballot) {
+    if (this.ballots[ballot.id]) {
+      this.votes[ballot.id] = {...ballot};
+      this.ballots[ballot.id] = {...ballot};
+      return;
     }
-    if (!this.votes[delegateAddress]) {
-      this.votes[delegateAddress] = new Set();
-    }
-    let delegateVoterSet = this.votes[delegateAddress];
-    if (delegateVoterSet.has(voterAddress)) {
+    let { voterAddress, delegateAddress } = ballot;
+    let hasExistingVote = await this.hasVoteForDelegate(voterAddress, delegateAddress);
+    if (hasExistingVote) {
       let error = new Error(
-        `Voter ${voterAddress} already voted for delegate ${delegateAddress}`
+        `Voter ${voterAddress} has already voted for delegate ${delegateAddress}`
       );
       error.name = 'VoterAlreadyVotedForDelegateError';
       error.type = 'InvalidActionError';
       throw error;
     }
-    delegateVoterSet.add(voterAddress);
+    this.votes[ballot.id] = {...ballot};
+    this.ballots[ballot.id] = {...ballot};
   }
 
-  async removeVote(voterAddress, delegateAddress) {
-    if (!this.accounts[delegateAddress]) {
-      let error = new Error(`Delegate ${delegateAddress} did not exist`);
-      error.name = 'DelegateAccountDidNotExistError';
-      error.type = 'InvalidActionError';
-      throw error;
+  async unvote(ballot) {
+    if (this.ballots[ballot.id]) {
+      this.ballots[ballot.id] = {...ballot};
+      return;
     }
-    if (!this.accounts[voterAddress]) {
-      let error = new Error(`Voter ${voterAddress} did not exist`);
-      error.name = 'VoterAccountDidNotExistError';
-      error.type = 'InvalidActionError';
-      throw error;
+    let { voterAddress, delegateAddress } = ballot;
+    let existingVote;
+    try {
+      existingVote = await this.getVoteForDelegate(voterAddress, delegateAddress);
+    } catch (error) {
+      if (error.type !== 'InvalidActionError') {
+        throw error;
+      }
     }
-    if (!this.hasVote(voterAddress, delegateAddress)) {
+    if (!existingVote) {
       let error = new Error(
-        `Account ${voterAddress} was not voting for delegate ${delegateAddress}`
+        `Voter ${voterAddress} could not unvote delegate ${delegateAddress} because it was not voting for it`
       );
-      error.name = 'VoteDidNotExistError';
+      error.name = 'VoterNotVotingForDelegateError';
       error.type = 'InvalidActionError';
       throw error;
     }
-    this.votes[delegateAddress].delete(voterAddress);
+    delete this.votes[existingVote.id];
+    this.ballots[ballot.id] = {...ballot};
   }
 
   async registerMultisigWallet(multisigAddress, memberAddresses, requiredSignatureCount) {
@@ -230,6 +246,11 @@ class DAL {
   }
 
   async getBlocksFromHeight(height, limit) {
+    return this.getSignedBlocksFromHeight(height, limit)
+      .map(block => this.simplifyBlock(block));
+  }
+
+  async getSignedBlocksFromHeight(height, limit) {
     if (height < 1) {
       height = 1;
     }
@@ -257,7 +278,7 @@ class DAL {
       error.type = 'InvalidActionError';
       throw error;
     }
-    return block;
+    return this.simplifyBlock(block);
   }
 
   async getBlocksBetweenHeights(fromHeight, toHeight, limit) {
@@ -270,10 +291,14 @@ class DAL {
         }
       }
     }
-    return selectedBlocks;
+    return selectedBlocks.map(block => this.simplifyBlock(block));
   }
 
   async getBlockAtHeight(height) {
+    return this.simplifyBlock(this.getSignedBlockAtHeight(height));
+  }
+
+  async getSignedBlockAtHeight(height) {
     let block = this.blocks[height - 1];
     if (!block) {
       let error = new Error(
@@ -301,7 +326,8 @@ class DAL {
 
   async getBlocksByTimestamp(offset, limit, order) {
     return this.sortByProperty(this.blocks, 'timestamp', order)
-      .slice(offset, offset + limit);
+      .slice(offset, offset + limit)
+      .map(block => this.simplifyBlock(block));
   }
 
   async upsertBlock(block, synched) {
@@ -336,12 +362,6 @@ class DAL {
       throw error;
     }
     return transaction;
-  }
-
-  async upsertTransaction(transaction) {
-    this.transactions[transaction.id] = {
-      ...transaction
-    };
   }
 
   async getTransactionsByTimestamp(offset, limit, order) {
@@ -406,29 +426,49 @@ class DAL {
     );
   }
 
-  async getDelegatesByVoteWeight(offset, limit, order) {
-    let delegateList = [];
-    let delegateAddressList = Object.keys(this.votes);
-    for (let delegateAddress of delegateAddressList) {
-      let voterAddressList = [...this.votes[delegateAddress]];
-      let voteWeight = 0n;
-      for (let voterAddress of voterAddressList) {
-        let voter = this.accounts[voterAddress] || {};
-        voteWeight += BigInt(voter.balance || 0);
-      }
-      delegateList.push({
-        address: delegateAddress,
-        voteWeight
-      });
+  async upsertDelegate(delegate) {
+    this.delegates[delegate.address] = {
+      ...delegate
+    };
+  }
+
+  async updateDelegate(walletAddress, changePacket) {
+    let delegate = this.delegates[walletAddress];
+    if (!delegate) {
+      let error = new Error(`Delegate ${walletAddress} did not exist`);
+      error.name = 'DelegateDidNotExistError';
+      error.type = 'InvalidActionError';
+      throw error;
     }
-    return this.sortByProperty(delegateList, 'voteWeight', order)
-      .slice(offset, offset + limit)
-      .map((delegate) => {
-        return {
-          ...delegate,
-          voteWeight: delegate.voteWeight.toString()
-        };
-      });
+    let changedKeys = Object.keys(changePacket);
+    for (let key of changedKeys) {
+      delegate[key] = changePacket[key];
+    }
+  }
+
+  async hasDelegate(walletAddress) {
+    return !!this.delegates[walletAddress];
+  }
+
+  async getDelegate(walletAddress) {
+    let delegate = this.delegates[walletAddress];
+    if (!delegate) {
+      let error = new Error(`Delegate ${walletAddress} did not exist`);
+      error.name = 'DelegateDidNotExistError';
+      error.type = 'InvalidActionError';
+      throw error;
+    }
+    return {...delegate};
+  }
+
+  async getDelegatesByVoteWeight(offset, limit, order) {
+    return this.sortByProperty(
+      Object.values(this.delegates).filter(delegate => delegate.voteWeight !== '0'),
+      'voteWeight',
+      order,
+      BigInt
+    )
+    .slice(offset, offset + limit);
   }
 
   sortAsc(list, property, typeCastFunction) {
@@ -478,6 +518,12 @@ class DAL {
       return this.sortAsc(list, property, typeCastFunction);
     }
     return this.sortDesc(list, property, typeCastFunction);
+  }
+
+  simplifyBlock(signedBlock) {
+    let { transactions, forgerSignature, signatures, ...simpleBlock } = signedBlock;
+    simpleBlock.numberOfTransactions = transactions.length;
+    return simpleBlock;
   }
 }
 
