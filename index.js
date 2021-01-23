@@ -21,6 +21,11 @@ const {
   validateSortOrder
 } = require('./schemas/primitives');
 
+const { LDPOS_PASSWORD } = process.env;
+const CIPHER_ALGORITHM = 'aes-192-cbc';
+const CIPHER_KEY = LDPOS_PASSWORD ? crypto.scryptSync(LDPOS_PASSWORD, 'salt', 24) : undefined;
+const CIPHER_IV = Buffer.alloc(16, 0);
+
 const DEFAULT_MODULE_ALIAS = 'ldpos_chain';
 const DEFAULT_GENESIS_PATH = './genesis/mainnet/genesis.json';
 const DEFAULT_CRYPTO_CLIENT_LIB_PATH = 'ldpos-client';
@@ -1727,6 +1732,43 @@ module.exports = class LDPoSChainModule {
     return sortedTransactions;
   }
 
+  getForgingPassphrase(options) {
+    let {
+      encryptedForgingPassphrase,
+      forgingPassphrase
+    } = options;
+
+    if (encryptedForgingPassphrase) {
+      if (!LDPOS_PASSWORD) {
+        throw new Error(
+          `Cannot decrypt the encryptedForgingPassphrase from the ${
+            this.alias
+          } module config without a valid LDPOS_PASSWORD environment variable`
+        );
+      }
+      if (forgingPassphrase) {
+        throw new Error(
+          `The ${
+            this.alias
+          } module config should have either a forgingPassphrase or encryptedForgingPassphrase but not both`
+        );
+      }
+      try {
+        let decipher = crypto.createDecipheriv(CIPHER_ALGORITHM, CIPHER_KEY, CIPHER_IV);
+        let decrypted = decipher.update(encryptedForgingPassphrase, 'hex', 'utf8');
+        decrypted += decipher.final('utf8');
+        forgingPassphrase = decrypted;
+      } catch (error) {
+        throw new Error(
+          `Failed to decrypt encryptedForgingPassphrase in ${
+            this.alias
+          } module config - Check that the LDPOS_PASSWORD environment variable is correct`
+        );
+      }
+    }
+    return forgingPassphrase;
+  }
+
   async startBlockProcessingLoop() {
     let options = this.options;
     let channel = this.channel;
@@ -1755,10 +1797,12 @@ module.exports = class LDPoSChainModule {
     this.cryptoClientLibPath = options.cryptoClientLibPath || DEFAULT_CRYPTO_CLIENT_LIB_PATH;
     let { createClient } = require(this.cryptoClientLibPath);
 
-    if (options.forgingPassphrase) {
+    let forgingPassphrase = this.getForgingPassphrase(options);
+
+    if (forgingPassphrase) {
       try {
         ldposClient = await createClient({
-          passphrase: options.forgingPassphrase,
+          passphrase: forgingPassphrase,
           walletAddress: options.forgingWalletAddress,
           adapter: this.dal,
           connect: true
