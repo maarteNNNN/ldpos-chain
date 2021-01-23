@@ -1,4 +1,5 @@
 const { EventEmitter } = require('events');
+const url = require('url');
 
 class Channel {
   constructor(options) {
@@ -22,7 +23,7 @@ class Channel {
 
   async invoke(procedureName, data) {
     let procedureParts = procedureName.split(':');
-    let moduleName = procedureParts[0];
+    let { pathname: moduleName } = url.parse(procedureParts[0], true);
     let actionName = procedureParts[1];
     let targetFunction = this.modules[moduleName].actionHandlers[actionName];
     if (!targetFunction) {
