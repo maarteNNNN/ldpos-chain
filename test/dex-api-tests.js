@@ -22,6 +22,7 @@ describe('DEX API tests', async () => {
   let bootstrapEventTriggered;
   let clientForger;
   let chainChangeEvents;
+  let launchChainModule;
 
   beforeEach(async () => {
     chainModule = new LDPoSChainModule({
@@ -67,31 +68,22 @@ describe('DEX API tests', async () => {
       }
     });
 
-    options = {
-      genesisPath: './test/utils/genesis-dex-api.json',
-      forgingPassphrase: 'clerk aware give dog reopen peasant duty cheese tobacco trouble gold angle',
-      minTransactionsPerBlock: 0, // Enable forging empty blocks.
-      forgingInterval: 10000,
-      forgingBlockBroadcastDelay: 200,
-      forgingSignatureBroadcastDelay: 200,
-      propagationRandomness: 100,
-      propagationTimeout: 5000
+    launchChainModule = async (moduleOptions) => {
+      bootstrapEventTriggered = false;
+      channel.subscribe(`${chainModule.alias}:bootstrap`, async () => {
+        bootstrapEventTriggered = true;
+      });
+
+      chainChangeEvents = [];
+      channel.subscribe(`${chainModule.alias}:chainChanges`, async (event) => {
+        chainChangeEvents.push(event);
+      });
+      await chainModule.load(channel, moduleOptions);
+      clientForger = await createClient({
+        passphrase: moduleOptions.forgingPassphrase,
+        adapter
+      });
     };
-
-    bootstrapEventTriggered = false;
-    channel.subscribe(`${chainModule.alias}:bootstrap`, async () => {
-      bootstrapEventTriggered = true;
-    });
-
-    chainChangeEvents = [];
-    channel.subscribe(`${chainModule.alias}:chainChanges`, async (event) => {
-      chainChangeEvents.push(event);
-    });
-    await chainModule.load(channel, options);
-    clientForger = await createClient({
-      passphrase: options.forgingPassphrase,
-      adapter
-    });
   });
 
   afterEach(async () => {
@@ -99,6 +91,20 @@ describe('DEX API tests', async () => {
   });
 
   describe('module state', async () => {
+
+    beforeEach(async () => {
+      options = {
+        genesisPath: './test/utils/genesis-dex-api.json',
+        forgingPassphrase: 'clerk aware give dog reopen peasant duty cheese tobacco trouble gold angle',
+        minTransactionsPerBlock: 0, // Enable forging empty blocks.
+        forgingInterval: 30000,
+        forgingBlockBroadcastDelay: 200,
+        forgingSignatureBroadcastDelay: 200,
+        propagationRandomness: 100,
+        propagationTimeout: 5000
+      };
+      await launchChainModule(options);
+    });
 
     it('should expose an info property', async () => {
       let moduleInfo = chainModule.info;
@@ -132,6 +138,18 @@ describe('DEX API tests', async () => {
     let multisigMemberBPassphrase;
 
     beforeEach(async () => {
+      options = {
+        genesisPath: './test/utils/genesis-dex-api.json',
+        forgingPassphrase: 'clerk aware give dog reopen peasant duty cheese tobacco trouble gold angle',
+        minTransactionsPerBlock: 0, // Enable forging empty blocks.
+        forgingInterval: 30000,
+        forgingBlockBroadcastDelay: 200,
+        forgingSignatureBroadcastDelay: 200,
+        propagationRandomness: 100,
+        propagationTimeout: 5000
+      };
+      await launchChainModule(options);
+
       multisigMemberAPassphrase = 'birth select quiz process bid raccoon memory village snow cable agent bean';
       multisigMemberBPassphrase = 'genius shoulder into daring armor proof cycle bench patrol paper grant picture';
 
@@ -255,7 +273,7 @@ describe('DEX API tests', async () => {
             }
           ]
         }
-      ].map(block => {
+      ].map((block) => {
         block.previousBlockId = lastBlockId;
         let preparedBlock = clientForger.prepareBlock(block);
         let { transactions, ...preparedBlockWithoutTxns } = preparedBlock;
@@ -718,6 +736,20 @@ describe('DEX API tests', async () => {
   });
 
   describe('module events', async () => {
+
+    beforeEach(async () => {
+      options = {
+        genesisPath: './test/utils/genesis-dex-api.json',
+        forgingPassphrase: 'clerk aware give dog reopen peasant duty cheese tobacco trouble gold angle',
+        minTransactionsPerBlock: 0, // Enable forging empty blocks.
+        forgingInterval: 10000,
+        forgingBlockBroadcastDelay: 200,
+        forgingSignatureBroadcastDelay: 200,
+        propagationRandomness: 100,
+        propagationTimeout: 5000
+      };
+      await launchChainModule(options);
+    });
 
     it('should trigger bootstrap event after launch', async () => {
       await wait(200);
