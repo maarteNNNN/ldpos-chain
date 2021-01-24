@@ -405,6 +405,14 @@ module.exports = class LDPoSChainModule {
           return this.getForgingDelegates();
         },
         isPublic: true
+      },
+      getAccountVotes: {
+        handler: async action => {
+          validateWalletAddress('walletAddress', action.params, this.networkSymbol);
+          let { walletAddress } = action.params;
+          return this.dal.getAccountVotes(walletAddress);
+        },
+        isPublic: true
       }
     };
   }

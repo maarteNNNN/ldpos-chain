@@ -128,26 +128,6 @@ class DAL {
     );
   }
 
-  async getVoteForDelegate(voterAddress, delegateAddress) {
-    let delegateVote = Object.values(this.ballots).find(
-      currentBallot => (
-        currentBallot.active &&
-        currentBallot.type === 'vote' &&
-        currentBallot.voterAddress === voterAddress &&
-        currentBallot.delegateAddress === delegateAddress
-      )
-    );
-    if (!delegateVote) {
-      let error = new Error(
-        `Vote from voter ${voterAddress} for delegate ${delegateAddress} did not exist`
-      );
-      error.name = 'DelegateVoteDidNotExistError';
-      error.type = 'InvalidActionError';
-      throw error;
-    }
-    return {...delegateVote};
-  }
-
   async vote(ballot) {
     if (this.ballots[ballot.id]) {
       this.ballots[ballot.id] = {...ballot, type: 'vote', active: true};
