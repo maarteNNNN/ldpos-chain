@@ -246,8 +246,8 @@ class DAL {
   }
 
   async getBlocksFromHeight(height, limit) {
-    return this.getSignedBlocksFromHeight(height, limit)
-      .map(block => this.simplifyBlock(block));
+    let blocks = await this.getSignedBlocksFromHeight(height, limit)
+    return blocks.map(block => this.simplifyBlock(block));
   }
 
   async getSignedBlocksFromHeight(height, limit) {
@@ -295,7 +295,8 @@ class DAL {
   }
 
   async getBlockAtHeight(height) {
-    return this.simplifyBlock(this.getSignedBlockAtHeight(height));
+    let block = await this.getSignedBlockAtHeight(height);
+    return this.simplifyBlock(block);
   }
 
   async getSignedBlockAtHeight(height) {
