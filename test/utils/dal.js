@@ -45,7 +45,8 @@ class DAL {
         });
         let delegate = await this.getDelegate(delegateAddress);
         let updatedVoteWeight = BigInt(delegate.voteWeight) + BigInt(accountInfo.balance);
-        await this.updateDelegate(delegateAddress, {
+        await this.upsertDelegate({
+          address: delegateAddress,
           voteWeight: updatedVoteWeight.toString()
         });
       }
