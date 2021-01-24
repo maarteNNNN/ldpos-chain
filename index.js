@@ -992,10 +992,18 @@ module.exports = class LDPoSChainModule {
                 error.type = 'InvalidActionError';
                 throw error;
               }
-              await this.dal.vote(voteChange);
+              await this.dal.vote({
+                id: voteChange.id,
+                voterAddress,
+                delegateAddress: voteChange.delegateAddress
+              });
               delegateInfo.voteWeightDelta += voterChanges.balance;
             } else if (voteChange.type === 'unvote') {
-              await this.dal.unvote(voteChange);
+              await this.dal.unvote({
+                id: voteChange.id,
+                voterAddress,
+                delegateAddress: voteChange.delegateAddress
+              });
               delegateInfo.voteWeightDelta -= voterChanges.balance;
             }
           } catch (error) {

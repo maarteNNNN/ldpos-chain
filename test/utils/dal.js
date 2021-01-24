@@ -6,7 +6,6 @@ class DAL {
   constructor() {
     this.accounts = {};
     this.delegates = {};
-    this.votes = {};
     this.ballots = {};
     this.blocks = [];
     this.transactions = {};
@@ -116,24 +115,38 @@ class DAL {
       throw error;
     }
     let voteSet = new Set();
-    let voteList = Object.values(this.votes);
+    let voteList = Object.values(this.ballots).filter(
+      currentBallot => (
+        currentBallot.active &&
+        currentBallot.type === 'vote' &&
+        currentBallot.voterAddress === voterAddress
+      )
+    );
     for (let vote of voteList) {
-      if (vote.voterAddress === voterAddress) {
-        voteSet.add(vote.delegateAddress);
-      }
+      voteSet.add(vote.delegateAddress);
     }
     return [...voteSet];
   }
 
   async hasVoteForDelegate(voterAddress, delegateAddress) {
-    return Object.values(this.votes).some(
-      vote => vote.voterAddress === voterAddress && vote.delegateAddress === delegateAddress
+    return Object.values(this.ballots).some(
+      ballot => (
+        ballot.active &&
+        ballot.type === 'vote' &&
+        ballot.voterAddress === voterAddress &&
+        ballot.delegateAddress === delegateAddress
+      )
     );
   }
 
   async getVoteForDelegate(voterAddress, delegateAddress) {
-    let delegateVote = Object.values(this.votes).find(
-      vote => vote.voterAddress === voterAddress && vote.delegateAddress === delegateAddress
+    let delegateVote = Object.values(this.ballots).find(
+      currentBallot => (
+        currentBallot.active &&
+        currentBallot.type === 'vote' &&
+        currentBallot.voterAddress === voterAddress &&
+        currentBallot.delegateAddress === delegateAddress
+      )
     );
     if (!delegateVote) {
       let error = new Error(
@@ -148,8 +161,7 @@ class DAL {
 
   async vote(ballot) {
     if (this.ballots[ballot.id]) {
-      this.votes[ballot.id] = {...ballot};
-      this.ballots[ballot.id] = {...ballot};
+      this.ballots[ballot.id] = {...ballot, type: 'vote', active: true};
       return;
     }
     let { voterAddress, delegateAddress } = ballot;
@@ -162,25 +174,44 @@ class DAL {
       error.type = 'InvalidActionError';
       throw error;
     }
-    this.votes[ballot.id] = {...ballot};
-    this.ballots[ballot.id] = {...ballot};
+    let existingUnvoteBallots = Object.values(this.ballots).filter(
+      currentBallot => (
+        currentBallot.active &&
+        currentBallot.type === 'unvote' &&
+        currentBallot.voterAddress === voterAddress &&
+        currentBallot.delegateAddress === delegateAddress
+      )
+    );
+    for (let unvoteBallot of existingUnvoteBallots) {
+      unvoteBallot.active = false;
+    }
+    this.ballots[ballot.id] = {...ballot, type: 'vote', active: true};
   }
 
   async unvote(ballot) {
     if (this.ballots[ballot.id]) {
-      this.ballots[ballot.id] = {...ballot};
+      this.ballots[ballot.id] = {...ballot, type: 'unvote', active: true};
       return;
     }
     let { voterAddress, delegateAddress } = ballot;
-    let existingVote;
-    try {
-      existingVote = await this.getVoteForDelegate(voterAddress, delegateAddress);
-    } catch (error) {
-      if (error.type !== 'InvalidActionError') {
-        throw error;
-      }
-    }
-    if (!existingVote) {
+    let existingVoteBallots = Object.values(this.ballots).filter(
+      currentBallot => (
+        currentBallot.active &&
+        currentBallot.type === 'vote' &&
+        currentBallot.voterAddress === voterAddress &&
+        currentBallot.delegateAddress === delegateAddress
+      )
+    );
+    let existingUnvoteBallot = Object.values(this.ballots).find(
+      currentBallot => (
+        currentBallot.active &&
+        currentBallot.type === 'unvote' &&
+        currentBallot.voterAddress === voterAddress &&
+        currentBallot.delegateAddress === delegateAddress
+      )
+    );
+
+    if (!existingVoteBallots.length || existingUnvoteBallot) {
       let error = new Error(
         `Voter ${voterAddress} could not unvote delegate ${delegateAddress} because it was not voting for it`
       );
@@ -188,8 +219,10 @@ class DAL {
       error.type = 'InvalidActionError';
       throw error;
     }
-    delete this.votes[existingVote.id];
-    this.ballots[ballot.id] = {...ballot};
+    for (let voteBallot of existingVoteBallots) {
+      voteBallot.active = false;
+    }
+    this.ballots[ballot.id] = {...ballot, type: 'unvote', active: true};
   }
 
   async registerMultisigWallet(multisigAddress, memberAddresses, requiredSignatureCount) {
