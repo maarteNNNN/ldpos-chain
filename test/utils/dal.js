@@ -1,3 +1,5 @@
+const crypto = require('crypto');
+
 const DEFAULT_NETWORK_SYMBOL = 'ldpos';
 
 class DAL {
@@ -31,18 +33,24 @@ class DAL {
             voteWeight: '0'
           });
         }
-        await Promise.all(
-          votes.map(async (delegateAddress) => {
-            await this.vote(account.address, delegateAddress);
-            let delegate = await this.getDelegate(delegateAddress);
-            let updatedVoteWeight = BigInt(delegate.voteWeight) + BigInt(account.balance);
-            await this.updateDelegate(delegateAddress, {
-              voteWeight: updatedVoteWeight.toString()
-            });
-          })
-        );
       })
     );
+
+    for (let accountInfo of accounts) {
+      let { votes } = accountInfo;
+      for (let delegateAddress of votes) {
+        await this.vote({
+          id: crypto.randomBytes(32).toString('base64'),
+          voterAddress: accountInfo.address,
+          delegateAddress
+        });
+        let delegate = await this.getDelegate(delegateAddress);
+        let updatedVoteWeight = BigInt(delegate.voteWeight) + BigInt(accountInfo.balance);
+        await this.updateDelegate(delegateAddress, {
+          voteWeight: updatedVoteWeight.toString()
+        });
+      }
+    }
 
     await Promise.all(
       multisigWalletList.map(async (multisigWallet) => {
@@ -135,7 +143,7 @@ class DAL {
       error.type = 'InvalidActionError';
       throw error;
     }
-    return delegateVote;
+    return {...delegateVote};
   }
 
   async vote(ballot) {
@@ -242,7 +250,7 @@ class DAL {
   }
 
   async getLastBlock() {
-    return this.blocks[this.blocks.length - 1];
+    return {...this.blocks[this.blocks.length - 1]};
   }
 
   async getBlocksFromHeight(height, limit) {
@@ -255,7 +263,11 @@ class DAL {
       height = 1;
     }
     let startIndex = height - 1;
-    return this.blocks.slice(startIndex, startIndex + limit);
+    return this.blocks
+      .slice(startIndex, startIndex + limit)
+      .map((block) => {
+        return {...block};
+      });
   }
 
   async getLastBlockAtTimestamp(timestamp) {
@@ -309,7 +321,7 @@ class DAL {
       error.type = 'InvalidActionError';
       throw error;
     }
-    return block;
+    return {...block};
   }
 
   async getBlock(id) {
@@ -322,7 +334,7 @@ class DAL {
       error.type = 'InvalidActionError';
       throw error;
     }
-    return block;
+    return {...block};
   }
 
   async getBlocksByTimestamp(offset, limit, order) {
@@ -362,12 +374,15 @@ class DAL {
       error.type = 'InvalidActionError';
       throw error;
     }
-    return transaction;
+    return {...transaction};
   }
 
   async getTransactionsByTimestamp(offset, limit, order) {
     return this.sortByProperty(Object.values(this.transactions), 'timestamp', order)
-      .slice(offset, offset + limit);
+      .slice(offset, offset + limit)
+      .map((transaction) => {
+        return {...transaction};
+      });
   }
 
   async getTransactionsFromBlock(blockId, offset, limit) {
@@ -381,7 +396,11 @@ class DAL {
     if (limit == null) {
       return blockTxns;
     }
-    return blockTxns.slice(0, limit);
+    return blockTxns
+      .slice(0, limit)
+      .map((transaction) => {
+        return {...transaction};
+      });
   }
 
   async getInboundTransactions(walletAddress, fromTimestamp, limit, order) {
@@ -396,7 +415,9 @@ class DAL {
         }
       }
     }
-    return inboundTransactions;
+    return inboundTransactions.map((transaction) => {
+      return {...transaction};
+    });
   }
 
   async getOutboundTransactions(walletAddress, fromTimestamp, limit, order) {
@@ -410,21 +431,32 @@ class DAL {
         }
       }
     }
-    return outboundTransactions;
+    return outboundTransactions.map((transaction) => {
+      return {...transaction};
+    });
   }
 
   async getInboundTransactionsFromBlock(walletAddress, blockId) {
     let transactionList = Object.values(this.transactions);
-    return transactionList.filter(
-      transaction => transaction.blockId === blockId && transaction.recipientAddress === walletAddress
-    );
+    return transactionList
+      .filter(
+        transaction => transaction.blockId === blockId && transaction.recipientAddress === walletAddress
+      )
+      .map((transaction) => {
+        return {...transaction};
+      });
   }
 
   async getOutboundTransactionsFromBlock(walletAddress, blockId) {
     let transactionList = Object.values(this.transactions);
-    return transactionList.filter(
-      transaction => transaction.blockId === blockId && transaction.senderAddress === walletAddress
-    );
+    return transactionList
+      .filter(
+        transaction => transaction.blockId === blockId &&
+        transaction.senderAddress === walletAddress
+      )
+      .map((transaction) => {
+        return {...transaction};
+      });
   }
 
   async upsertDelegate(delegate) {
@@ -469,7 +501,10 @@ class DAL {
       order,
       BigInt
     )
-    .slice(offset, offset + limit);
+    .slice(offset, offset + limit)
+    .map((delegate) => {
+      return {...delegate};
+    });
   }
 
   sortAsc(list, property, typeCastFunction) {

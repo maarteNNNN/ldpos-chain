@@ -9,7 +9,7 @@ const { createClient } = require('ldpos-client');
 
 const LDPoSChainModule = require('../index');
 
-describe.only('Functional tests', async () => {
+describe('Functional tests', async () => {
   let chainModule;
   let dal;
   let adapter;

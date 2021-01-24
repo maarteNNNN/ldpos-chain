@@ -908,7 +908,7 @@ module.exports = class LDPoSChainModule {
       affectedAddressList.map(async (voterAddress) => {
         let delegateAddressList = await this.dal.getAccountVotes(voterAddress);
         accountVotes[voterAddress] = new Set(delegateAddressList);
-        for (let delegateAddress in delegateAddressList) {
+        for (let delegateAddress of delegateAddressList) {
           if (!delegateVoters[delegateAddress]) {
             delegateVoters[delegateAddress] = new Set();
           }
@@ -1000,7 +1000,7 @@ module.exports = class LDPoSChainModule {
             }
           } catch (error) {
             if (error.type === 'InvalidActionError') {
-              this.logger.warn(error);
+              this.logger.debug(error);
             } else {
               throw error;
             }
@@ -1011,7 +1011,7 @@ module.exports = class LDPoSChainModule {
 
     await Promise.all(
       affectedDelegateAddressList.map(async (delegateAddress) => {
-        let delegateInfo = affectedDelegateDetails[voteChange.delegateAddress];
+        let delegateInfo = affectedDelegateDetails[delegateAddress];
         let { delegate } = delegateInfo;
         let updatedVoteWeight = BigInt(delegate.voteWeight) + delegateInfo.voteWeightDelta;
         let delegateUpdatePacket = {
@@ -1356,6 +1356,7 @@ module.exports = class LDPoSChainModule {
         } delegates so it cannot vote for any more`
       );
     }
+
     if (voteSet.has(delegateAddress)) {
       throw new Error(
         `Voter account ${
