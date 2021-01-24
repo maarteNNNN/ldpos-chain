@@ -67,7 +67,9 @@ class DAL {
   }
 
   async upsertAccount(account) {
+    let existingAccount = this.accounts[account.address];
     this.accounts[account.address] = {
+      ...existingAccount,
       ...account
     };
   }
@@ -85,20 +87,6 @@ class DAL {
       throw error;
     }
     return {...account};
-  }
-
-  async updateAccount(walletAddress, changePacket) {
-    let account = this.accounts[walletAddress];
-    if (!account) {
-      let error = new Error(`Account ${walletAddress} did not exist`);
-      error.name = 'AccountDidNotExistError';
-      error.type = 'InvalidActionError';
-      throw error;
-    }
-    let changedKeys = Object.keys(changePacket);
-    for (let key of changedKeys) {
-      account[key] = changePacket[key];
-    }
   }
 
   async getAccountsByBalance(offset, limit, order) {
@@ -493,23 +481,11 @@ class DAL {
   }
 
   async upsertDelegate(delegate) {
+    let existingDelegate = this.delegates[delegate.address];
     this.delegates[delegate.address] = {
+      ...existingDelegate,
       ...delegate
     };
-  }
-
-  async updateDelegate(walletAddress, changePacket) {
-    let delegate = this.delegates[walletAddress];
-    if (!delegate) {
-      let error = new Error(`Delegate ${walletAddress} did not exist`);
-      error.name = 'DelegateDidNotExistError';
-      error.type = 'InvalidActionError';
-      throw error;
-    }
-    let changedKeys = Object.keys(changePacket);
-    for (let key of changedKeys) {
-      delegate[key] = changePacket[key];
-    }
   }
 
   async hasDelegate(walletAddress) {

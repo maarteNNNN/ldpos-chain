@@ -866,24 +866,16 @@ module.exports = class LDPoSChainModule {
           balance: accountChanges.balance.toString(),
           updateHeight: height
         };
-        try {
-          if (account.updateHeight == null) {
-            await this.dal.upsertAccount({
-              ...account,
-              ...accountUpdatePacket
-            });
-          } else if (account.updateHeight < height) {
-            await this.dal.updateAccount(
-              account.address,
-              accountUpdatePacket
-            );
-          }
-        } catch (error) {
-          if (error.type === 'InvalidActionError') {
-            this.logger.warn(error);
-          } else {
-            throw error;
-          }
+        if (account.updateHeight == null) {
+          await this.dal.upsertAccount({
+            ...account,
+            ...accountUpdatePacket
+          });
+        } else if (account.updateHeight < height) {
+          await this.dal.upsertAccount({
+            address: account.address,
+            ...accountUpdatePacket
+          });
         }
       })
     );
@@ -1026,19 +1018,11 @@ module.exports = class LDPoSChainModule {
           voteWeight: updatedVoteWeight.toString(),
           updateHeight: height
         };
-        try {
-          if (delegate.updateHeight == null || delegate.updateHeight < height) {
-            await this.dal.updateDelegate(
-              delegate.address,
-              delegateUpdatePacket
-            );
-          }
-        } catch (error) {
-          if (error.type === 'InvalidActionError') {
-            this.logger.warn(error);
-          } else {
-            throw error;
-          }
+        if (delegate.updateHeight == null || delegate.updateHeight < height) {
+          await this.dal.upsertDelegate({
+            address: delegate.address,
+            ...delegateUpdatePacket
+          });
         }
       })
     );
