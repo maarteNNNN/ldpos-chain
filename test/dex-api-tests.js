@@ -156,6 +156,7 @@ describe('DEX API tests', async () => {
       // Passphrase: panic test motion image soldier cloth script spice trigger magnet accident add
       multisigAccount = {
         address: '17475c261ba8b5b7653700dfda1a2952053a4400efd8c9cbd4bbd86912c4a419ldpos',
+        type: 'multisig',
         forgingPublicKey: 'KSxPdmjDS1LKGraH7fD9HjtjAYc6Y+H7O5ON0y90M9w=',
         nextForgingKeyIndex: 0,
         multisigPublicKey: 'KDlcXmucsuE5VS1WKUCCA2doLRS9U4rOxqzEtnnySfg=',
@@ -169,6 +170,7 @@ describe('DEX API tests', async () => {
         // Passphrase: birth select quiz process bid raccoon memory village snow cable agent bean
         {
           address: '660c22683a6d466f66740042677ed1adc8bb723bd871c32c93f52eaa224a817fldpos',
+          type: 'sig',
           forgingPublicKey: 'VyMOMKKy63KLCA1YkqTjaBZnlm5wdk0TOVu2LmAfAK0=',
           nextForgingKeyIndex: 0,
           multisigPublicKey: 'xreuBmWlBA/6og9dXjIkiiH7BHISFRBXIks3AFAzrmc=',
@@ -180,6 +182,7 @@ describe('DEX API tests', async () => {
         // Passphrase: genius shoulder into daring armor proof cycle bench patrol paper grant picture
         {
           address: '772e25778a36dc33a7c00115471d270ead1458c170b222e9c63f17da588dd9edldpos',
+          type: 'sig',
           forgingPublicKey: 'SzXp6/L1ZztVN/LKxkkYQHR9BKoUuf1hjFf0a8vkZIE=',
           nextForgingKeyIndex: 0,
           multisigPublicKey: 'Zzqtg8AErQsUHSIiDFFX8O72WqhkzKgRFcZazfupOLM=',
@@ -191,6 +194,7 @@ describe('DEX API tests', async () => {
         // Passphrase: emotion belt burden flash vital neglect old census dress kid ocean warfare
         {
           address: '708fc8aa632c697cb4239aba8e2b6b55a3a2824b061fa4dd500207d34d450ad0ldpos',
+          type: 'sig',
           forgingPublicKey: 'a8b9hWja0sLqsynJ+edM0N8rNUWQaIRbhfi/P0Njfkw=',
           nextForgingKeyIndex: 0,
           multisigPublicKey: 'lik8+MS783g9rqqqki1aZm7spwIfr/Uog+sKN50tK6Y=',

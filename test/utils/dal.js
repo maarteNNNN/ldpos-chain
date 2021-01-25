@@ -23,6 +23,7 @@ class DAL {
         let { votes, ...accountWithoutVotes } = accountInfo;
         let account = {
           ...accountWithoutVotes,
+          type: 'sig',
           updateHeight: 0
         };
         await this.upsertAccount(account);

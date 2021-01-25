@@ -563,11 +563,11 @@ module.exports = class LDPoSChainModule {
     }
   }
 
-  async receiveLastBlockSignatures(lastBlock, requiredSignatureCount, timeout) {
+  async receiveLastBlockSignatures(lastBlock, requiredCount, timeout) {
     let signerSet = new Set(
       lastBlock.signatures.map(blockSignature => blockSignature.signerAddress)
     );
-    if (signerSet.size >= requiredSignatureCount) {
+    if (signerSet.size >= requiredCount) {
       return;
     }
     while (true) {
@@ -580,7 +580,7 @@ module.exports = class LDPoSChainModule {
           `Failed to receive enough block signatures before timeout - Received ${
             signerSet.size
           } out of ${
-            requiredSignatureCount
+            requiredCount
           } required signatures`
         );
       }
@@ -588,7 +588,7 @@ module.exports = class LDPoSChainModule {
       if (blockId === lastBlock.id && !signerSet.has(blockSignature.signerAddress)) {
         lastBlock.signatures.push(blockSignature);
         signerSet.add(blockSignature.signerAddress);
-        if (signerSet.size >= requiredSignatureCount) {
+        if (signerSet.size >= requiredCount) {
           break;
         }
       }
