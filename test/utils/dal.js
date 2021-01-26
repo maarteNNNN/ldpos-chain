@@ -411,7 +411,6 @@ class DAL {
 
     let inboundTransactions = [];
     for (let transaction of transactionList) {
-      let timestampMatches = ;
       if (
         transaction.recipientAddress === walletAddress &&
         (
