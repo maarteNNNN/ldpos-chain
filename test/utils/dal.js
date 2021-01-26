@@ -411,7 +411,14 @@ class DAL {
 
     let inboundTransactions = [];
     for (let transaction of transactionList) {
-      if (transaction.recipientAddress === walletAddress && transaction.timestamp >= fromTimestamp) {
+      let timestampMatches = ;
+      if (
+        transaction.recipientAddress === walletAddress &&
+        (
+          fromTimestamp == null ||
+          order === 'desc' ? transaction.timestamp <= fromTimestamp : transaction.timestamp >= fromTimestamp
+        )
+      ) {
         inboundTransactions.push(transaction);
         if (inboundTransactions.length >= limit) {
           break;
@@ -427,7 +434,13 @@ class DAL {
     let transactionList = this.sortByProperty(Object.values(this.transactions), 'timestamp', order);
     let outboundTransactions = [];
     for (let transaction of transactionList) {
-      if (transaction.senderAddress === walletAddress && transaction.timestamp >= fromTimestamp) {
+      if (
+        transaction.senderAddress === walletAddress &&
+        (
+          fromTimestamp == null ||
+          order === 'desc' ? transaction.timestamp <= fromTimestamp : transaction.timestamp >= fromTimestamp
+        )
+      ) {
         outboundTransactions.push(transaction);
         if (outboundTransactions.length >= limit) {
           break;

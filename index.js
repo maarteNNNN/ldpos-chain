@@ -257,7 +257,9 @@ module.exports = class LDPoSChainModule {
       getInboundTransactions: {
         handler: async action => {
           validateWalletAddress('walletAddress', action.params, this.networkSymbol);
-          validateTimestamp('fromTimestamp', action.params);
+          if (action.params.fromTimestamp != null) {
+            validateTimestamp('fromTimestamp', action.params);
+          }
           validateLimit('limit', action.params, this.maxAPILimit);
           validateSortOrder('order', action.params);
           let { walletAddress, fromTimestamp, limit, order } = action.params;
@@ -270,7 +272,9 @@ module.exports = class LDPoSChainModule {
       getOutboundTransactions: {
         handler: async action => {
           validateWalletAddress('walletAddress', action.params, this.networkSymbol);
-          validateTimestamp('fromTimestamp', action.params);
+          if (action.params.fromTimestamp != null) {
+            validateTimestamp('fromTimestamp', action.params);
+          }
           validateLimit('limit', action.params, this.maxAPILimit);
           validateSortOrder('order', action.params);
           let { walletAddress, fromTimestamp, limit, order } = action.params;

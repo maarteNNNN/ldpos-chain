@@ -235,7 +235,7 @@ describe('DEX API tests', async () => {
               amount: '1100000000',
               fee: '100000000',
               timestamp: 10000,
-              message: ''
+              message: '0'
             },
             {
               type: 'transfer',
@@ -243,7 +243,7 @@ describe('DEX API tests', async () => {
               amount: '1200000000',
               fee: '100000000',
               timestamp: 20000,
-              message: ''
+              message: '1'
             }
           ]
         },
@@ -258,7 +258,7 @@ describe('DEX API tests', async () => {
               amount: '1300000000',
               fee: '100000000',
               timestamp: 30000,
-              message: ''
+              message: '2'
             }
           ]
         },
@@ -273,7 +273,7 @@ describe('DEX API tests', async () => {
               amount: '1300000000',
               fee: '100000000',
               timestamp: 80000,
-              message: ''
+              message: '3'
             }
           ]
         }
@@ -403,13 +403,13 @@ describe('DEX API tests', async () => {
         assert.equal(Array.isArray(transactions), true);
         assert.equal(transactions.length, 4);
         assert.equal(transactions[0].senderAddress, clientForger.walletAddress);
-        assert.equal(transactions[0].id, 'o9vq17lJ6cbVPf6uewUSVpF1JSDR9CpvDM2SCCI2QOc=');
+        assert.equal(transactions[0].message, '0');
         assert.equal(transactions[1].senderAddress, clientForger.walletAddress);
-        assert.equal(transactions[1].id, 'rXe8wVRFSOLpSQNNMnHJ2yNH683iiZMrjRJil6WcjK0=');
+        assert.equal(transactions[1].message, '1');
         assert.equal(transactions[2].senderAddress, clientForger.walletAddress);
-        assert.equal(transactions[2].id, 'sb7YWN5BKuDDnnVkjRUepH4kLcdQdVd4KUIqxW7uMqY=');
+        assert.equal(transactions[2].message, '2');
         assert.equal(transactions[3].senderAddress, clientForger.walletAddress);
-        assert.equal(transactions[3].id, 'z5acncVaKKI+ppwN95zT0Qhv971EZVOXdEhGZ5NbR6Y=');
+        assert.equal(transactions[3].message, '3');
 
         for (let txn of transactions) {
           assert.equal(typeof txn.id, 'string');
@@ -420,7 +420,7 @@ describe('DEX API tests', async () => {
         }
       });
 
-      it('should return transactions which are more recent than fromTimestamp', async () => {
+      it('should return transactions which are more recent than fromTimestamp by default', async () => {
         let transactions = await chainModule.actions.getOutboundTransactions.handler({
           params: {
             walletAddress: clientForger.walletAddress,
@@ -431,11 +431,30 @@ describe('DEX API tests', async () => {
         assert.equal(Array.isArray(transactions), true);
         assert.equal(transactions.length, 3);
         assert.equal(transactions[0].senderAddress, clientForger.walletAddress);
-        assert.equal(transactions[0].id, 'rXe8wVRFSOLpSQNNMnHJ2yNH683iiZMrjRJil6WcjK0=');
+        assert.equal(transactions[0].message, '1');
         assert.equal(transactions[1].senderAddress, clientForger.walletAddress);
-        assert.equal(transactions[1].id, 'sb7YWN5BKuDDnnVkjRUepH4kLcdQdVd4KUIqxW7uMqY=');
+        assert.equal(transactions[1].message, '2');
         assert.equal(transactions[2].senderAddress, clientForger.walletAddress);
-        assert.equal(transactions[2].id, 'z5acncVaKKI+ppwN95zT0Qhv971EZVOXdEhGZ5NbR6Y=');
+        assert.equal(transactions[2].message, '3');
+      });
+
+      it('should return transactions which are more recent than fromTimestamp when order is desc', async () => {
+        let transactions = await chainModule.actions.getOutboundTransactions.handler({
+          params: {
+            walletAddress: clientForger.walletAddress,
+            fromTimestamp: 40000,
+            limit: 100,
+            order: 'desc'
+          }
+        });
+        assert.equal(Array.isArray(transactions), true);
+        assert.equal(transactions.length, 3);
+        assert.equal(transactions[0].senderAddress, clientForger.walletAddress);
+        assert.equal(transactions[0].message, '2');
+        assert.equal(transactions[1].senderAddress, clientForger.walletAddress);
+        assert.equal(transactions[1].message, '1');
+        assert.equal(transactions[2].senderAddress, clientForger.walletAddress);
+        assert.equal(transactions[2].message, '0');
       });
 
       it('should limit the number of transactions based on the specified limit', async () => {
@@ -449,7 +468,7 @@ describe('DEX API tests', async () => {
         assert.equal(Array.isArray(transactions), true);
         assert.equal(transactions.length, 1);
         assert.equal(transactions[0].senderAddress, clientForger.walletAddress);
-        assert.equal(transactions[0].id, 'o9vq17lJ6cbVPf6uewUSVpF1JSDR9CpvDM2SCCI2QOc=');
+        assert.equal(transactions[0].message, '0');
       });
 
       it('should return an empty array if no transactions can be matched', async () => {
@@ -489,7 +508,7 @@ describe('DEX API tests', async () => {
         assert.equal(typeof txn.recipientAddress, 'string');
 
         assert.equal(transactions[0].recipientAddress, recipientAddress);
-        assert.equal(transactions[0].id, 'rXe8wVRFSOLpSQNNMnHJ2yNH683iiZMrjRJil6WcjK0=');
+        assert.equal(transactions[0].message, '1');
       });
 
       it('should return an empty array if no transactions match the specified blockId', async () => {
@@ -541,9 +560,9 @@ describe('DEX API tests', async () => {
         }
 
         assert.equal(transactions[0].senderAddress, clientForger.walletAddress);
-        assert.equal(transactions[0].id, 'o9vq17lJ6cbVPf6uewUSVpF1JSDR9CpvDM2SCCI2QOc=');
+        assert.equal(transactions[0].message, '0');
         assert.equal(transactions[1].senderAddress, clientForger.walletAddress);
-        assert.equal(transactions[1].id, 'rXe8wVRFSOLpSQNNMnHJ2yNH683iiZMrjRJil6WcjK0=');
+        assert.equal(transactions[1].message, '1');
       });
 
       it('should return transactions with a valid signatures property if transaction is from a multisig wallet', async () => {
