@@ -84,9 +84,11 @@ describe('Public API tests', async () => {
       chainChangeEvents.push(event);
     });
     await chainModule.load(channel, options);
-    clientForger = await createClient({
-      passphrase: options.forgingPassphrase,
+    clientForger = createClient({
       adapter
+    });
+    await clientForger.connect({
+      passphrase: options.forgingPassphrase
     });
   });
 

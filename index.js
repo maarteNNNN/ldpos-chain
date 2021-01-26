@@ -1910,23 +1910,22 @@ module.exports = class LDPoSChainModule {
 
     if (forgingPassphrase) {
       try {
-        ldposClient = await createClient({
-          passphrase: forgingPassphrase,
+        ldposClient = createClient({
           walletAddress: options.forgingWalletAddress,
-          adapter: this.dal,
-          connect: true
+          adapter: this.dal
+        });
+        await ldposClient.connect({
+          passphrase: forgingPassphrase
         });
       } catch (error) {
         throw new Error(
           `Failed to initialize forging because of error: ${error.message}`
         );
       }
-
       forgingWalletAddress = ldposClient.getWalletAddress();
     } else {
-      ldposClient = await createClient({
-        adapter: this.dal,
-        connect: false
+      ldposClient = createClient({
+        adapter: this.dal
       });
     }
 

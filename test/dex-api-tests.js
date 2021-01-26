@@ -79,9 +79,11 @@ describe('DEX API tests', async () => {
         chainChangeEvents.push(event);
       });
       await chainModule.load(channel, moduleOptions);
-      clientForger = await createClient({
-        passphrase: moduleOptions.forgingPassphrase,
+      clientForger = createClient({
         adapter
+      });
+      await clientForger.connect({
+        passphrase: moduleOptions.forgingPassphrase
       });
     };
   });
@@ -212,13 +214,18 @@ describe('DEX API tests', async () => {
       await dal.upsertAccount(multisigAccount);
       await dal.registerMultisigWallet(multisigAccount.address, memberAddessList, 2);
 
-      clientA = await createClient({
-        passphrase: multisigMemberAPassphrase,
+      clientA = createClient({
         adapter
       });
-      clientB = await createClient({
-        passphrase: multisigMemberBPassphrase,
+      await clientA.connect({
+        passphrase: multisigMemberAPassphrase
+      });
+
+      clientB = createClient({
         adapter
+      });
+      await clientB.connect({
+        passphrase: multisigMemberBPassphrase
       });
 
       let lastBlockId = null;

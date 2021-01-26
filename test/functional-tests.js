@@ -99,17 +99,21 @@ describe('Functional tests', async () => {
         };
 
         await chainModule.load(channel, options);
-        clientForger = await createClient({
-          passphrase: options.forgingPassphrase,
+        clientForger = createClient({
           adapter
+        });
+        await clientForger.connect({
+          passphrase: options.forgingPassphrase
         });
 
         // Address: 660c22683a6d466f66740042677ed1adc8bb723bd871c32c93f52eaa224a817fldpos
         walletAPassphrase = 'birth select quiz process bid raccoon memory village snow cable agent bean';
 
-        clientA = await createClient({
-          passphrase: walletAPassphrase,
+        clientA = createClient({
           adapter
+        });
+        await clientA.connect({
+          passphrase: walletAPassphrase
         });
       });
 
@@ -213,17 +217,21 @@ describe('Functional tests', async () => {
 
       await chainModule.load(channel, options);
       await wait(2000);
-      clientForger = await createClient({
-        passphrase: options.forgingPassphrase,
+      clientForger = createClient({
         adapter
+      });
+      await clientForger.connect({
+        passphrase: options.forgingPassphrase
       });
 
       // Address: 660c22683a6d466f66740042677ed1adc8bb723bd871c32c93f52eaa224a817fldpos
       walletAPassphrase = 'birth select quiz process bid raccoon memory village snow cable agent bean';
 
-      clientA = await createClient({
-        passphrase: walletAPassphrase,
+      clientA = createClient({
         adapter
+      });
+      await clientA.connect({
+        passphrase: walletAPassphrase
       });
     });
 
@@ -401,15 +409,19 @@ describe('Functional tests', async () => {
       beforeEach(async () => {
 
         // Address: ea87e8bf7de70528b70bd9ef4d22c2169815bd2e9a1b35ce7905cb2255cbc2celdpos
-        multisigClient = await createClient({
-          passphrase: 'guitar sight absurd copper right amount habit boat trigger bundle high pudding',
+        multisigClient = createClient({
           adapter
+        });
+        await multisigClient.connect({
+          passphrase: 'guitar sight absurd copper right amount habit boat trigger bundle high pudding'
         });
 
         // Address: 859d1e3fe282683bc9e88475cb3389551f72e9b70c9436aea3acd757c2718326ldpos
-        clientB = await createClient({
-          passphrase: 'trip timber saddle fine shock orbit lamp nominee subject pledge random wedding',
+        clientB = createClient({
           adapter
+        });
+        await clientB.connect({
+          passphrase: 'trip timber saddle fine shock orbit lamp nominee subject pledge random wedding'
         });
 
         for (let i = 0; i < 5; i++) {
@@ -506,14 +518,18 @@ describe('Functional tests', async () => {
           return realUpsertBlockMethod.apply(this, args);
         };
 
-        multisigClient = await createClient({
-          passphrase: 'guitar sight absurd copper right amount habit boat trigger bundle high pudding',
+        multisigClient = createClient({
           adapter
         });
+        await multisigClient.connect({
+          passphrase: 'guitar sight absurd copper right amount habit boat trigger bundle high pudding'
+        });
 
-        clientB = await createClient({
-          passphrase: 'trip timber saddle fine shock orbit lamp nominee subject pledge random wedding',
+        clientB = createClient({
           adapter
+        });
+        await clientB.connect({
+          passphrase: 'trip timber saddle fine shock orbit lamp nominee subject pledge random wedding'
         });
 
         for (let i = 0; i < 5; i++) {
@@ -620,17 +636,21 @@ describe('Functional tests', async () => {
       };
 
       await chainModule.load(channel, options);
-      clientForger = await createClient({
-        passphrase: options.forgingPassphrase,
+      clientForger = createClient({
         adapter
+      });
+      await clientForger.connect({
+        passphrase: options.forgingPassphrase
       });
 
       // Address: 660c22683a6d466f66740042677ed1adc8bb723bd871c32c93f52eaa224a817fldpos
       walletAPassphrase = 'birth select quiz process bid raccoon memory village snow cable agent bean';
 
-      clientA = await createClient({
-        passphrase: walletAPassphrase,
+      clientA = createClient({
         adapter
+      });
+      await clientA.connect({
+        passphrase: walletAPassphrase
       });
     });
 
@@ -656,9 +676,11 @@ describe('Functional tests', async () => {
 
         await wait(8000);
 
-        firstRecipientClient = await createClient({
-          passphrase: 'genius shoulder into daring armor proof cycle bench patrol paper grant picture',
+        firstRecipientClient = createClient({
           adapter
+        });
+        await firstRecipientClient.connect({
+          passphrase: 'genius shoulder into daring armor proof cycle bench patrol paper grant picture'
         });
 
         // Recipient passphrase: sniff there advice door hand eyebrow story eyebrow brief window mushroom legend
@@ -759,17 +781,21 @@ describe('Functional tests', async () => {
       };
 
       await chainModule.load(channel, options);
-      clientForger = await createClient({
-        passphrase: options.forgingPassphrase,
+      clientForger = createClient({
         adapter
+      });
+      await clientForger.connect({
+        passphrase: options.forgingPassphrase
       });
 
       // Address: 660c22683a6d466f66740042677ed1adc8bb723bd871c32c93f52eaa224a817fldpos
       walletAPassphrase = 'birth select quiz process bid raccoon memory village snow cable agent bean';
 
-      clientA = await createClient({
-        passphrase: walletAPassphrase,
+      clientA = createClient({
         adapter
+      });
+      await clientA.connect({
+        passphrase: walletAPassphrase
       });
     });
 
@@ -902,17 +928,21 @@ describe('Functional tests', async () => {
       };
 
       await chainModule.load(channel, options);
-      clientForger = await createClient({
-        passphrase: options.forgingPassphrase,
+      clientForger = createClient({
         adapter
+      });
+      await clientForger.connect({
+        passphrase: options.forgingPassphrase
       });
 
       // Address: 660c22683a6d466f66740042677ed1adc8bb723bd871c32c93f52eaa224a817fldpos
       walletAPassphrase = 'birth select quiz process bid raccoon memory village snow cable agent bean';
 
-      clientA = await createClient({
-        passphrase: walletAPassphrase,
+      clientA = createClient({
         adapter
+      });
+      await clientA.connect({
+        passphrase: walletAPassphrase
       });
     });
 
@@ -1005,21 +1035,27 @@ describe('Functional tests', async () => {
       };
 
       await chainModule.load(channel, options);
-      clientForger = await createClient({
-        passphrase: options.forgingPassphrase,
+      clientForger = createClient({
         adapter
+      });
+      await clientForger.connect({
+        passphrase: options.forgingPassphrase
       });
 
       // Address: 660c22683a6d466f66740042677ed1adc8bb723bd871c32c93f52eaa224a817fldpos
-      clientA = await createClient({
-        passphrase: 'birth select quiz process bid raccoon memory village snow cable agent bean',
+      clientA = createClient({
         adapter
+      });
+      await clientA.connect({
+        passphrase: 'birth select quiz process bid raccoon memory village snow cable agent bean'
       });
 
       // Address: 859d1e3fe282683bc9e88475cb3389551f72e9b70c9436aea3acd757c2718326ldpos
-      clientB = await createClient({
-        passphrase: 'trip timber saddle fine shock orbit lamp nominee subject pledge random wedding',
+      clientB = createClient({
         adapter
+      });
+      await clientB.connect({
+        passphrase: 'trip timber saddle fine shock orbit lamp nominee subject pledge random wedding'
       });
     });
 
@@ -1212,15 +1248,19 @@ describe('Functional tests', async () => {
       };
 
       await chainModule.load(channel, options);
-      clientForger = await createClient({
-        passphrase: options.forgingPassphrase,
+      clientForger = createClient({
         adapter
+      });
+      await clientForger.connect({
+        passphrase: options.forgingPassphrase
       });
 
       // Address: 660c22683a6d466f66740042677ed1adc8bb723bd871c32c93f52eaa224a817fldpos
-      clientA = await createClient({
-        passphrase: 'birth select quiz process bid raccoon memory village snow cable agent bean',
+      clientA = createClient({
         adapter
+      });
+      await clientA.connect({
+        passphrase: 'birth select quiz process bid raccoon memory village snow cable agent bean'
       });
     });
 
@@ -1336,15 +1376,19 @@ describe('Functional tests', async () => {
       };
 
       await chainModule.load(channel, options);
-      clientForger = await createClient({
-        passphrase: options.forgingPassphrase,
+      clientForger = createClient({
         adapter
+      });
+      await clientForger.connect({
+        passphrase: options.forgingPassphrase
       });
 
       // Address: 660c22683a6d466f66740042677ed1adc8bb723bd871c32c93f52eaa224a817fldpos
-      clientA = await createClient({
-        passphrase: 'birth select quiz process bid raccoon memory village snow cable agent bean',
+      clientA = createClient({
         adapter
+      });
+      await clientA.connect({
+        passphrase: 'birth select quiz process bid raccoon memory village snow cable agent bean'
       });
     });
 
@@ -1437,15 +1481,19 @@ describe('Functional tests', async () => {
       };
 
       await chainModule.load(channel, options);
-      clientForger = await createClient({
-        passphrase: options.forgingPassphrase,
+      clientForger = createClient({
         adapter
+      });
+      await clientForger.connect({
+        passphrase: options.forgingPassphrase
       });
 
       // Address: 660c22683a6d466f66740042677ed1adc8bb723bd871c32c93f52eaa224a817fldpos
-      clientA = await createClient({
-        passphrase: 'birth select quiz process bid raccoon memory village snow cable agent bean',
+      clientA = createClient({
         adapter
+      });
+      await clientA.connect({
+        passphrase: 'birth select quiz process bid raccoon memory village snow cable agent bean'
       });
     });
 
