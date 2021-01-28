@@ -1,4 +1,4 @@
-const { isValidWalletAddress } = require('./primitives');
+const { validateWalletAddressValue } = require('./primitives');
 
 function validateRegisterMultisigWalletTransactionSchema(transaction, minMultisigMembers, maxMultisigMembers, networkSymbol) {
   if (!transaction) {
@@ -30,11 +30,13 @@ function validateRegisterMultisigWalletTransactionSchema(transaction, minMultisi
     );
   }
   for (let memberAddress of transaction.memberAddresses) {
-    if (!isValidWalletAddress(memberAddress, networkSymbol)) {
+    try {
+      validateWalletAddressValue(memberAddress, networkSymbol);
+    } catch (error) {
       throw new Error(
-        `Wallet address in memberAddresses array must be a string with a length of ${
-          walletAddressLength
-        } characters`
+        `Register multisig transaction memberAddresses must contain valid wallet addresses - ${
+          error.message
+        }`
       );
     }
   }

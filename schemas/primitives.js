@@ -12,6 +12,24 @@ function isValidWalletAddress(walletAddress, networkSymbol) {
   return addressSymbol === networkSymbol;
 }
 
+function validateWalletAddressValue(walletAddress, networkSymbol) {
+  if (networkSymbol == null) {
+    throw new Error(
+      'Failed to validate wallet address value because the network symbol could not be determined'
+    );
+  }
+  if (!isValidWalletAddress(walletAddress, networkSymbol)) {
+    let walletAddressLength = ADDRESS_BASE_LENGTH + networkSymbol.length;
+    throw new Error(
+      `Wallet address must be a string of ${
+        walletAddressLength
+      } characters ending with ${
+        networkSymbol
+      }`
+    );
+  }
+}
+
 function validateWalletAddress(propertyName, packet, networkSymbol) {
   if (networkSymbol == null) {
     throw new Error(
@@ -185,8 +203,8 @@ function validateTimestamp(propertyName, packet) {
 }
 
 module.exports = {
-  isValidWalletAddress,
   validateWalletAddress,
+  validateWalletAddressValue,
   validatePublicKey,
   validateKeyIndex,
   validateSignature,
