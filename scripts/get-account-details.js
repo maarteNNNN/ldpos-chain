@@ -14,7 +14,7 @@ let merkle = new ProperMerkle({
 });
 
 let network = 'ldpos';
-let seed = bip39.mnemonicToSeedSync(mnemonic).toString('hex');
+let seed = bip39.mnemonicToSeedSync(mnemonic).toString('base64');
 
 console.log('SEED:', seed);
 console.log('');
@@ -23,7 +23,7 @@ let forgingTree = merkle.generateMSSTreeSync(seed, `${network}-forging-0`);
 let multisigTree = merkle.generateMSSTreeSync(seed, `${network}-multisig-0`);
 let sigTree = merkle.generateMSSTreeSync(seed, `${network}-sig-0`);
 
-let walletAddress = `${Buffer.from(sigTree.publicRootHash, 'base64').toString('hex')}${network}`;
+let walletAddress = `${sigTree.publicRootHash}${network}`;
 
 console.log('------FORGING PUBLIC KEY------');
 console.log(forgingTree.publicRootHash);

@@ -1,7 +1,7 @@
 {
   "accounts": [
     {
-      "address": "092188ca7934529fc624acf62f2b6ce96c3167424f54aa467428f3d0dcdcc60cldpos",
+      "address": "CSGIynk0Up/GJKz2Lyts6WwxZ0JPVKpGdCjz0Nzcxgw=ldpos",
       "type": "sig",
       "forgingPublicKey": "mw26bjrYNk+8hIdx2WRwLJWrSqdnjaKSrhii0lQBtUU=",
       "nextForgingKeyIndex": 0,
@@ -10,7 +10,7 @@
       "sigPublicKey": "CSGIynk0Up/GJKz2Lyts6WwxZ0JPVKpGdCjz0Nzcxgw=",
       "nextSigKeyIndex": 0,
       "balance": "10000000000000000",
-      "votes": ["092188ca7934529fc624acf62f2b6ce96c3167424f54aa467428f3d0dcdcc60cldpos"]
+      "votes": ["CSGIynk0Up/GJKz2Lyts6WwxZ0JPVKpGdCjz0Nzcxgw=ldpos"]
     }
   ]
 }

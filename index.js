@@ -18,7 +18,8 @@ const {
   validateTimestamp,
   validateOffset,
   validateLimit,
-  validateSortOrder
+  validateSortOrder,
+  ADDRESS_BASE_LENGTH
 } = require('./schemas/primitives');
 
 const { LDPOS_PASSWORD } = process.env;
@@ -1242,10 +1243,7 @@ module.exports = class LDPoSChainModule {
       senderSigPublicKey = senderAccount.sigPublicKey;
     } else {
       // If the account does not yet have a sigPublicKey, derive it from the address.
-      senderSigPublicKey = Buffer.from(
-        senderAccount.address.slice(0, 64),
-        'hex'
-      ).toString('base64');
+      senderSigPublicKey = senderAccount.address.slice(0, ADDRESS_BASE_LENGTH);
     }
 
     if (

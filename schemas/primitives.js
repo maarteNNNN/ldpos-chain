@@ -1,13 +1,15 @@
+const ADDRESS_BASE_LENGTH = 44;
+
 function isValidWalletAddress(walletAddress, networkSymbol) {
   if (typeof walletAddress !== 'string') {
     return false;
   }
-  let networkSymbolLength = networkSymbol.length;
-  let walletAddressLength = 64 + networkSymbolLength;
+  let walletAddressLength = ADDRESS_BASE_LENGTH + networkSymbol.length;
   if (walletAddress.length !== walletAddressLength) {
     return false;
   }
-  return true;
+  let addressSymbol = walletAddress.slice(ADDRESS_BASE_LENGTH);
+  return addressSymbol === networkSymbol;
 }
 
 function validateWalletAddress(propertyName, packet, networkSymbol) {
@@ -18,8 +20,15 @@ function validateWalletAddress(propertyName, packet, networkSymbol) {
   }
   let walletAddress = packet[propertyName];
   if (!isValidWalletAddress(walletAddress, networkSymbol)) {
+    let walletAddressLength = ADDRESS_BASE_LENGTH + networkSymbol.length;
     throw new Error(
-      `Wallet address in ${propertyName} must be a string with a length of ${walletAddressLength} characters`
+      `Wallet address in ${
+        propertyName
+      } must be a string of ${
+        walletAddressLength
+      } characters ending with ${
+        networkSymbol
+      }`
     );
   }
 }
@@ -191,5 +200,6 @@ module.exports = {
   validateOffset,
   validateLimit,
   validateSortOrder,
-  validateTimestamp
+  validateTimestamp,
+  ADDRESS_BASE_LENGTH
 };
