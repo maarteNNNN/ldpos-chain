@@ -59,7 +59,8 @@ const DEFAULT_MAX_CONSECUTIVE_TRANSACTION_FETCH_FAILURES = 3;
 const DEFAULT_CATCH_UP_CONSENSUS_POLL_COUNT = 6;
 const DEFAULT_CATCH_UP_CONSENSUS_MIN_RATIO = .5;
 const DEFAULT_API_LIMIT = 100;
-const DEFAULT_MAX_API_LIMIT = 100;
+const DEFAULT_MAX_PUBLIC_API_LIMIT = 100;
+const DEFAULT_MAX_PRIVATE_API_LIMIT = 10000;
 
 const PROPAGATION_MODE_DELAYED = 'delayed';
 const PROPAGATION_MODE_IMMEDIATE = 'immediate';
@@ -152,8 +153,9 @@ module.exports = class LDPoSChainModule {
       },
       getAccountsByBalance: {
         handler: async action => {
+          let maxLimit = action.isPublic ? this.maxPublicAPILimit : this.maxPrivateAPILimit;
           validateOffset('offset', action.params);
-          validateLimit('limit', action.params, this.maxAPILimit);
+          validateLimit('limit', action.params, maxLimit);
           validateSortOrder('order', action.params);
           let { offset, limit, order } = action.params;
           offset = this.sanitizeOffset(offset);
@@ -207,9 +209,10 @@ module.exports = class LDPoSChainModule {
       },
       getOutboundPendingTransactions: {
         handler: async action => {
+          let maxLimit = action.isPublic ? this.maxPublicAPILimit : this.maxPrivateAPILimit;
           validateTransactionId('walletAddress', action.params);
           validateOffset('offset', action.params);
-          validateLimit('limit', action.params, this.maxAPILimit);
+          validateLimit('limit', action.params, maxLimit);
           let { walletAddress, offset, limit } = action.params;
           offset = this.sanitizeOffset(offset);
           limit = this.sanitizeLimit(limit);
@@ -246,8 +249,9 @@ module.exports = class LDPoSChainModule {
       },
       getTransactionsByTimestamp: {
         handler: async action => {
+          let maxLimit = action.isPublic ? this.maxPublicAPILimit : this.maxPrivateAPILimit;
           validateOffset('offset', action.params);
-          validateLimit('limit', action.params, this.maxAPILimit);
+          validateLimit('limit', action.params, maxLimit);
           validateSortOrder('order', action.params);
           let { offset, limit, order } = action.params;
           offset = this.sanitizeOffset(offset);
@@ -259,11 +263,12 @@ module.exports = class LDPoSChainModule {
       },
       getInboundTransactions: {
         handler: async action => {
+          let maxLimit = action.isPublic ? this.maxPublicAPILimit : this.maxPrivateAPILimit;
           validateWalletAddress('walletAddress', action.params, this.networkSymbol);
           if (action.params.fromTimestamp != null) {
             validateTimestamp('fromTimestamp', action.params);
           }
-          validateLimit('limit', action.params, this.maxAPILimit);
+          validateLimit('limit', action.params, maxLimit);
           validateSortOrder('order', action.params);
           let { walletAddress, fromTimestamp, limit, order } = action.params;
           limit = this.sanitizeLimit(limit);
@@ -274,11 +279,12 @@ module.exports = class LDPoSChainModule {
       },
       getOutboundTransactions: {
         handler: async action => {
+          let maxLimit = action.isPublic ? this.maxPublicAPILimit : this.maxPrivateAPILimit;
           validateWalletAddress('walletAddress', action.params, this.networkSymbol);
           if (action.params.fromTimestamp != null) {
             validateTimestamp('fromTimestamp', action.params);
           }
-          validateLimit('limit', action.params, this.maxAPILimit);
+          validateLimit('limit', action.params, maxLimit);
           validateSortOrder('order', action.params);
           let { walletAddress, fromTimestamp, limit, order } = action.params;
           limit = this.sanitizeLimit(limit);
@@ -289,9 +295,10 @@ module.exports = class LDPoSChainModule {
       },
       getTransactionsFromBlock: {
         handler: async action => {
+          let maxLimit = action.isPublic ? this.maxPublicAPILimit : this.maxPrivateAPILimit;
           validateBlockId('blockId', action.params);
           validateOffset('offset', action.params);
-          validateLimit('limit', action.params, this.maxAPILimit);
+          validateLimit('limit', action.params, maxLimit);
           let { blockId, offset, limit } = action.params;
           offset = this.sanitizeOffset(offset);
           limit = this.sanitizeLimit(limit);
@@ -333,8 +340,9 @@ module.exports = class LDPoSChainModule {
       },
       getBlocksFromHeight: {
         handler: async action => {
+          let maxLimit = action.isPublic ? this.maxPublicAPILimit : this.maxPrivateAPILimit;
           validateBlockHeight('height', action.params);
-          validateLimit('limit', action.params, this.maxAPILimit);
+          validateLimit('limit', action.params, maxLimit);
           let { height, limit } = action.params;
           limit = this.sanitizeLimit(limit);
           return this.dal.getBlocksFromHeight(height, limit);
@@ -343,8 +351,9 @@ module.exports = class LDPoSChainModule {
       },
       getSignedBlocksFromHeight: {
         handler: async action => {
+          let maxLimit = action.isPublic ? this.maxPublicAPILimit : this.maxPrivateAPILimit;
           validateBlockHeight('height', action.params);
-          validateLimit('limit', action.params, this.maxAPILimit);
+          validateLimit('limit', action.params, maxLimit);
           let { height, limit } = action.params;
           limit = this.sanitizeLimit(limit);
           return this.dal.getSignedBlocksFromHeight(height, limit);
@@ -353,9 +362,10 @@ module.exports = class LDPoSChainModule {
       },
       getBlocksBetweenHeights: {
         handler: async action => {
+          let maxLimit = action.isPublic ? this.maxPublicAPILimit : this.maxPrivateAPILimit;
           validateBlockHeight('fromHeight', action.params);
           validateBlockHeight('toHeight', action.params);
-          validateLimit('limit', action.params, this.maxAPILimit);
+          validateLimit('limit', action.params, maxLimit);
           let { fromHeight, toHeight, limit } = action.params;
           limit = this.sanitizeLimit(limit);
           return this.dal.getBlocksBetweenHeights(fromHeight, toHeight, limit);
@@ -388,8 +398,9 @@ module.exports = class LDPoSChainModule {
       },
       getBlocksByTimestamp: {
         handler: async action => {
+          let maxLimit = action.isPublic ? this.maxPublicAPILimit : this.maxPrivateAPILimit;
           validateOffset('offset', action.params);
-          validateLimit('limit', action.params, this.maxAPILimit);
+          validateLimit('limit', action.params, maxLimit);
           validateSortOrder('order', action.params);
           let { offset, limit, order } = action.params;
           offset = this.sanitizeOffset(offset);
@@ -404,8 +415,9 @@ module.exports = class LDPoSChainModule {
       },
       getDelegatesByVoteWeight: {
         handler: async action => {
+          let maxLimit = action.isPublic ? this.maxPublicAPILimit : this.maxPrivateAPILimit;
           validateOffset('offset', action.params);
-          validateLimit('limit', action.params, this.maxAPILimit);
+          validateLimit('limit', action.params, maxLimit);
           validateSortOrder('order', action.params);
           let { offset, limit, order } = action.params;
           offset = this.sanitizeOffset(offset);
@@ -2816,7 +2828,8 @@ module.exports = class LDPoSChainModule {
       catchUpConsensusPollCount: DEFAULT_CATCH_UP_CONSENSUS_POLL_COUNT,
       catchUpConsensusMinRatio: DEFAULT_CATCH_UP_CONSENSUS_MIN_RATIO,
       apiLimit: DEFAULT_API_LIMIT,
-      maxAPILimit: DEFAULT_MAX_API_LIMIT
+      maxPublicAPILimit: DEFAULT_MAX_PUBLIC_API_LIMIT,
+      maxPrivateAPILimit: DEFAULT_MAX_PRIVATE_API_LIMIT
     };
     this.options = {...defaultOptions, ...options};
 
@@ -2851,7 +2864,8 @@ module.exports = class LDPoSChainModule {
     this.maxTransactionBackpressurePerAccount = this.options.maxTransactionBackpressurePerAccount;
     this.maxConsecutiveTransactionFetchFailures = this.options.maxConsecutiveTransactionFetchFailures;
     this.apiLimit = this.options.apiLimit;
-    this.maxAPILimit = this.options.maxAPILimit;
+    this.maxPublicAPILimit = this.options.maxPublicAPILimit;
+    this.maxPrivateAPILimit = this.options.maxPrivateAPILimit;
 
     if (this.minDelegateBlockSignatureRatio < 0.5) {
       throw new Error(

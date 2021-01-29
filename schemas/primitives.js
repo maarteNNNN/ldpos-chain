@@ -63,7 +63,7 @@ function validatePublicKey(propertyName, packet) {
 
 function validateOffset(propertyName, packet) {
   let offset = packet[propertyName];
-  if (offset != null && !Number.isInteger(offset) || offset < 0 || offset > Number.MAX_SAFE_INTEGER) {
+  if (offset != null && (!Number.isInteger(offset) || offset < 0 || offset > Number.MAX_SAFE_INTEGER)) {
     throw new Error(
       `If specified, offset in ${
         propertyName
@@ -81,7 +81,7 @@ function validateLimit(propertyName, packet, maxLimit) {
     );
   }
   let limit = packet[propertyName];
-  if (limit != null && !Number.isInteger(limit) || limit < 0 || limit > maxLimit) {
+  if (limit != null && (!Number.isInteger(limit) || limit < 0 || limit > maxLimit)) {
     throw new Error(
       `If specified, limit in ${
         propertyName
