@@ -455,7 +455,7 @@ module.exports = class LDPoSChainModule {
       fetchBlockEndConfirmations,
       fetchBlockLimit,
       fetchBlockPause,
-      blockSignerMajorityCount,
+      requiredBlockSignatureCount,
       maxConsecutiveBlockFetchFailures
     } = options;
 
@@ -533,7 +533,7 @@ module.exports = class LDPoSChainModule {
             block,
             this.minTransactionsPerBlock,
             this.maxTransactionsPerBlock,
-            blockSignerMajorityCount,
+            requiredBlockSignatureCount,
             this.delegateCount,
             this.networkSymbol
           );
@@ -1057,9 +1057,9 @@ module.exports = class LDPoSChainModule {
     }
 
     let blockSignaturesToStore;
-    if (blockSignatureList.length > this.blockSignaturesToFetch) {
+    if (blockSignatureList.length > this.blockSignaturesToProvide) {
       blockSignaturesToStore = shuffle(blockSignatureList)
-        .slice(0, this.blockSignaturesToFetch);
+        .slice(0, this.blockSignaturesToProvide);
     } else {
       blockSignaturesToStore = blockSignatureList;
     }
@@ -1977,6 +1977,7 @@ module.exports = class LDPoSChainModule {
         while (true) {
           let activeDelegateCount = Math.min(this.topActiveDelegates.length, delegateCount);
           let blockSignerMajorityCount = Math.floor(activeDelegateCount * this.minDelegateBlockSignatureRatio);
+          let requiredBlockSignatureCountDuringCatchUp = Math.min(blockSignerMajorityCount, this.blockSignaturesToFetch);
 
           // If the node is already on the latest network height, it will just return it.
           this.networkHeight = await this.catchUpWithNetwork({
@@ -1984,7 +1985,7 @@ module.exports = class LDPoSChainModule {
             fetchBlockLimit,
             fetchBlockPause,
             fetchBlockEndConfirmations,
-            blockSignerMajorityCount,
+            requiredBlockSignatureCount: requiredBlockSignatureCountDuringCatchUp,
             maxConsecutiveBlockFetchFailures
           });
           this.nodeHeight = this.networkHeight;
