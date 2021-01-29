@@ -327,8 +327,12 @@ class DAL {
     return {...block};
   }
 
+  async hasBlock(id) {
+    return this.blocks.some(currentBlock => currentBlock.id === id);
+  }
+
   async getBlock(id) {
-    let block = this.blocks.find(candidateBlock => candidateBlock.id === id);
+    let block = this.blocks.find(currentBlock => currentBlock.id === id);
     if (!block) {
       let error = new Error(
         `No block existed with ID ${id}`

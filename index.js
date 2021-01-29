@@ -56,6 +56,8 @@ const DEFAULT_MAX_VOTES_PER_ACCOUNT = 11;
 const DEFAULT_MAX_TRANSACTION_BACKPRESSURE_PER_ACCOUNT = 30;
 const DEFAULT_MAX_CONSECUTIVE_BLOCK_FETCH_FAILURES = 5;
 const DEFAULT_MAX_CONSECUTIVE_TRANSACTION_FETCH_FAILURES = 3;
+const DEFAULT_CATCH_UP_CONSENSUS_POLL_COUNT = 6;
+const DEFAULT_CATCH_UP_CONSENSUS_MIN_RATIO = .5;
 const DEFAULT_API_LIMIT = 100;
 const DEFAULT_MAX_API_LIMIT = 100;
 
@@ -376,6 +378,14 @@ module.exports = class LDPoSChainModule {
         },
         isPublic: true
       },
+      hasBlock: {
+        handler: async action => {
+          validateBlockId('blockId', action.params);
+          let { blockId } = action.params;
+          return this.dal.hasBlock(blockId);
+        },
+        isPublic: true
+      },
       getBlocksByTimestamp: {
         handler: async action => {
           validateOffset('offset', action.params);
@@ -524,6 +534,59 @@ module.exports = class LDPoSChainModule {
 
       if (!newBlocks.length) {
         // If there are no new blocks, assume that we've finished synching.
+        break;
+      }
+
+      let lastBlock = this.lastProcessedBlock;
+
+      let allBlockIdsLineUp = true;
+      for (let block of newBlocks) {
+        if (block.previousBlockId !== lastBlock.id) {
+          allBlockIdsLineUp = false;
+          break;
+        }
+        lastBlock = block;
+      }
+
+      if (!allBlockIdsLineUp) {
+        this.logger.warn(
+          new Error(
+            `Batch of blocks ending with the block ${
+              lastBlock.id
+            } was discarded because some of the block IDs did not line up`
+          )
+        );
+        break;
+      }
+
+      let results = await Promise.all(
+        [...Array(this.catchUpConsensusPollCount).keys()].map(async () => {
+          try {
+            let response = await this.channel.invoke('network:request', {
+              procedure: `${this.alias}:hasBlock`,
+              data: {
+                blockId: lastBlock.id
+              }
+            });
+            return response.data || false;
+          } catch (error) {
+            return false;
+          }
+        })
+      );
+      let matchingCount = results.reduce((total, peerHasBlock) => total + (peerHasBlock ? 1 : 0), 0);
+      let consensusRatio = matchingCount / this.catchUpConsensusPollCount;
+
+      if (consensusRatio < this.catchUpConsensusMinRatio) {
+        this.logger.warn(
+          new Error(
+            `Batch of blocks ending with the block ${
+              lastBlock.id
+            } was discarded because the sampled network consensus of ${
+              Math.round(consensusRatio * 10000) / 100
+            }% did not meet the minimum required ratio`
+          )
+        );
         break;
       }
 
@@ -2750,6 +2813,8 @@ module.exports = class LDPoSChainModule {
       maxTransactionBackpressurePerAccount: DEFAULT_MAX_TRANSACTION_BACKPRESSURE_PER_ACCOUNT,
       maxConsecutiveBlockFetchFailures: DEFAULT_MAX_CONSECUTIVE_BLOCK_FETCH_FAILURES,
       maxConsecutiveTransactionFetchFailures: DEFAULT_MAX_CONSECUTIVE_TRANSACTION_FETCH_FAILURES,
+      catchUpConsensusPollCount: DEFAULT_CATCH_UP_CONSENSUS_POLL_COUNT,
+      catchUpConsensusMinRatio: DEFAULT_CATCH_UP_CONSENSUS_MIN_RATIO,
       apiLimit: DEFAULT_API_LIMIT,
       maxAPILimit: DEFAULT_MAX_API_LIMIT
     };
