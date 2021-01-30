@@ -703,14 +703,14 @@ module.exports = class LDPoSChainModule {
     return crypto.createHash('sha256').update(message, 'utf8').digest(encoding || 'base64');
   }
 
-  forgeBlock(height, timestamp, transactions) {
-    let block = {
+  async forgeBlock(height, timestamp, transactions) {
+    let blockData = {
       height,
       timestamp,
       previousBlockId: this.lastProcessedBlock ? this.lastProcessedBlock.id : null,
       transactions
     };
-    return this.ldposClient.prepareBlock(block);
+    return this.ldposClient.prepareBlock(blockData);
   }
 
   async getSanitizedAccount(walletAddress) {
@@ -1599,7 +1599,7 @@ module.exports = class LDPoSChainModule {
   }
 
   async verifyFullySignedBlock(block, lastBlock) {
-    let senderAccountDetails = await this.verifyForgedBlock(block, lastBlock);
+    let { senderAccountDetails } = await this.verifyForgedBlock(block, lastBlock);
 
     await Promise.all(
       block.signatures.map(blockSignature => this.verifyBlockSignature(block, blockSignature))
@@ -1670,7 +1670,11 @@ module.exports = class LDPoSChainModule {
     if (!this.ldposClient.verifyBlock(block)) {
       throw new Error('Block was invalid');
     }
-    return this.verifyBlockTransactions(block);
+    let senderAccountDetails = await this.verifyBlockTransactions(block);
+    return {
+      senderAccountDetails,
+      delegateChangedKeys: block.forgingPublicKey !== targetDelegateAccount.forgingPublicKey
+    };
   }
 
   async verifyBlockTransactions(block) {
@@ -1985,7 +1989,8 @@ module.exports = class LDPoSChainModule {
       try {
         ldposClient = createClient({
           walletAddress: options.forgingWalletAddress,
-          adapter: this.dal
+          adapter: this.dal,
+          store: this.dal
         });
         await ldposClient.connect({
           passphrase: forgingPassphrase
@@ -1998,7 +2003,8 @@ module.exports = class LDPoSChainModule {
       forgingWalletAddress = ldposClient.getWalletAddress();
     } else {
       ldposClient = createClient({
-        adapter: this.dal
+        adapter: this.dal,
+        store: this.dal
       });
     }
 
@@ -2080,6 +2086,7 @@ module.exports = class LDPoSChainModule {
           let isCurrentForgingDelegate = forgingWalletAddress && forgingWalletAddress === currentForgingDelegateAddress;
           let block;
           let senderAccountDetails;
+          let delegateChangedKeys;
 
           if (isCurrentForgingDelegate) {
             let validTransactions = [];
@@ -2165,7 +2172,10 @@ module.exports = class LDPoSChainModule {
 
             let pendingTransactions = this.sortPendingTransactions(validTransactions);
             let blockTransactions = pendingTransactions.slice(0, maxTransactionsPerBlock).map(txn => this.simplifyTransaction(txn, true));
-            block = this.forgeBlock(nextHeight, blockTimestamp, blockTransactions);
+            let previousForgingPublicKey = this.ldposClient.forgingPublicKey;
+            block = await this.forgeBlock(nextHeight, blockTimestamp, blockTransactions);
+            delegateChangedKeys = this.ldposClient.forgingPublicKey !== previousForgingPublicKey;
+
             this.lastReceivedSignerAddressSet.clear();
             this.lastReceivedBlock = block;
             this.logger.info(`Forged block ${block.id} at height ${block.height}`);
@@ -2185,6 +2195,7 @@ module.exports = class LDPoSChainModule {
                 let blockInfo = await this.receiveLastBlockInfo(forgingBlockBroadcastDelay + propagationTimeout);
                 block = blockInfo.block;
                 senderAccountDetails = blockInfo.senderAccountDetails;
+                delegateChangedKeys = blockInfo.delegateChangedKeys;
                 this.logger.info(
                   `Received valid block ${
                     block.id
@@ -2236,7 +2247,8 @@ module.exports = class LDPoSChainModule {
             await this.receiveLastBlockSignatures(block, blockSignerMajorityCount, forgingSignatureBroadcastDelay + propagationTimeout);
             this.logger.info(`Received a sufficient number of valid delegate signatures for block ${block.id}`);
 
-            if (block.transactions.length >= this.minTransactionsPerBlock) {
+            // Only process the block if it has transactions or if the forging delegate wants to change their forging key.
+            if (block.transactions.length >= this.minTransactionsPerBlock || delegateChangedKeys) {
               await this.processBlock(block, senderAccountDetails, false);
               this.lastFullySignedBlock = block;
 
@@ -2589,9 +2601,12 @@ module.exports = class LDPoSChainModule {
       let block = event.data;
 
       let senderAccountDetails;
+      let delegateChangedKeys;
       try {
         validateBlockSchema(block, 0, this.maxTransactionsPerBlock, 0, 0, this.networkSymbol);
-        senderAccountDetails = await this.verifyForgedBlock(block, this.lastProcessedBlock);
+        let blockInfo = await this.verifyForgedBlock(block, this.lastProcessedBlock);
+        senderAccountDetails = blockInfo.senderAccountDetails;
+        delegateChangedKeys = blockInfo.delegateChangedKeys;
         let currentBlockTimeSlot = this.getCurrentBlockTimeSlot(this.forgingInterval);
         if (block.timestamp !== currentBlockTimeSlot) {
           throw new Error(
@@ -2714,7 +2729,8 @@ module.exports = class LDPoSChainModule {
       this.lastReceivedBlock = block;
       this.verifiedBlockInfoStream.write({
         block: this.lastReceivedBlock,
-        senderAccountDetails
+        senderAccountDetails,
+        delegateChangedKeys
       });
 
       await this.propagateBlock(block, true);

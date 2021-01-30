@@ -10,6 +10,7 @@ class DAL {
     this.blocks = [];
     this.transactions = {};
     this.multisigMembers = {};
+    this.store = {};
   }
 
   async init(options) {
@@ -62,6 +63,18 @@ class DAL {
         );
       })
     );
+  }
+
+  async saveItem(key, value) {
+    this.store[key] = value;
+  }
+
+  async loadItem(key) {
+    return this.store[key];
+  }
+
+  async deleteItem(key) {
+    delete this.store[key];
   }
 
   async getNetworkSymbol() {
