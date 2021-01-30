@@ -606,7 +606,7 @@ module.exports = class LDPoSChainModule {
         try {
           validateBlockSchema(
             block,
-            this.minTransactionsPerBlock,
+            0,
             this.maxTransactionsPerBlock,
             requiredBlockSignatureCount,
             this.delegateCount,
