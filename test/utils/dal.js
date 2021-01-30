@@ -419,7 +419,9 @@ class DAL {
         transaction.recipientAddress === walletAddress &&
         (
           fromTimestamp == null ||
-          order === 'desc' ? transaction.timestamp <= fromTimestamp : transaction.timestamp >= fromTimestamp
+          (
+            order === 'desc' ? transaction.timestamp <= fromTimestamp : transaction.timestamp >= fromTimestamp
+          )
         )
       ) {
         inboundTransactions.push(transaction);
@@ -441,7 +443,9 @@ class DAL {
         transaction.senderAddress === walletAddress &&
         (
           fromTimestamp == null ||
-          order === 'desc' ? transaction.timestamp <= fromTimestamp : transaction.timestamp >= fromTimestamp
+          (
+            order === 'desc' ? transaction.timestamp <= fromTimestamp : transaction.timestamp >= fromTimestamp
+          )
         )
       ) {
         outboundTransactions.push(transaction);
