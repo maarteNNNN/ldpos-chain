@@ -1252,7 +1252,7 @@ module.exports = class LDPoSChainModule {
 
     await this.fetchTopActiveDelegates();
 
-    this.channel.publish(`${this.alias}:chainChanges`, {
+    this.publishToChannel(`${this.alias}:chainChanges`, {
       type: 'addBlock',
       block: this.simplifyBlock(block)
     });
@@ -2153,14 +2153,6 @@ module.exports = class LDPoSChainModule {
                 return senderAccountInfo;
               })
             );
-            if (validTransactions.length < this.minTransactionsPerBlock) {
-              this.logger.debug(
-                `Skipped forging block which contained less than the minimum amount of ${
-                  this.minTransactionsPerBlock
-                } transactions`
-              );
-              continue;
-            }
 
             let senderAccountDetailsList = senderAccountDetailsResultList.filter(senderAccountDetails => senderAccountDetails);
             senderAccountDetails = {};
@@ -2243,11 +2235,24 @@ module.exports = class LDPoSChainModule {
             // Will throw if the required number of valid signatures cannot be gathered in time.
             await this.receiveLastBlockSignatures(block, blockSignerMajorityCount, forgingSignatureBroadcastDelay + propagationTimeout);
             this.logger.info(`Received a sufficient number of valid delegate signatures for block ${block.id}`);
-            await this.processBlock(block, senderAccountDetails, false);
-            this.lastFullySignedBlock = block;
 
-            this.nodeHeight = nextHeight;
-            this.networkHeight = nextHeight;
+            if (block.transactions.length >= this.minTransactionsPerBlock) {
+              await this.processBlock(block, senderAccountDetails, false);
+              this.lastFullySignedBlock = block;
+
+              this.nodeHeight = nextHeight;
+              this.networkHeight = nextHeight;
+            } else {
+              this.logger.debug(
+                `Skipped processing block ${block.id} which contained less than the minimum amount of ${
+                  this.minTransactionsPerBlock
+                } transactions`
+              );
+              this.publishToChannel(`${this.alias}:chainChanges`, {
+                type: 'skipBlock',
+                block: this.simplifyBlock(block)
+              });
+            }
           } catch (error) {
             if (this.isActive) {
               this.logger.error(error);
@@ -2585,7 +2590,7 @@ module.exports = class LDPoSChainModule {
 
       let senderAccountDetails;
       try {
-        validateBlockSchema(block, this.minTransactionsPerBlock, this.maxTransactionsPerBlock, 0, 0, this.networkSymbol);
+        validateBlockSchema(block, 0, this.maxTransactionsPerBlock, 0, 0, this.networkSymbol);
         senderAccountDetails = await this.verifyForgedBlock(block, this.lastProcessedBlock);
         let currentBlockTimeSlot = this.getCurrentBlockTimeSlot(this.forgingInterval);
         if (block.timestamp !== currentBlockTimeSlot) {
@@ -2949,7 +2954,21 @@ module.exports = class LDPoSChainModule {
       );
     }
 
-    channel.publish(`${this.alias}:bootstrap`);
+    this.publishToChannel(`${this.alias}:bootstrap`);
+  }
+
+  async publishToChannel(channelName, data) {
+    try {
+      await this.channel.publish(channelName, data);
+    } catch (error) {
+      this.logger.error(
+        new Error(
+          `Failed to publish to the ${channelName} channel because of error: ${
+            error.message
+          }`
+        )
+      );
+    }
   }
 
   async unload() {
