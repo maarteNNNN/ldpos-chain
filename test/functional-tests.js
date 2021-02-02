@@ -13,6 +13,7 @@ describe('Functional tests', async () => {
   let chainModule;
   let dal;
   let adapter;
+  let store;
   let channel;
   let options;
   let bootstrapEventTriggered;
@@ -53,6 +54,14 @@ describe('Functional tests', async () => {
       postTransaction: async (transaction) => {
         return chainModule.actions.postTransaction.handler({ params: { transaction } });
       }
+    };
+
+    store = {
+      saveItem: async () => {},
+      loadItem: async () => {
+        return '0';
+      },
+      deleteItem: async () => {}
     };
 
     channel = new Channel({
