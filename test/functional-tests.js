@@ -109,7 +109,8 @@ describe('Functional tests', async () => {
 
         await chainModule.load(channel, options);
         clientForger = createClient({
-          adapter
+          adapter,
+          store
         });
         await clientForger.connect({
           passphrase: options.forgingPassphrase
@@ -119,7 +120,8 @@ describe('Functional tests', async () => {
         walletAPassphrase = 'birth select quiz process bid raccoon memory village snow cable agent bean';
 
         clientA = createClient({
-          adapter
+          adapter,
+          store
         });
         await clientA.connect({
           passphrase: walletAPassphrase
@@ -227,7 +229,8 @@ describe('Functional tests', async () => {
       await chainModule.load(channel, options);
       await wait(2000);
       clientForger = createClient({
-        adapter
+        adapter,
+        store
       });
       await clientForger.connect({
         passphrase: options.forgingPassphrase
@@ -237,7 +240,8 @@ describe('Functional tests', async () => {
       walletAPassphrase = 'birth select quiz process bid raccoon memory village snow cable agent bean';
 
       clientA = createClient({
-        adapter
+        adapter,
+        store
       });
       await clientA.connect({
         passphrase: walletAPassphrase
@@ -419,7 +423,8 @@ describe('Functional tests', async () => {
 
         // Address: 6ofov33nBSi3C9nvTSLCFpgVvS6aGzXOeQXLIlXLws4=ldpos
         multisigClient = createClient({
-          adapter
+          adapter,
+          store
         });
         await multisigClient.connect({
           passphrase: 'guitar sight absurd copper right amount habit boat trigger bundle high pudding'
@@ -427,7 +432,8 @@ describe('Functional tests', async () => {
 
         // Address: hZ0eP+KCaDvJ6IR1yzOJVR9y6bcMlDauo6zXV8JxgyY=ldpos
         clientB = createClient({
-          adapter
+          adapter,
+          store
         });
         await clientB.connect({
           passphrase: 'trip timber saddle fine shock orbit lamp nominee subject pledge random wedding'
@@ -528,14 +534,16 @@ describe('Functional tests', async () => {
         };
 
         multisigClient = createClient({
-          adapter
+          adapter,
+          store
         });
         await multisigClient.connect({
           passphrase: 'guitar sight absurd copper right amount habit boat trigger bundle high pudding'
         });
 
         clientB = createClient({
-          adapter
+          adapter,
+          store
         });
         await clientB.connect({
           passphrase: 'trip timber saddle fine shock orbit lamp nominee subject pledge random wedding'
@@ -646,7 +654,8 @@ describe('Functional tests', async () => {
 
       await chainModule.load(channel, options);
       clientForger = createClient({
-        adapter
+        adapter,
+        store
       });
       await clientForger.connect({
         passphrase: options.forgingPassphrase
@@ -656,7 +665,8 @@ describe('Functional tests', async () => {
       walletAPassphrase = 'birth select quiz process bid raccoon memory village snow cable agent bean';
 
       clientA = createClient({
-        adapter
+        adapter,
+        store
       });
       await clientA.connect({
         passphrase: walletAPassphrase
@@ -686,7 +696,8 @@ describe('Functional tests', async () => {
         await wait(8000);
 
         firstRecipientClient = createClient({
-          adapter
+          adapter,
+          store
         });
         await firstRecipientClient.connect({
           passphrase: 'genius shoulder into daring armor proof cycle bench patrol paper grant picture'
@@ -791,7 +802,8 @@ describe('Functional tests', async () => {
 
       await chainModule.load(channel, options);
       clientForger = createClient({
-        adapter
+        adapter,
+        store
       });
       await clientForger.connect({
         passphrase: options.forgingPassphrase
@@ -801,7 +813,8 @@ describe('Functional tests', async () => {
       walletAPassphrase = 'birth select quiz process bid raccoon memory village snow cable agent bean';
 
       clientA = createClient({
-        adapter
+        adapter,
+        store
       });
       await clientA.connect({
         passphrase: walletAPassphrase
@@ -938,7 +951,8 @@ describe('Functional tests', async () => {
 
       await chainModule.load(channel, options);
       clientForger = createClient({
-        adapter
+        adapter,
+        store
       });
       await clientForger.connect({
         passphrase: options.forgingPassphrase
@@ -948,7 +962,8 @@ describe('Functional tests', async () => {
       walletAPassphrase = 'birth select quiz process bid raccoon memory village snow cable agent bean';
 
       clientA = createClient({
-        adapter
+        adapter,
+        store
       });
       await clientA.connect({
         passphrase: walletAPassphrase
@@ -1045,7 +1060,8 @@ describe('Functional tests', async () => {
 
       await chainModule.load(channel, options);
       clientForger = createClient({
-        adapter
+        adapter,
+        store
       });
       await clientForger.connect({
         passphrase: options.forgingPassphrase
@@ -1053,7 +1069,8 @@ describe('Functional tests', async () => {
 
       // Address: ZgwiaDptRm9mdABCZ37Rrci7cjvYccMsk/UuqiJKgX8=ldpos
       clientA = createClient({
-        adapter
+        adapter,
+        store
       });
       await clientA.connect({
         passphrase: 'birth select quiz process bid raccoon memory village snow cable agent bean'
@@ -1061,7 +1078,8 @@ describe('Functional tests', async () => {
 
       // Address: hZ0eP+KCaDvJ6IR1yzOJVR9y6bcMlDauo6zXV8JxgyY=ldpos
       clientB = createClient({
-        adapter
+        adapter,
+        store
       });
       await clientB.connect({
         passphrase: 'trip timber saddle fine shock orbit lamp nominee subject pledge random wedding'
@@ -1258,7 +1276,8 @@ describe('Functional tests', async () => {
 
       await chainModule.load(channel, options);
       clientForger = createClient({
-        adapter
+        adapter,
+        store
       });
       await clientForger.connect({
         passphrase: options.forgingPassphrase
@@ -1266,7 +1285,8 @@ describe('Functional tests', async () => {
 
       // Address: ZgwiaDptRm9mdABCZ37Rrci7cjvYccMsk/UuqiJKgX8=ldpos
       clientA = createClient({
-        adapter
+        adapter,
+        store
       });
       await clientA.connect({
         passphrase: 'birth select quiz process bid raccoon memory village snow cable agent bean'
@@ -1386,7 +1406,8 @@ describe('Functional tests', async () => {
 
       await chainModule.load(channel, options);
       clientForger = createClient({
-        adapter
+        adapter,
+        store
       });
       await clientForger.connect({
         passphrase: options.forgingPassphrase
@@ -1394,7 +1415,8 @@ describe('Functional tests', async () => {
 
       // Address: ZgwiaDptRm9mdABCZ37Rrci7cjvYccMsk/UuqiJKgX8=ldpos
       clientA = createClient({
-        adapter
+        adapter,
+        store
       });
       await clientA.connect({
         passphrase: 'birth select quiz process bid raccoon memory village snow cable agent bean'
@@ -1491,7 +1513,8 @@ describe('Functional tests', async () => {
 
       await chainModule.load(channel, options);
       clientForger = createClient({
-        adapter
+        adapter,
+        store
       });
       await clientForger.connect({
         passphrase: options.forgingPassphrase
@@ -1499,7 +1522,8 @@ describe('Functional tests', async () => {
 
       // Address: ZgwiaDptRm9mdABCZ37Rrci7cjvYccMsk/UuqiJKgX8=ldpos
       clientA = createClient({
-        adapter
+        adapter,
+        store
       });
       await clientA.connect({
         passphrase: 'birth select quiz process bid raccoon memory village snow cable agent bean'
