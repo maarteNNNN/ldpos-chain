@@ -95,7 +95,7 @@ describe('Functional tests', async () => {
     describe('with a single registered delegate', async () => {
 
       beforeEach(async () => {
-        // Forger address: ldpos092188ca7934529fc624acf62f2b6ce96c316742
+        // Forger address: ldposfacd5ebf967ebd87436bd5932a58168b9a1151e3
         options = {
           genesisPath: './test/utils/genesis-functional.json',
           forgingPassphrase: 'clerk aware give dog reopen peasant duty cheese tobacco trouble gold angle',
@@ -116,7 +116,7 @@ describe('Functional tests', async () => {
           passphrase: options.forgingPassphrase
         });
 
-        // Address: ldpos660c22683a6d466f66740042677ed1adc8bb723b
+        // Address: ldpos1f4db4c3ae469a987776493d47a81a70c245ed00
         walletAPassphrase = 'birth select quiz process bid raccoon memory village snow cable agent bean';
 
         clientA = createClient({
@@ -153,7 +153,7 @@ describe('Functional tests', async () => {
             let block = newBlocks[i];
             assert.equal(block.height, i + 1);
             assert.equal(block.timestamp % 5000, 0);
-            assert.equal(block.forgerAddress, 'ldpos092188ca7934529fc624acf62f2b6ce96c316742');
+            assert.equal(block.forgerAddress, 'ldposfacd5ebf967ebd87436bd5932a58168b9a1151e3');
             assert.equal(typeof block.forgingPublicKey, 'string');
             assert.equal(typeof block.nextForgingPublicKey, 'string');
             assert.equal(typeof block.nextForgingKeyIndex, 'number');
@@ -236,7 +236,7 @@ describe('Functional tests', async () => {
         passphrase: options.forgingPassphrase
       });
 
-      // Address: ldpos660c22683a6d466f66740042677ed1adc8bb723b
+      // Address: ldpos1f4db4c3ae469a987776493d47a81a70c245ed00
       walletAPassphrase = 'birth select quiz process bid raccoon memory village snow cable agent bean';
 
       clientA = createClient({
@@ -421,7 +421,7 @@ describe('Functional tests', async () => {
 
       beforeEach(async () => {
 
-        // Address: ldposea87e8bf7de70528b70bd9ef4d22c2169815bd2e
+        // Address: ldpos3689799460f1aa80689bfd81bbd20314b616b88e
         multisigClient = createClient({
           adapter,
           store
@@ -430,7 +430,7 @@ describe('Functional tests', async () => {
           passphrase: 'guitar sight absurd copper right amount habit boat trigger bundle high pudding'
         });
 
-        // Address: ldpos859d1e3fe282683bc9e88475cb3389551f72e9b7
+        // Address: ldpos367429ac94d4204823fba7e79076d794ee0144c5
         clientB = createClient({
           adapter,
           store
@@ -661,7 +661,7 @@ describe('Functional tests', async () => {
         passphrase: options.forgingPassphrase
       });
 
-      // Address: ldpos660c22683a6d466f66740042677ed1adc8bb723b
+      // Address: ldpos1f4db4c3ae469a987776493d47a81a70c245ed00
       walletAPassphrase = 'birth select quiz process bid raccoon memory village snow cable agent bean';
 
       clientA = createClient({
@@ -678,10 +678,9 @@ describe('Functional tests', async () => {
       let firstRecipientClient;
 
       beforeEach(async () => {
-        // Recipient passphrase: genius shoulder into daring armor proof cycle bench patrol paper grant picture
         let preparedTxn = await clientA.prepareTransaction({
           type: 'transfer',
-          recipientAddress: 'ldpos772e25778a36dc33a7c00115471d270ead1458c1',
+          recipientAddress: 'ldposc917fe4c2a3a323fd221d4df44bb9ad0a3ecc3c8',
           amount: '10000000000',
           fee: '10000000',
           timestamp: 100000,
@@ -699,6 +698,7 @@ describe('Functional tests', async () => {
           adapter,
           store
         });
+        // Address: ldposc917fe4c2a3a323fd221d4df44bb9ad0a3ecc3c8
         await firstRecipientClient.connect({
           passphrase: 'genius shoulder into daring armor proof cycle bench patrol paper grant picture'
         });
@@ -706,7 +706,7 @@ describe('Functional tests', async () => {
         // Recipient passphrase: sniff there advice door hand eyebrow story eyebrow brief window mushroom legend
         let firstRecipientPreparedTxn = await firstRecipientClient.prepareTransaction({
           type: 'transfer',
-          recipientAddress: 'ldpos115c785c9132993179e6c30885b61f73df47526b',
+          recipientAddress: 'ldposc586d60664f1c8658a1bcee2d7192c0fc3dc2c60',
           amount: '500000000',
           fee: '10000000',
           timestamp: 100000,
@@ -735,7 +735,7 @@ describe('Functional tests', async () => {
           }),
           chainModule.actions.getAccount.handler({
             params: {
-              walletAddress: 'ldpos115c785c9132993179e6c30885b61f73df47526b'
+              walletAddress: 'ldposc586d60664f1c8658a1bcee2d7192c0fc3dc2c60'
             }
           })
         ]);
@@ -809,7 +809,7 @@ describe('Functional tests', async () => {
         passphrase: options.forgingPassphrase
       });
 
-      // Address: ldpos660c22683a6d466f66740042677ed1adc8bb723b
+      // Address: ldpos1f4db4c3ae469a987776493d47a81a70c245ed00
       walletAPassphrase = 'birth select quiz process bid raccoon memory village snow cable agent bean';
 
       clientA = createClient({
@@ -826,7 +826,7 @@ describe('Functional tests', async () => {
       beforeEach(async () => {
         let preparedTxn = await clientA.prepareTransaction({
           type: 'vote',
-          delegateAddress: 'ldpos660c22683a6d466f66740042677ed1adc8bb723b',
+          delegateAddress: 'ldpos1f4db4c3ae469a987776493d47a81a70c245ed00',
           fee: '20000000',
           timestamp: 100000,
           message: ''
@@ -844,7 +844,7 @@ describe('Functional tests', async () => {
         let activeDelegatesAfterList = await chainModule.actions.getForgingDelegates.handler();
         assert.equal(Array.isArray(activeDelegatesAfterList), true);
         assert.equal(activeDelegatesAfterList.length, 2);
-        assert.equal(activeDelegatesAfterList[1].address, 'ldpos660c22683a6d466f66740042677ed1adc8bb723b');
+        assert.equal(activeDelegatesAfterList[1].address, 'ldpos1f4db4c3ae469a987776493d47a81a70c245ed00');
         assert.equal(activeDelegatesAfterList[1].voteWeight, '99980000000');
       });
 
@@ -857,7 +857,7 @@ describe('Functional tests', async () => {
 
         let preparedTxn = await clientA.prepareTransaction({
           type: 'vote',
-          delegateAddress: 'ldpos092188ca7934529fc624acf62f2b6ce96c316742',
+          delegateAddress: 'ldposfacd5ebf967ebd87436bd5932a58168b9a1151e3',
           fee: '20000000',
           timestamp: 100000,
           message: ''
@@ -892,7 +892,7 @@ describe('Functional tests', async () => {
 
         let preparedTxn = await clientA.prepareTransaction({
           type: 'vote',
-          delegateAddress: 'ldpos660c22683a6d466f66740042677ed1adc8bb723b',
+          delegateAddress: 'ldpos1f4db4c3ae469a987776493d47a81a70c245ed00',
           fee: '20000000',
           timestamp: 100000,
           message: ''
@@ -905,7 +905,7 @@ describe('Functional tests', async () => {
 
         let secondPreparedTxn = await clientA.prepareTransaction({
           type: 'vote',
-          delegateAddress: 'ldpos859d1e3fe282683bc9e88475cb3389551f72e9b7',
+          delegateAddress: 'ldpos367429ac94d4204823fba7e79076d794ee0144c5',
           fee: '20000000',
           timestamp: 100000,
           message: ''
@@ -958,7 +958,7 @@ describe('Functional tests', async () => {
         passphrase: options.forgingPassphrase
       });
 
-      // Address: ldpos660c22683a6d466f66740042677ed1adc8bb723b
+      // Address: ldpos1f4db4c3ae469a987776493d47a81a70c245ed00
       walletAPassphrase = 'birth select quiz process bid raccoon memory village snow cable agent bean';
 
       clientA = createClient({
@@ -978,7 +978,7 @@ describe('Functional tests', async () => {
 
         let preparedTxn = await clientA.prepareTransaction({
           type: 'unvote',
-          delegateAddress: 'ldpos092188ca7934529fc624acf62f2b6ce96c316742',
+          delegateAddress: 'ldposfacd5ebf967ebd87436bd5932a58168b9a1151e3',
           fee: '20000000',
           timestamp: 100000,
           message: ''
@@ -1017,7 +1017,7 @@ describe('Functional tests', async () => {
 
         let preparedTxn = await clientA.prepareTransaction({
           type: 'unvote',
-          delegateAddress: 'ldpos859d1e3fe282683bc9e88475cb3389551f72e9b7',
+          delegateAddress: 'ldpos367429ac94d4204823fba7e79076d794ee0144c5',
           fee: '20000000',
           timestamp: 100000,
           message: ''
@@ -1067,7 +1067,7 @@ describe('Functional tests', async () => {
         passphrase: options.forgingPassphrase
       });
 
-      // Address: ldpos660c22683a6d466f66740042677ed1adc8bb723b
+      // Address: ldpos1f4db4c3ae469a987776493d47a81a70c245ed00
       clientA = createClient({
         adapter,
         store
@@ -1076,7 +1076,7 @@ describe('Functional tests', async () => {
         passphrase: 'birth select quiz process bid raccoon memory village snow cable agent bean'
       });
 
-      // Address: ldpos859d1e3fe282683bc9e88475cb3389551f72e9b7
+      // Address: ldpos367429ac94d4204823fba7e79076d794ee0144c5
       clientB = createClient({
         adapter,
         store
@@ -1095,8 +1095,8 @@ describe('Functional tests', async () => {
           type: 'registerMultisigWallet',
           requiredSignatureCount: 2,
           memberAddresses: [
-            'ldpos092188ca7934529fc624acf62f2b6ce96c316742',
-            'ldpos859d1e3fe282683bc9e88475cb3389551f72e9b7'
+            'ldposfacd5ebf967ebd87436bd5932a58168b9a1151e3',
+            'ldpos367429ac94d4204823fba7e79076d794ee0144c5'
           ],
           fee: '50000000',
           timestamp: 100000,
@@ -1156,8 +1156,8 @@ describe('Functional tests', async () => {
           type: 'registerMultisigWallet',
           requiredSignatureCount: 2,
           memberAddresses: [
-            'ldpos092188ca7934529fc624acf62f2b6ce96c316742',
-            'ldpos859d1e3fe282683bc9e88475cb3389551f72e9b7'
+            'ldposfacd5ebf967ebd87436bd5932a58168b9a1151e3',
+            'ldpos367429ac94d4204823fba7e79076d794ee0144c5'
           ],
           fee: '50000000',
           timestamp: 100000,
@@ -1182,7 +1182,7 @@ describe('Functional tests', async () => {
           type: 'registerMultisigWallet',
           requiredSignatureCount: 1,
           memberAddresses: [
-            'ldpos092188ca7934529fc624acf62f2b6ce96c316742'
+            'ldposfacd5ebf967ebd87436bd5932a58168b9a1151e3'
           ],
           fee: '50000000',
           timestamp: 100000,
@@ -1227,8 +1227,8 @@ describe('Functional tests', async () => {
           type: 'registerMultisigWallet',
           requiredSignatureCount: 3,
           memberAddresses: [
-            'ldpos092188ca7934529fc624acf62f2b6ce96c316742',
-            'ldpos859d1e3fe282683bc9e88475cb3389551f72e9b7'
+            'ldposfacd5ebf967ebd87436bd5932a58168b9a1151e3',
+            'ldpos367429ac94d4204823fba7e79076d794ee0144c5'
           ],
           fee: '50000000',
           timestamp: 100000,
@@ -1283,7 +1283,7 @@ describe('Functional tests', async () => {
         passphrase: options.forgingPassphrase
       });
 
-      // Address: ldpos660c22683a6d466f66740042677ed1adc8bb723b
+      // Address: ldpos1f4db4c3ae469a987776493d47a81a70c245ed00
       clientA = createClient({
         adapter,
         store
@@ -1315,7 +1315,7 @@ describe('Functional tests', async () => {
         await wait(8000);
 
         // Should allow control of an account to be transferred to a different user.
-        clientForger.walletAddress = 'ldpos660c22683a6d466f66740042677ed1adc8bb723b';
+        clientForger.walletAddress = 'ldpos1f4db4c3ae469a987776493d47a81a70c245ed00';
 
         // Recipient passphrase: genius shoulder into daring armor proof cycle bench patrol paper grant picture
         let preparedTxnB = await clientForger.prepareTransaction({
@@ -1413,7 +1413,7 @@ describe('Functional tests', async () => {
         passphrase: options.forgingPassphrase
       });
 
-      // Address: ldpos660c22683a6d466f66740042677ed1adc8bb723b
+      // Address: ldpos1f4db4c3ae469a987776493d47a81a70c245ed00
       clientA = createClient({
         adapter,
         store
@@ -1520,7 +1520,7 @@ describe('Functional tests', async () => {
         passphrase: options.forgingPassphrase
       });
 
-      // Address: ldpos660c22683a6d466f66740042677ed1adc8bb723b
+      // Address: ldpos1f4db4c3ae469a987776493d47a81a70c245ed00
       clientA = createClient({
         adapter,
         store

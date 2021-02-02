@@ -9,12 +9,18 @@ if (!mnemonic) {
   process.exit(1);
 }
 
+const SEED_ENCODING = 'hex';
+const NODE_ENCODING = 'hex';
+const ADDRESS_ENCODING = 'hex';
+
 let merkle = new ProperMerkle({
-  leafCount: 32
+  leafCount: 32,
+  seedEncoding: SEED_ENCODING,
+  nodeEncoding: NODE_ENCODING
 });
 
 let network = 'ldpos';
-let seed = bip39.mnemonicToSeedSync(mnemonic).toString('base64');
+let seed = bip39.mnemonicToSeedSync(mnemonic).toString(SEED_ENCODING);
 
 console.log('SEED:', seed);
 console.log('');
@@ -23,7 +29,7 @@ let forgingTree = merkle.generateMSSTreeSync(seed, `${network}-forging-0`);
 let multisigTree = merkle.generateMSSTreeSync(seed, `${network}-multisig-0`);
 let sigTree = merkle.generateMSSTreeSync(seed, `${network}-sig-0`);
 
-let walletAddress = `${network}${sigTree.publicRootHash.slice(0, 43)}`;
+let walletAddress = `${network}${Buffer.from(sigTree.publicRootHash, NODE_ENCODING).slice(0, 20).toString(ADDRESS_ENCODING)}`;
 
 console.log('------FORGING PUBLIC KEY------');
 console.log(forgingTree.publicRootHash);

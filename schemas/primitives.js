@@ -1,4 +1,8 @@
 const ADDRESS_BASE_LENGTH = 40;
+const ID_LENGTH = 40;
+const SIGNATURE_LENGTH = 32984;
+const SIGNATURE_HASH_LENGTH = 44;
+const PUBLIC_KEY_LENGTH = 64;
 
 function isValidWalletAddress(walletAddress, networkSymbol) {
   if (typeof walletAddress !== 'string') {
@@ -56,7 +60,7 @@ function validatePublicKey(propertyName, packet) {
   if (typeof publicKey !== 'string') {
     throw new Error(`Public key in ${propertyName} must be a string`);
   }
-  if (publicKey.length !== 44) {
+  if (publicKey.length !== PUBLIC_KEY_LENGTH) {
     throw new Error(`Public key in ${propertyName} must have a length of 44 characters`);
   }
 }
@@ -121,8 +125,8 @@ function validateSignature(propertyName, packet) {
   if (typeof signature !== 'string') {
     throw new Error(`Signature in ${propertyName} must be a string`);
   }
-  if (signature.length !== 32984) {
-    throw new Error(`Signature in ${propertyName} must have a length of 32984 characters`);
+  if (signature.length !== SIGNATURE_LENGTH) {
+    throw new Error(`Signature in ${propertyName} must have a length of ${SIGNATURE_LENGTH} characters`);
   }
 }
 
@@ -131,7 +135,7 @@ function validateSignatureHash(propertyName, packet) {
   if (typeof signatureHash !== 'string') {
     throw new Error(`Signature hash in ${propertyName} must be a string`);
   }
-  if (signatureHash.length !== 44) {
+  if (signatureHash.length !== SIGNATURE_HASH_LENGTH) {
     throw new Error(`Signature hash in ${propertyName} must have a length of 44 characters`);
   }
 }
@@ -141,7 +145,7 @@ function validateBlockId(propertyName, packet) {
   if (typeof blockId !== 'string') {
     throw new Error(`Block ID must in ${propertyName} be a string`);
   }
-  if (blockId.length !== 44) {
+  if (blockId.length !== ID_LENGTH) {
     throw new Error(`Block ID in ${propertyName} must have a length of 44 characters`);
   }
 }
@@ -158,7 +162,7 @@ function validateTransactionId(propertyName, packet) {
   if (typeof transactionId !== 'string') {
     throw new Error(`Transaction ID in ${propertyName} must be a string`);
   }
-  if (transactionId.length !== 44) {
+  if (transactionId.length !== ID_LENGTH) {
     throw new Error(`Transaction ID in ${propertyName} must have a length of 44 characters`);
   }
 }
@@ -219,5 +223,9 @@ module.exports = {
   validateLimit,
   validateSortOrder,
   validateTimestamp,
-  ADDRESS_BASE_LENGTH
+  ADDRESS_BASE_LENGTH,
+  ID_LENGTH,
+  SIGNATURE_LENGTH,
+  SIGNATURE_HASH_LENGTH,
+  PUBLIC_KEY_LENGTH
 };

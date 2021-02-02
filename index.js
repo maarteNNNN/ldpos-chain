@@ -1326,7 +1326,8 @@ module.exports = class LDPoSChainModule {
     } else {
       // If the account does not yet have a sigPublicKey, check that the account
       // address corresponds to the sigPublicKey from the transaction.
-      let txnSigPublicKeyHex = Buffer.from(transaction.sigPublicKey, 'base64').slice(0, 20).toString('hex');
+      // The first 20 bytes (40 hex chars) of the public key have to match the sender address.
+      let txnSigPublicKeyHex = transaction.sigPublicKey.slice(0, 40);
       let addressHex = senderAccount.address.slice(this.networkSymbol.length);
       if (txnSigPublicKeyHex !== addressHex) {
         throw new Error(
@@ -1338,6 +1339,7 @@ module.exports = class LDPoSChainModule {
     }
 
     if (fullCheck) {
+      // Check that the transaction signature corresponds to the public key.
       if (!this.ldposClient.verifyTransaction(transaction)) {
         throw new Error('Transaction senderSignature was invalid');
       }
