@@ -1,4 +1,4 @@
-const ADDRESS_BASE_LENGTH = 44;
+const ADDRESS_BASE_LENGTH = 40;
 
 function isValidWalletAddress(walletAddress, networkSymbol) {
   if (typeof walletAddress !== 'string') {
@@ -8,7 +8,7 @@ function isValidWalletAddress(walletAddress, networkSymbol) {
   if (walletAddress.length !== walletAddressLength) {
     return false;
   }
-  let addressSymbol = walletAddress.slice(ADDRESS_BASE_LENGTH);
+  let addressSymbol = walletAddress.slice(0, networkSymbol.length);
   return addressSymbol === networkSymbol;
 }
 
@@ -23,7 +23,7 @@ function validateWalletAddressValue(walletAddress, networkSymbol) {
     throw new Error(
       `Wallet address must be a string of ${
         walletAddressLength
-      } characters ending with ${
+      } characters starting with ${
         networkSymbol
       }`
     );
@@ -44,7 +44,7 @@ function validateWalletAddress(propertyName, packet, networkSymbol) {
         propertyName
       } must be a string of ${
         walletAddressLength
-      } characters ending with ${
+      } characters starting with ${
         networkSymbol
       }`
     );

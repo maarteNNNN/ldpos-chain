@@ -18,8 +18,7 @@ const {
   validateTimestamp,
   validateOffset,
   validateLimit,
-  validateSortOrder,
-  ADDRESS_BASE_LENGTH
+  validateSortOrder
 } = require('./schemas/primitives');
 
 const { LDPOS_PASSWORD } = process.env;
@@ -1313,24 +1312,31 @@ module.exports = class LDPoSChainModule {
   verifySigTransactionAuthentication(senderAccount, transaction, fullCheck) {
     validateSigTransactionSchema(transaction, fullCheck);
 
-    let senderSigPublicKey;
     if (senderAccount.sigPublicKey) {
-      senderSigPublicKey = senderAccount.sigPublicKey;
+      if (
+        transaction.sigPublicKey !== senderAccount.sigPublicKey &&
+        transaction.sigPublicKey !== senderAccount.nextSigPublicKey
+      ) {
+        throw new Error(
+          `Transaction sigPublicKey did not match the sigPublicKey or nextSigPublicKey of the account ${
+            senderAccount.address
+          }`
+        );
+      }
     } else {
-      // If the account does not yet have a sigPublicKey, derive it from the address.
-      senderSigPublicKey = senderAccount.address.slice(0, ADDRESS_BASE_LENGTH);
+      // If the account does not yet have a sigPublicKey, check that the account
+      // address corresponds to the sigPublicKey from the transaction.
+      let txnSigPublicKeyHex = Buffer.from(transaction.sigPublicKey, 'base64').slice(0, 20).toString('hex');
+      let addressHex = senderAccount.address.slice(this.networkSymbol.length);
+      if (txnSigPublicKeyHex !== addressHex) {
+        throw new Error(
+          `Transaction sigPublicKey did not correspond to the address of the account ${
+            senderAccount.address
+          }`
+        );
+      }
     }
 
-    if (
-      transaction.sigPublicKey !== senderSigPublicKey &&
-      transaction.sigPublicKey !== senderAccount.nextSigPublicKey
-    ) {
-      throw new Error(
-        `Transaction sigPublicKey did not match the sigPublicKey or nextSigPublicKey of account ${
-          senderAccount.address
-        }`
-      );
-    }
     if (fullCheck) {
       if (!this.ldposClient.verifyTransaction(transaction)) {
         throw new Error('Transaction senderSignature was invalid');

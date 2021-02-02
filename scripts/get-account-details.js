@@ -23,7 +23,7 @@ let forgingTree = merkle.generateMSSTreeSync(seed, `${network}-forging-0`);
 let multisigTree = merkle.generateMSSTreeSync(seed, `${network}-multisig-0`);
 let sigTree = merkle.generateMSSTreeSync(seed, `${network}-sig-0`);
 
-let walletAddress = `${sigTree.publicRootHash}${network}`;
+let walletAddress = `${network}${sigTree.publicRootHash.slice(0, 43)}`;
 
 console.log('------FORGING PUBLIC KEY------');
 console.log(forgingTree.publicRootHash);

@@ -167,7 +167,7 @@ describe('DEX API tests', async () => {
 
       // Passphrase: panic test motion image soldier cloth script spice trigger magnet accident add
       multisigAccount = {
-        address: 'F0dcJhuotbdlNwDf2hopUgU6RADv2MnL1LvYaRLEpBk=ldpos',
+        address: 'ldpos17475c261ba8b5b7653700dfda1a2952053a4400',
         type: 'multisig',
         forgingPublicKey: 'KSxPdmjDS1LKGraH7fD9HjtjAYc6Y+H7O5ON0y90M9w=',
         nextForgingKeyIndex: 0,
@@ -181,7 +181,7 @@ describe('DEX API tests', async () => {
       memberAccounts = [
         // Passphrase: birth select quiz process bid raccoon memory village snow cable agent bean
         {
-          address: 'ZgwiaDptRm9mdABCZ37Rrci7cjvYccMsk/UuqiJKgX8=ldpos',
+          address: 'ldpos660c22683a6d466f66740042677ed1adc8bb723b',
           type: 'sig',
           forgingPublicKey: 'VyMOMKKy63KLCA1YkqTjaBZnlm5wdk0TOVu2LmAfAK0=',
           nextForgingKeyIndex: 0,
@@ -193,7 +193,7 @@ describe('DEX API tests', async () => {
         },
         // Passphrase: genius shoulder into daring armor proof cycle bench patrol paper grant picture
         {
-          address: 'dy4ld4o23DOnwAEVRx0nDq0UWMFwsiLpxj8X2liN2e0=ldpos',
+          address: 'ldpos772e25778a36dc33a7c00115471d270ead1458c1',
           type: 'sig',
           forgingPublicKey: 'SzXp6/L1ZztVN/LKxkkYQHR9BKoUuf1hjFf0a8vkZIE=',
           nextForgingKeyIndex: 0,
@@ -205,7 +205,7 @@ describe('DEX API tests', async () => {
         },
         // Passphrase: emotion belt burden flash vital neglect old census dress kid ocean warfare
         {
-          address: 'cI/IqmMsaXy0I5q6jitrVaOigksGH6TdUAIH001FCtA=ldpos',
+          address: 'ldpos708fc8aa632c697cb4239aba8e2b6b55a3a2824b',
           type: 'sig',
           forgingPublicKey: 'a8b9hWja0sLqsynJ+edM0N8rNUWQaIRbhfi/P0Njfkw=',
           nextForgingKeyIndex: 0,
@@ -249,7 +249,7 @@ describe('DEX API tests', async () => {
           transactions: [
             {
               type: 'transfer',
-              recipientAddress: 'dy4ld4o23DOnwAEVRx0nDq0UWMFwsiLpxj8X2liN2e0=ldpos',
+              recipientAddress: 'ldpos772e25778a36dc33a7c00115471d270ead1458c1',
               amount: '1100000000',
               fee: '100000000',
               timestamp: 10000,
@@ -257,7 +257,7 @@ describe('DEX API tests', async () => {
             },
             {
               type: 'transfer',
-              recipientAddress: 'ZgwiaDptRm9mdABCZ37Rrci7cjvYccMsk/UuqiJKgX8=ldpos',
+              recipientAddress: 'ldpos660c22683a6d466f66740042677ed1adc8bb723b',
               amount: '1200000000',
               fee: '100000000',
               timestamp: 20000,
@@ -272,7 +272,7 @@ describe('DEX API tests', async () => {
           transactions: [
             {
               type: 'transfer',
-              recipientAddress: 'ZgwiaDptRm9mdABCZ37Rrci7cjvYccMsk/UuqiJKgX8=ldpos',
+              recipientAddress: 'ldpos660c22683a6d466f66740042677ed1adc8bb723b',
               amount: '1300000000',
               fee: '100000000',
               timestamp: 30000,
@@ -287,7 +287,7 @@ describe('DEX API tests', async () => {
           transactions: [
             {
               type: 'transfer',
-              recipientAddress: 'ZgwiaDptRm9mdABCZ37Rrci7cjvYccMsk/UuqiJKgX8=ldpos',
+              recipientAddress: 'ldpos660c22683a6d466f66740042677ed1adc8bb723b',
               amount: '1300000000',
               fee: '100000000',
               timestamp: 80000,
@@ -358,7 +358,7 @@ describe('DEX API tests', async () => {
         try {
           await chainModule.actions.getMultisigWalletMembers.handler({
             params: {
-              walletAddress: 'YxK3fGykIzFBg16zf48zpF8Y1Q+McGlImXkKWOBFH2o=ldpos'
+              walletAddress: 'ldpos6312b77c6ca4233141835eb37f8f33a45f18d50f'
             }
           });
         } catch (error) {
@@ -387,7 +387,7 @@ describe('DEX API tests', async () => {
         try {
           await chainModule.actions.getMinMultisigRequiredSignatures.handler({
             params: {
-              walletAddress: 'YxK3fGykIzFBg16zf48zpF8Y1Q+McGlImXkKWOBFH2o=ldpos'
+              walletAddress: 'ldpos6312b77c6ca4233141835eb37f8f33a45f18d50f'
             }
           });
         } catch (error) {
@@ -403,7 +403,7 @@ describe('DEX API tests', async () => {
         try {
           await chainModule.actions.getMinMultisigRequiredSignatures.handler({
             params: {
-              walletAddress: 'ZgwiaDptRm9mdABCZ37Rrci7cjvYccMsk/UuqiJKgX8=ldpos'
+              walletAddress: 'ldpos660c22683a6d466f66740042677ed1adc8bb723b'
             }
           });
         } catch (error) {
@@ -500,7 +500,7 @@ describe('DEX API tests', async () => {
       it('should return an empty array if no transactions can be matched', async () => {
         let transactions = await chainModule.actions.getOutboundTransactions.handler({
           params: {
-            walletAddress: 'YxK3fGykIzFBg16zf48zpF8Y1Q+McGlImXkKWOBFH2o=ldpos',
+            walletAddress: 'ldpos6312b77c6ca4233141835eb37f8f33a45f18d50f',
             fromTimestamp: 0,
             limit: 100
           }
@@ -514,7 +514,7 @@ describe('DEX API tests', async () => {
     describe('getInboundTransactionsFromBlock action', async () => {
 
       it('should return an array of transactions sent to the specified walletAddress', async () => {
-        let recipientAddress = 'ZgwiaDptRm9mdABCZ37Rrci7cjvYccMsk/UuqiJKgX8=ldpos';
+        let recipientAddress = 'ldpos660c22683a6d466f66740042677ed1adc8bb723b';
         let transactions = await chainModule.actions.getInboundTransactionsFromBlock.handler({
           params: {
             walletAddress: recipientAddress,
@@ -538,7 +538,7 @@ describe('DEX API tests', async () => {
       });
 
       it('should return an empty array if no transactions match the specified blockId', async () => {
-        let recipientAddress = 'ZgwiaDptRm9mdABCZ37Rrci7cjvYccMsk/UuqiJKgX8=ldpos';
+        let recipientAddress = 'ldpos660c22683a6d466f66740042677ed1adc8bb723b';
         let transactions = await chainModule.actions.getInboundTransactionsFromBlock.handler({
           params: {
             walletAddress: recipientAddress,
@@ -550,10 +550,10 @@ describe('DEX API tests', async () => {
       });
 
       it('should return an empty array if no transactions match the specified walletAddress', async () => {
-        let recipientAddress = 'ZgwiaDptRm9mdABCZ37Rrci7cjvYccMsk/UuqiJKgX8=ldpos';
+        let recipientAddress = 'ldpos660c22683a6d466f66740042677ed1adc8bb723b';
         let transactions = await chainModule.actions.getInboundTransactionsFromBlock.handler({
           params: {
-            walletAddress: 'YxK3fGykIzFBg16zf48zpF8Y1Q+McGlImXkKWOBFH2o=ldpos',
+            walletAddress: 'ldpos6312b77c6ca4233141835eb37f8f33a45f18d50f',
             blockId: 'dfa9f15e7fe79cebc88d2c3f76ba39680ae5279a14e='
           }
         });
@@ -630,7 +630,7 @@ describe('DEX API tests', async () => {
       it('should return an empty array if no transactions match the specified walletAddress', async () => {
         let transactions = await chainModule.actions.getOutboundTransactionsFromBlock.handler({
           params: {
-            walletAddress: 'YxK3fGykIzFBg16zf48zpF8Y1Q+McGlImXkKWOBFH2o=ldpos',
+            walletAddress: 'ldpos6312b77c6ca4233141835eb37f8f33a45f18d50f',
             blockId: 'dfa9f15e7fe79cebc88d2c3f76ba39680ae5279a14e='
           }
         });
@@ -767,7 +767,7 @@ describe('DEX API tests', async () => {
         // The chain module can handle the transaction and signature objects however it wants.
         let preparedTxn = await clientForger.prepareTransaction({
           type: 'transfer',
-          recipientAddress: 'ZgwiaDptRm9mdABCZ37Rrci7cjvYccMsk/UuqiJKgX8=ldpos',
+          recipientAddress: 'ldpos660c22683a6d466f66740042677ed1adc8bb723b',
           amount: '3300000000',
           fee: '100000000',
           timestamp: 100000,
