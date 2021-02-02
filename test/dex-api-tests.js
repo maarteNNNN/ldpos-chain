@@ -17,6 +17,7 @@ describe('DEX API tests', async () => {
   let chainModule;
   let dal;
   let adapter;
+  let store;
   let channel;
   let options;
   let bootstrapEventTriggered;
@@ -57,6 +58,14 @@ describe('DEX API tests', async () => {
       }
     };
 
+    store = {
+      saveItem: async () => {},
+      loadItem: async () => {
+        return '0';
+      },
+      deleteItem: async () => {}
+    };
+
     channel = new Channel({
       modules: {
         app: new AppModule(),
@@ -80,7 +89,8 @@ describe('DEX API tests', async () => {
       });
       await chainModule.load(channel, moduleOptions);
       clientForger = createClient({
-        adapter
+        adapter,
+        store
       });
       await clientForger.connect({
         passphrase: moduleOptions.forgingPassphrase
@@ -215,22 +225,23 @@ describe('DEX API tests', async () => {
       await dal.registerMultisigWallet(multisigAccount.address, memberAddessList, 2);
 
       clientA = createClient({
-        adapter
+        adapter,
+        store
       });
       await clientA.connect({
         passphrase: multisigMemberAPassphrase
       });
 
       clientB = createClient({
-        adapter
+        adapter,
+        store
       });
       await clientB.connect({
         passphrase: multisigMemberBPassphrase
       });
 
       let lastBlockId = null;
-
-      blockList = [
+      let blockData = [
         {
           height: 1,
           timestamp: 30000,
@@ -284,38 +295,46 @@ describe('DEX API tests', async () => {
             }
           ]
         }
-      ].map((block) => {
-        block.previousBlockId = lastBlockId;
-        let preparedBlock = clientForger.prepareBlock(block);
-        let { transactions, ...preparedBlockWithoutTxns } = preparedBlock;
-        lastBlockId = preparedBlockWithoutTxns.id;
+      ];
 
-        if (block.height === 3) {
+      blockList = await Promise.all(
+        blockData.map(async (block) => {
+          block.previousBlockId = lastBlockId;
+          let preparedBlock = await clientForger.prepareBlock(block);
+          let { transactions, ...preparedBlockWithoutTxns } = preparedBlock;
+          lastBlockId = preparedBlockWithoutTxns.id;
+
+          if (block.height === 3) {
+            return {
+              height: preparedBlockWithoutTxns.height,
+              timestamp: preparedBlockWithoutTxns.timestamp,
+              previousBlockId: preparedBlockWithoutTxns.previousBlockId,
+              transactions: await Promise.all(
+                transactions.map(async (txn) => {
+                  let multisigTxn = clientForger.prepareMultisigTransaction(txn);
+                  let signatureA = await clientA.signMultisigTransaction(multisigTxn);
+                  let signatureB = await clientB.signMultisigTransaction(multisigTxn);
+                  multisigTxn.signatures = [signatureA, signatureB];
+                  return chainModule.simplifyTransaction(multisigTxn, true);
+                })
+              ),
+              ...preparedBlockWithoutTxns
+            };
+          }
+
           return {
             height: preparedBlockWithoutTxns.height,
             timestamp: preparedBlockWithoutTxns.timestamp,
             previousBlockId: preparedBlockWithoutTxns.previousBlockId,
-            transactions: transactions.map((txn) => {
-              let multisigTxn = clientForger.prepareMultisigTransaction(txn);
-              let signatureA = clientA.signMultisigTransaction(multisigTxn);
-              let signatureB = clientB.signMultisigTransaction(multisigTxn);
-              multisigTxn.signatures = [signatureA, signatureB];
-              return chainModule.simplifyTransaction(multisigTxn, true);
-            }),
+            transactions: await Promise.all(
+              transactions.map(
+                async (txn) => chainModule.simplifyTransaction(await clientForger.prepareTransaction(txn), true)
+              )
+            ),
             ...preparedBlockWithoutTxns
           };
-        }
-
-        return {
-          height: preparedBlockWithoutTxns.height,
-          timestamp: preparedBlockWithoutTxns.timestamp,
-          previousBlockId: preparedBlockWithoutTxns.previousBlockId,
-          transactions: transactions.map(
-            txn => chainModule.simplifyTransaction(clientForger.prepareTransaction(txn), true)
-          ),
-          ...preparedBlockWithoutTxns
-        };
-      });
+        })
+      );
 
       for (let block of blockList) {
         await dal.upsertBlock(block);
@@ -746,7 +765,7 @@ describe('DEX API tests', async () => {
         // The format of each signature object is flexible depending on the output of the ChainCrypto
         // adapter but it will have a 'signerAddress' property.
         // The chain module can handle the transaction and signature objects however it wants.
-        let preparedTxn = clientForger.prepareTransaction({
+        let preparedTxn = await clientForger.prepareTransaction({
           type: 'transfer',
           recipientAddress: 'ZgwiaDptRm9mdABCZ37Rrci7cjvYccMsk/UuqiJKgX8=ldpos',
           amount: '3300000000',

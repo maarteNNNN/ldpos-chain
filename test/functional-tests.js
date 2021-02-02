@@ -160,7 +160,7 @@ describe('Functional tests', async () => {
             await wait(600);
 
             // Recipient passphrase: genius shoulder into daring armor proof cycle bench patrol paper grant picture
-            let preparedTxn = clientA.prepareTransaction({
+            let preparedTxn = await clientA.prepareTransaction({
               type: 'transfer',
               recipientAddress: 'dy4ld4o23DOnwAEVRx0nDq0UWMFwsiLpxj8X2liN2e0=ldpos',
               amount: `${i + 1}00000000`,
@@ -242,7 +242,7 @@ describe('Functional tests', async () => {
           await wait(600);
 
           // Recipient passphrase: genius shoulder into daring armor proof cycle bench patrol paper grant picture
-          let preparedTxn = clientA.prepareTransaction({
+          let preparedTxn = await clientA.prepareTransaction({
             type: 'transfer',
             recipientAddress: 'dy4ld4o23DOnwAEVRx0nDq0UWMFwsiLpxj8X2liN2e0=ldpos',
             amount: `${i + 1}00000000`,
@@ -328,7 +328,7 @@ describe('Functional tests', async () => {
           await wait(600);
 
           // Recipient passphrase: genius shoulder into daring armor proof cycle bench patrol paper grant picture
-          let preparedTxn = clientA.prepareTransaction({
+          let preparedTxn = await clientA.prepareTransaction({
             type: 'transfer',
             recipientAddress: 'dy4ld4o23DOnwAEVRx0nDq0UWMFwsiLpxj8X2liN2e0=ldpos',
             amount: `${i + 1}00000000`,
@@ -437,8 +437,8 @@ describe('Functional tests', async () => {
             message: ''
           });
 
-          let memberASignature = clientA.signMultisigTransaction(preparedTxn);
-          let memberBSignature = clientB.signMultisigTransaction(preparedTxn);
+          let memberASignature = await clientA.signMultisigTransaction(preparedTxn);
+          let memberBSignature = await clientB.signMultisigTransaction(preparedTxn);
 
           multisigClient.attachMultisigTransactionSignature(preparedTxn, memberASignature);
           multisigClient.attachMultisigTransactionSignature(preparedTxn, memberBSignature);
@@ -545,8 +545,8 @@ describe('Functional tests', async () => {
             message: ''
           });
 
-          let memberASignature = clientA.signMultisigTransaction(preparedTxn);
-          let memberBSignature = clientB.signMultisigTransaction(preparedTxn);
+          let memberASignature = await clientA.signMultisigTransaction(preparedTxn);
+          let memberBSignature = await clientB.signMultisigTransaction(preparedTxn);
 
           multisigClient.attachMultisigTransactionSignature(preparedTxn, memberASignature);
           multisigClient.attachMultisigTransactionSignature(preparedTxn, memberBSignature);
@@ -660,7 +660,7 @@ describe('Functional tests', async () => {
 
       beforeEach(async () => {
         // Recipient passphrase: genius shoulder into daring armor proof cycle bench patrol paper grant picture
-        let preparedTxn = clientA.prepareTransaction({
+        let preparedTxn = await clientA.prepareTransaction({
           type: 'transfer',
           recipientAddress: 'dy4ld4o23DOnwAEVRx0nDq0UWMFwsiLpxj8X2liN2e0=ldpos',
           amount: '10000000000',
@@ -684,7 +684,7 @@ describe('Functional tests', async () => {
         });
 
         // Recipient passphrase: sniff there advice door hand eyebrow story eyebrow brief window mushroom legend
-        let firstRecipientPreparedTxn = firstRecipientClient.prepareTransaction({
+        let firstRecipientPreparedTxn = await firstRecipientClient.prepareTransaction({
           type: 'transfer',
           recipientAddress: 'EVx4XJEymTF55sMIhbYfc99HUmtRxfbK0m4XKjPmy58=ldpos',
           amount: '500000000',
@@ -736,7 +736,7 @@ describe('Functional tests', async () => {
       beforeEach(async () => {
         caughtError = null;
         // Recipient passphrase: genius shoulder into daring armor proof cycle bench patrol paper grant picture
-        let preparedTxn = clientA.prepareTransaction({
+        let preparedTxn = await clientA.prepareTransaction({
           type: 'transfer',
           recipientAddress: 'dy4ld4o23DOnwAEVRx0nDq0UWMFwsiLpxj8X2liN2e0=ldpos',
           amount: '100000000000',
@@ -802,7 +802,7 @@ describe('Functional tests', async () => {
     describe('valid vote', async () => {
 
       beforeEach(async () => {
-        let preparedTxn = clientA.prepareTransaction({
+        let preparedTxn = await clientA.prepareTransaction({
           type: 'vote',
           delegateAddress: 'ZgwiaDptRm9mdABCZ37Rrci7cjvYccMsk/UuqiJKgX8=ldpos',
           fee: '20000000',
@@ -833,7 +833,7 @@ describe('Functional tests', async () => {
       beforeEach(async () => {
         caughtError = null;
 
-        let preparedTxn = clientA.prepareTransaction({
+        let preparedTxn = await clientA.prepareTransaction({
           type: 'vote',
           delegateAddress: 'CSGIynk0Up/GJKz2Lyts6WwxZ0JPVKpGdCjz0Nzcxgw=ldpos',
           fee: '20000000',
@@ -868,7 +868,7 @@ describe('Functional tests', async () => {
       beforeEach(async () => {
         caughtError = null;
 
-        let preparedTxn = clientA.prepareTransaction({
+        let preparedTxn = await clientA.prepareTransaction({
           type: 'vote',
           delegateAddress: 'ZgwiaDptRm9mdABCZ37Rrci7cjvYccMsk/UuqiJKgX8=ldpos',
           fee: '20000000',
@@ -881,7 +881,7 @@ describe('Functional tests', async () => {
           }
         });
 
-        let secondPreparedTxn = clientA.prepareTransaction({
+        let secondPreparedTxn = await clientA.prepareTransaction({
           type: 'vote',
           delegateAddress: 'hZ0eP+KCaDvJ6IR1yzOJVR9y6bcMlDauo6zXV8JxgyY=ldpos',
           fee: '20000000',
@@ -952,7 +952,7 @@ describe('Functional tests', async () => {
       beforeEach(async () => {
         activeDelegatesBeforeList = await chainModule.actions.getForgingDelegates.handler();
 
-        let preparedTxn = clientA.prepareTransaction({
+        let preparedTxn = await clientA.prepareTransaction({
           type: 'unvote',
           delegateAddress: 'CSGIynk0Up/GJKz2Lyts6WwxZ0JPVKpGdCjz0Nzcxgw=ldpos',
           fee: '20000000',
@@ -991,7 +991,7 @@ describe('Functional tests', async () => {
       beforeEach(async () => {
         activeDelegatesBeforeList = await chainModule.actions.getForgingDelegates.handler();
 
-        let preparedTxn = clientA.prepareTransaction({
+        let preparedTxn = await clientA.prepareTransaction({
           type: 'unvote',
           delegateAddress: 'hZ0eP+KCaDvJ6IR1yzOJVR9y6bcMlDauo6zXV8JxgyY=ldpos',
           fee: '20000000',
@@ -1064,7 +1064,7 @@ describe('Functional tests', async () => {
       let caughtError;
 
       beforeEach(async () => {
-        let preparedTxn = clientA.prepareTransaction({
+        let preparedTxn = await clientA.prepareTransaction({
           type: 'registerMultisigWallet',
           requiredSignatureCount: 2,
           memberAddresses: [
@@ -1085,7 +1085,7 @@ describe('Functional tests', async () => {
         await wait(8000);
 
         // Recipient passphrase: genius shoulder into daring armor proof cycle bench patrol paper grant picture
-        let preparedTransferTxn = clientA.prepareTransaction({
+        let preparedTransferTxn = await clientA.prepareTransaction({
           type: 'transfer',
           recipientAddress: 'dy4ld4o23DOnwAEVRx0nDq0UWMFwsiLpxj8X2liN2e0=ldpos',
           amount: '12300000000',
@@ -1125,7 +1125,7 @@ describe('Functional tests', async () => {
       let accountAfter;
 
       beforeEach(async () => {
-        let preparedTxn = clientA.prepareTransaction({
+        let preparedTxn = await clientA.prepareTransaction({
           type: 'registerMultisigWallet',
           requiredSignatureCount: 2,
           memberAddresses: [
@@ -1151,7 +1151,7 @@ describe('Functional tests', async () => {
           }
         });
 
-        let preparedTxnB = clientA.prepareMultisigTransaction({
+        let preparedTxnB = await clientA.prepareMultisigTransaction({
           type: 'registerMultisigWallet',
           requiredSignatureCount: 1,
           memberAddresses: [
@@ -1162,8 +1162,8 @@ describe('Functional tests', async () => {
           message: ''
         });
 
-        let signatureA = clientForger.signMultisigTransaction(preparedTxnB);
-        let signatureB = clientB.signMultisigTransaction(preparedTxnB);
+        let signatureA = await clientForger.signMultisigTransaction(preparedTxnB);
+        let signatureB = await clientB.signMultisigTransaction(preparedTxnB);
 
         clientA.attachMultisigTransactionSignature(preparedTxnB, signatureA);
         clientA.attachMultisigTransactionSignature(preparedTxnB, signatureB);
@@ -1196,7 +1196,7 @@ describe('Functional tests', async () => {
       let caughtError;
 
       beforeEach(async () => {
-        let preparedTxn = clientA.prepareTransaction({
+        let preparedTxn = await clientA.prepareTransaction({
           type: 'registerMultisigWallet',
           requiredSignatureCount: 3,
           memberAddresses: [
@@ -1267,10 +1267,10 @@ describe('Functional tests', async () => {
     describe('valid registerSigDetails', async () => {
 
       beforeEach(async () => {
-        let preparedTxn = clientA.prepareTransaction({
+        let preparedTxn = await clientA.prepareTransaction({
           type: 'registerSigDetails',
-          newSigPublicKey: clientForger.getSigPublicKey(),
-          newNextSigPublicKey: clientForger.getNextSigPublicKey(),
+          newSigPublicKey: clientForger.sigPublicKey,
+          newNextSigPublicKey: clientForger.nextSigPublicKey,
           newNextSigKeyIndex: clientForger.sigKeyIndex + 1,
           fee: '10000000',
           timestamp: 100000,
@@ -1289,7 +1289,7 @@ describe('Functional tests', async () => {
         clientForger.walletAddress = 'ZgwiaDptRm9mdABCZ37Rrci7cjvYccMsk/UuqiJKgX8=ldpos';
 
         // Recipient passphrase: genius shoulder into daring armor proof cycle bench patrol paper grant picture
-        let preparedTxnB = clientForger.prepareTransaction({
+        let preparedTxnB = await clientForger.prepareTransaction({
           type: 'transfer',
           recipientAddress: 'dy4ld4o23DOnwAEVRx0nDq0UWMFwsiLpxj8X2liN2e0=ldpos',
           amount: '2000000000',
@@ -1326,10 +1326,10 @@ describe('Functional tests', async () => {
     describe('invalid registerSigDetails', async () => {
 
       beforeEach(async () => {
-        let preparedTxn = clientA.prepareTransaction({
+        let preparedTxn = await clientA.prepareTransaction({
           type: 'registerSigDetails',
-          newSigPublicKey: clientForger.getSigPublicKey(),
-          newNextSigPublicKey: clientForger.getNextSigPublicKey(),
+          newSigPublicKey: clientForger.sigPublicKey,
+          newNextSigPublicKey: clientForger.nextSigPublicKey,
           newNextSigKeyIndex: -1,
           fee: '10000000',
           timestamp: 100000,
@@ -1395,10 +1395,10 @@ describe('Functional tests', async () => {
     describe('valid registerMultisigDetails', async () => {
 
       beforeEach(async () => {
-        let preparedTxn = clientA.prepareTransaction({
+        let preparedTxn = await clientA.prepareTransaction({
           type: 'registerMultisigDetails',
-          newMultisigPublicKey: clientForger.getMultisigPublicKey(),
-          newNextMultisigPublicKey: clientForger.getNextMultisigPublicKey(),
+          newMultisigPublicKey: clientForger.multisigPublicKey,
+          newNextMultisigPublicKey: clientForger.nextMultisigPublicKey,
           newNextMultisigKeyIndex: clientForger.multisigKeyIndex + 1,
           fee: '10000000',
           timestamp: 100000,
@@ -1421,8 +1421,8 @@ describe('Functional tests', async () => {
           }
         });
         assert.equal(caughtError, null);
-        assert.equal(account.multisigPublicKey, clientForger.getMultisigPublicKey());
-        assert.equal(account.nextMultisigPublicKey, clientForger.getNextMultisigPublicKey());
+        assert.equal(account.multisigPublicKey, clientForger.multisigPublicKey);
+        assert.equal(account.nextMultisigPublicKey, clientForger.nextMultisigPublicKey);
         assert.equal(account.nextMultisigKeyIndex, clientForger.multisigKeyIndex + 1);
       });
 
@@ -1431,10 +1431,10 @@ describe('Functional tests', async () => {
     describe('invalid registerMultisigDetails', async () => {
 
       beforeEach(async () => {
-        let preparedTxn = clientA.prepareTransaction({
+        let preparedTxn = await clientA.prepareTransaction({
           type: 'registerMultisigDetails',
-          newMultisigPublicKey: clientForger.getSigPublicKey(),
-          newNextMultisigPublicKey: clientForger.getNextSigPublicKey(),
+          newMultisigPublicKey: clientForger.sigPublicKey,
+          newNextMultisigPublicKey: clientForger.nextSigPublicKey,
           newNextMultisigKeyIndex: -1,
           fee: '10000000',
           timestamp: 100000,
@@ -1500,10 +1500,10 @@ describe('Functional tests', async () => {
     describe('valid registerForgingDetails', async () => {
 
       beforeEach(async () => {
-        let preparedTxn = clientA.prepareTransaction({
+        let preparedTxn = await clientA.prepareTransaction({
           type: 'registerForgingDetails',
-          newForgingPublicKey: clientForger.getForgingPublicKey(),
-          newNextForgingPublicKey: clientForger.getNextForgingPublicKey(),
+          newForgingPublicKey: clientForger.forgingPublicKey,
+          newNextForgingPublicKey: clientForger.nextForgingPublicKey,
           newNextForgingKeyIndex: clientForger.forgingKeyIndex + 1,
           fee: '10000000',
           timestamp: 100000,
@@ -1526,8 +1526,8 @@ describe('Functional tests', async () => {
           }
         });
         assert.equal(caughtError, null);
-        assert.equal(account.forgingPublicKey, clientForger.getForgingPublicKey());
-        assert.equal(account.nextForgingPublicKey, clientForger.getNextForgingPublicKey());
+        assert.equal(account.forgingPublicKey, clientForger.forgingPublicKey);
+        assert.equal(account.nextForgingPublicKey, clientForger.nextForgingPublicKey);
         assert.equal(account.nextForgingKeyIndex, clientForger.forgingKeyIndex + 1);
       });
 
@@ -1536,10 +1536,10 @@ describe('Functional tests', async () => {
     describe('invalid registerForgingDetails', async () => {
 
       beforeEach(async () => {
-        let preparedTxn = clientA.prepareTransaction({
+        let preparedTxn = await clientA.prepareTransaction({
           type: 'registerForgingDetails',
-          newForgingPublicKey: clientForger.getSigPublicKey(),
-          newNextForgingPublicKey: clientForger.getNextSigPublicKey(),
+          newForgingPublicKey: clientForger.sigPublicKey,
+          newNextForgingPublicKey: clientForger.nextSigPublicKey,
           newNextForgingKeyIndex: -1,
           fee: '10000000',
           timestamp: 100000,
