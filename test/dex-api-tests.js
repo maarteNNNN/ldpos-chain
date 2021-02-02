@@ -193,7 +193,7 @@ describe('DEX API tests', async () => {
         },
         // Passphrase: genius shoulder into daring armor proof cycle bench patrol paper grant picture
         {
-          address: 'ldpos772e25778a36dc33a7c00115471d270ead1458c1',
+          address: 'ldposc917fe4c2a3a323fd221d4df44bb9ad0a3ecc3c8',
           type: 'sig',
           forgingPublicKey: 'SzXp6/L1ZztVN/LKxkkYQHR9BKoUuf1hjFf0a8vkZIE=',
           nextForgingKeyIndex: 0,
@@ -249,7 +249,7 @@ describe('DEX API tests', async () => {
           transactions: [
             {
               type: 'transfer',
-              recipientAddress: 'ldpos772e25778a36dc33a7c00115471d270ead1458c1',
+              recipientAddress: 'ldposc917fe4c2a3a323fd221d4df44bb9ad0a3ecc3c8',
               amount: '1100000000',
               fee: '100000000',
               timestamp: 10000,
@@ -554,7 +554,7 @@ describe('DEX API tests', async () => {
         let transactions = await chainModule.actions.getInboundTransactionsFromBlock.handler({
           params: {
             walletAddress: 'ldpos6312b77c6ca4233141835eb37f8f33a45f18d50f',
-            blockId: '9f061d15f8151056dc39ae06b0ac3a874df5c76f'
+            blockId: blockList[0].id
           }
         });
         assert.equal(Array.isArray(transactions), true);
@@ -631,7 +631,7 @@ describe('DEX API tests', async () => {
         let transactions = await chainModule.actions.getOutboundTransactionsFromBlock.handler({
           params: {
             walletAddress: 'ldpos6312b77c6ca4233141835eb37f8f33a45f18d50f',
-            blockId: '9f061d15f8151056dc39ae06b0ac3a874df5c76f'
+            blockId: blockList[0].id
           }
         });
         assert.equal(Array.isArray(transactions), true);

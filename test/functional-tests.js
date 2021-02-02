@@ -173,7 +173,7 @@ describe('Functional tests', async () => {
             // Recipient passphrase: genius shoulder into daring armor proof cycle bench patrol paper grant picture
             let preparedTxn = await clientA.prepareTransaction({
               type: 'transfer',
-              recipientAddress: 'ldpos772e25778a36dc33a7c00115471d270ead1458c1',
+              recipientAddress: 'ldposc917fe4c2a3a323fd221d4df44bb9ad0a3ecc3c8',
               amount: `${i + 1}00000000`,
               fee: `${i + 1}0000000`,
               timestamp: 100000,
@@ -257,7 +257,7 @@ describe('Functional tests', async () => {
           // Recipient passphrase: genius shoulder into daring armor proof cycle bench patrol paper grant picture
           let preparedTxn = await clientA.prepareTransaction({
             type: 'transfer',
-            recipientAddress: 'ldpos772e25778a36dc33a7c00115471d270ead1458c1',
+            recipientAddress: 'ldposc917fe4c2a3a323fd221d4df44bb9ad0a3ecc3c8',
             amount: `${i + 1}00000000`,
             fee: `${i + 1}0000000`,
             timestamp: 100000,
@@ -307,7 +307,7 @@ describe('Functional tests', async () => {
           }),
           chainModule.actions.getAccount.handler({
             params: {
-              walletAddress: 'ldpos772e25778a36dc33a7c00115471d270ead1458c1'
+              walletAddress: 'ldposc917fe4c2a3a323fd221d4df44bb9ad0a3ecc3c8'
             }
           })
         ]);
@@ -343,7 +343,7 @@ describe('Functional tests', async () => {
           // Recipient passphrase: genius shoulder into daring armor proof cycle bench patrol paper grant picture
           let preparedTxn = await clientA.prepareTransaction({
             type: 'transfer',
-            recipientAddress: 'ldpos772e25778a36dc33a7c00115471d270ead1458c1',
+            recipientAddress: 'ldposc917fe4c2a3a323fd221d4df44bb9ad0a3ecc3c8',
             amount: `${i + 1}00000000`,
             fee: `${i + 1}0000000`,
             timestamp: 100000,
@@ -402,7 +402,7 @@ describe('Functional tests', async () => {
           }),
           chainModule.actions.getAccount.handler({
             params: {
-              walletAddress: 'ldpos772e25778a36dc33a7c00115471d270ead1458c1'
+              walletAddress: 'ldposc917fe4c2a3a323fd221d4df44bb9ad0a3ecc3c8'
             }
           })
         ]);
@@ -445,7 +445,7 @@ describe('Functional tests', async () => {
           // Recipient passphrase: genius shoulder into daring armor proof cycle bench patrol paper grant picture
           let preparedTxn = multisigClient.prepareMultisigTransaction({
             type: 'transfer',
-            recipientAddress: 'ldpos772e25778a36dc33a7c00115471d270ead1458c1',
+            recipientAddress: 'ldposc917fe4c2a3a323fd221d4df44bb9ad0a3ecc3c8',
             amount: `${i + 1}00000000`,
             fee: `${i + 1}0000000`,
             timestamp: 100000,
@@ -502,7 +502,7 @@ describe('Functional tests', async () => {
           }),
           chainModule.actions.getAccount.handler({
             params: {
-              walletAddress: 'ldpos772e25778a36dc33a7c00115471d270ead1458c1'
+              walletAddress: 'ldposc917fe4c2a3a323fd221d4df44bb9ad0a3ecc3c8'
             }
           })
         ]);
@@ -555,7 +555,7 @@ describe('Functional tests', async () => {
           // Recipient passphrase: genius shoulder into daring armor proof cycle bench patrol paper grant picture
           let preparedTxn = multisigClient.prepareMultisigTransaction({
             type: 'transfer',
-            recipientAddress: 'ldpos772e25778a36dc33a7c00115471d270ead1458c1',
+            recipientAddress: 'ldposc917fe4c2a3a323fd221d4df44bb9ad0a3ecc3c8',
             amount: `${i + 1}00000000`,
             fee: `${i + 1}0000000`,
             timestamp: 100000,
@@ -621,7 +621,7 @@ describe('Functional tests', async () => {
           }),
           chainModule.actions.getAccount.handler({
             params: {
-              walletAddress: 'ldpos772e25778a36dc33a7c00115471d270ead1458c1'
+              walletAddress: 'ldposc917fe4c2a3a323fd221d4df44bb9ad0a3ecc3c8'
             }
           })
         ]);
@@ -758,7 +758,7 @@ describe('Functional tests', async () => {
         // Recipient passphrase: genius shoulder into daring armor proof cycle bench patrol paper grant picture
         let preparedTxn = await clientA.prepareTransaction({
           type: 'transfer',
-          recipientAddress: 'ldpos772e25778a36dc33a7c00115471d270ead1458c1',
+          recipientAddress: 'ldposc917fe4c2a3a323fd221d4df44bb9ad0a3ecc3c8',
           amount: '100000000000',
           fee: '10000000',
           timestamp: 100000,
@@ -1114,7 +1114,7 @@ describe('Functional tests', async () => {
         // Recipient passphrase: genius shoulder into daring armor proof cycle bench patrol paper grant picture
         let preparedTransferTxn = await clientA.prepareTransaction({
           type: 'transfer',
-          recipientAddress: 'ldpos772e25778a36dc33a7c00115471d270ead1458c1',
+          recipientAddress: 'ldposc917fe4c2a3a323fd221d4df44bb9ad0a3ecc3c8',
           amount: '12300000000',
           fee: '10000000',
           timestamp: 100000,
@@ -1320,7 +1320,7 @@ describe('Functional tests', async () => {
         // Recipient passphrase: genius shoulder into daring armor proof cycle bench patrol paper grant picture
         let preparedTxnB = await clientForger.prepareTransaction({
           type: 'transfer',
-          recipientAddress: 'ldpos772e25778a36dc33a7c00115471d270ead1458c1',
+          recipientAddress: 'ldposc917fe4c2a3a323fd221d4df44bb9ad0a3ecc3c8',
           amount: '2000000000',
           fee: '10000000',
           timestamp: 100000,
