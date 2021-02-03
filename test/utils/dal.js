@@ -1,4 +1,5 @@
 const crypto = require('crypto');
+const { ID_BYTE_SIZE } = require('../../schemas/primitives');
 
 const DEFAULT_NETWORK_SYMBOL = 'ldpos';
 
@@ -41,7 +42,7 @@ class DAL {
       let { votes } = accountInfo;
       for (let delegateAddress of votes) {
         await this.vote({
-          id: crypto.randomBytes(32).toString('base64'),
+          id: crypto.randomBytes(ID_BYTE_SIZE).toString('hex'),
           voterAddress: accountInfo.address,
           delegateAddress
         });
