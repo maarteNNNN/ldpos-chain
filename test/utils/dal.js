@@ -365,8 +365,8 @@ class DAL {
   }
 
   async upsertBlock(block, synched) {
-    this.blocks[block.height - 1] = { ...block };
     let { transactions } = block;
+    this.blocks[block.height - 1] = { ...block };
     let len = transactions.length;
     for (let i = 0; i < len; i++) {
       let txn = transactions[i];
@@ -583,7 +583,6 @@ class DAL {
 
   simplifyBlock(signedBlock) {
     let { transactions, forgerSignature, signatures, ...simpleBlock } = signedBlock;
-    simpleBlock.numberOfTransactions = transactions.length;
     return simpleBlock;
   }
 }

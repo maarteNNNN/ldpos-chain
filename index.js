@@ -445,7 +445,6 @@ module.exports = class LDPoSChainModule {
 
   simplifyBlock(signedBlock) {
     let { transactions, forgerSignature, signatures, ...simpleBlock } = signedBlock;
-    simpleBlock.numberOfTransactions = transactions.length;
     return simpleBlock;
   }
 
@@ -707,6 +706,7 @@ module.exports = class LDPoSChainModule {
       height,
       timestamp,
       previousBlockId: this.lastProcessedBlock ? this.lastProcessedBlock.id : null,
+      numberOfTransactions: transactions.length,
       transactions
     };
     return this.ldposClient.prepareBlock(blockData);

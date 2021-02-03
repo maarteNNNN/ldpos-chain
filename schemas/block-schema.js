@@ -1,6 +1,7 @@
 const {
   validateWalletAddress,
   validateKeyIndex,
+  validateCount,
   validateBlockId,
   validatePublicKey,
   validateTimestamp,
@@ -16,6 +17,7 @@ const validPropertyList = [
   'height',
   'timestamp',
   'previousBlockId',
+  'numberOfTransactions',
   'transactions',
   'forgerAddress',
   'forgingPublicKey',
@@ -45,6 +47,14 @@ function validateBlockSchema(block, minTransactionsPerBlock, maxTransactionsPerB
   if (block.transactions.length > maxTransactionsPerBlock) {
     throw new Error(
       `Block contained too many transactions - Maximum allowed is ${maxTransactionsPerBlock}`
+    );
+  }
+  validateCount('numberOfTransactions', block);
+  if (block.numberOfTransactions !== block.transactions.length) {
+    throw new Error(
+      `Block number of transactions count did not match the number of transactions in the block - Expected ${
+        block.transactions.length
+      }`
     );
   }
   validateWalletAddress('forgerAddress', block, networkSymbol);

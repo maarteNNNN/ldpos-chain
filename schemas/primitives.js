@@ -120,6 +120,19 @@ function validateKeyIndex(propertyName, packet) {
   }
 }
 
+function validateCount(propertyName, packet) {
+  let count = packet[propertyName];
+  if (!Number.isInteger(count) || count < 0 || count > Number.MAX_SAFE_INTEGER) {
+    throw new Error(
+      `Count in ${
+        propertyName
+      } must be an integer number between 0 and ${
+        Number.MAX_SAFE_INTEGER
+      } inclusive`
+    );
+  }
+}
+
 function validateSignature(propertyName, packet) {
   let signature = packet[propertyName];
   if (typeof signature !== 'string') {
@@ -211,6 +224,7 @@ module.exports = {
   validateWalletAddressValue,
   validatePublicKey,
   validateKeyIndex,
+  validateCount,
   validateSignature,
   validateSignatureHash,
   validateBlockId,
