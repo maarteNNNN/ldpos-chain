@@ -2,8 +2,7 @@ const ADDRESS_BASE_LENGTH = 40;
 const SIGNATURE_LENGTH = 32984;
 const SIGNATURE_HASH_LENGTH = 44;
 const PUBLIC_KEY_LENGTH = 64;
-const ID_BYTE_SIZE = 20;
-const ID_LENGTH = ID_BYTE_SIZE * 2;
+const ID_LENGTH = 40;
 
 function isValidWalletAddress(walletAddress, networkSymbol) {
   if (typeof walletAddress !== 'string') {
@@ -226,7 +225,6 @@ module.exports = {
   validateTimestamp,
   ADDRESS_BASE_LENGTH,
   ID_LENGTH,
-  ID_BYTE_SIZE,
   SIGNATURE_LENGTH,
   SIGNATURE_HASH_LENGTH,
   PUBLIC_KEY_LENGTH

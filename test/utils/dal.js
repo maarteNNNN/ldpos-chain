@@ -1,6 +1,6 @@
 const crypto = require('crypto');
-const { ID_BYTE_SIZE } = require('../../schemas/primitives');
 
+const ID_BYTE_SIZE = 20;
 const DEFAULT_NETWORK_SYMBOL = 'ldpos';
 
 class DAL {
