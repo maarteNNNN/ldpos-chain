@@ -21,7 +21,11 @@ const {
   validateSortOrder
 } = require('./schemas/primitives');
 
-const { LDPOS_PASSWORD } = process.env;
+const {
+  LDPOS_PASSWORD,
+  LDPOS_FORGING_KEY_INDEX
+} = process.env;
+
 const CIPHER_ALGORITHM = 'aes-192-cbc';
 const CIPHER_KEY = LDPOS_PASSWORD ? crypto.scryptSync(LDPOS_PASSWORD, 'salt', 24) : undefined;
 const CIPHER_IV = Buffer.alloc(16, 0);
@@ -1997,6 +2001,7 @@ module.exports = class LDPoSChainModule {
       try {
         ldposClient = createClient({
           walletAddress: options.forgingWalletAddress,
+          forgingKeyIndex: LDPOS_FORGING_KEY_INDEX == null ? null : Number(LDPOS_FORGING_KEY_INDEX),
           adapter: this.dal,
           store: this.dal
         });

@@ -74,10 +74,6 @@ class DAL {
     return this.store[key];
   }
 
-  async deleteItem(key) {
-    delete this.store[key];
-  }
-
   async getNetworkSymbol() {
     return this.networkSymbol;
   }
