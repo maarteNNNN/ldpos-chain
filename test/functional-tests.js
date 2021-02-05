@@ -6,8 +6,14 @@ const MockLDPoSChainModule = require('./utils/chain');
 const { sha256 } = require('./utils/hash');
 const wait = require('./utils/wait');
 const { createClient } = require('ldpos-client');
-
+const { tearDownAllFixtures, destroyConnection } = require('ldpos-knex-dal/test/setup');
 const LDPoSChainModule = require('../index');
+
+let dalLibPath = './test/utils/dal';
+const useKnexDal = process.env.USE_KNEX_DAL;
+if (useKnexDal) {
+  dalLibPath = 'ldpos-knex-dal/src/index'
+}
 
 describe('Functional tests', async () => {
   let chainModule;
@@ -24,11 +30,17 @@ describe('Functional tests', async () => {
   let clientB;
 
   beforeEach(async () => {
+    if (useKnexDal) {
+      try {
+        await tearDownAllFixtures();
+      } catch (e) {
+      }
+    }
     chainModule = new LDPoSChainModule({
       config: {
         components: {
           dal: {
-            libPath: './test/utils/dal'
+            libPath: dalLibPath
           }
         }
       },
@@ -90,7 +102,14 @@ describe('Functional tests', async () => {
     await chainModule.unload();
   });
 
+  after( async () => {
+    if (useKnexDal) {
+      await destroyConnection();
+    }
+  })
+
   describe('block forging', async () => {
+
 
     describe('with a single registered delegate', async () => {
 
@@ -420,7 +439,6 @@ describe('Functional tests', async () => {
     describe('when processing blocks which contain valid multisig transfer transactions', async () => {
 
       beforeEach(async () => {
-
         // Address: ldpos3689799460f1aa80689bfd81bbd20314b616b88e
         multisigClient = createClient({
           adapter,
