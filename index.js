@@ -2001,12 +2001,12 @@ module.exports = class LDPoSChainModule {
       try {
         ldposClient = createClient({
           walletAddress: options.forgingWalletAddress,
-          forgingKeyIndex: LDPOS_FORGING_KEY_INDEX == null ? null : Number(LDPOS_FORGING_KEY_INDEX),
           adapter: this.dal,
           store: this.dal
         });
         await ldposClient.connect({
-          passphrase: forgingPassphrase
+          passphrase: forgingPassphrase,
+          forgingKeyIndex: LDPOS_FORGING_KEY_INDEX == null ? null : Number(LDPOS_FORGING_KEY_INDEX)
         });
       } catch (error) {
         throw new Error(
