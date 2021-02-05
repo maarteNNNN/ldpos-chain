@@ -16,3 +16,8 @@ yarn test
 ```shell script
   yarn test:using-dal-knex
 ```
+
+- Stop postgres
+```shell script
+./scripts/stop-postgres.sh
+``` 
