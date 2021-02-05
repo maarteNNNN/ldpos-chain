@@ -1,7 +1,7 @@
 const crypto = require('crypto');
 
 const ID_BYTE_SIZE = 20;
-const DEFAULT_NETWORK_SYMBOL = 'ldpos';
+// TODO 222 CHange interface to BigInt instead of strings for all money (amounts, fees)...
 
 class DAL {
   constructor() {
@@ -18,7 +18,6 @@ class DAL {
     let { genesis } = options;
     let { accounts } = genesis;
     let multisigWalletList = genesis.multisigWallets || [];
-    this.networkSymbol = genesis.networkSymbol || DEFAULT_NETWORK_SYMBOL;
 
     await Promise.all(
       accounts.map(async (accountInfo) => {
@@ -72,10 +71,6 @@ class DAL {
 
   async loadItem(key) {
     return this.store[key];
-  }
-
-  async getNetworkSymbol() {
-    return this.networkSymbol;
   }
 
   async upsertAccount(account) {
