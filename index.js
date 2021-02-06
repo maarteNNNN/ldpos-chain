@@ -32,6 +32,7 @@ const CIPHER_IV = Buffer.alloc(16, 0);
 
 const DEFAULT_MODULE_ALIAS = 'ldpos_chain';
 const DEFAULT_GENESIS_PATH = './genesis/mainnet/genesis.json';
+const DEFAULT_NETWORK_SYMBOL = 'ldpos';
 const DEFAULT_CRYPTO_CLIENT_LIB_PATH = 'ldpos-client';
 const DEFAULT_DELEGATE_COUNT = 11;
 const DEFAULT_MIN_DELEGATE_BLOCK_SIGNATURE_RATIO = .6;
@@ -2000,12 +2001,14 @@ module.exports = class LDPoSChainModule {
     if (forgingPassphrase) {
       try {
         ldposClient = createClient({
-          walletAddress: options.forgingWalletAddress,
           adapter: this.dal,
-          store: this.dal
+          store: this.dal,
+          networkSymbol: this.networkSymbol,
+          verifyNetwork: false
         });
         await ldposClient.connect({
           passphrase: forgingPassphrase,
+          walletAddress: options.forgingWalletAddress,
           forgingKeyIndex: LDPOS_FORGING_KEY_INDEX == null ? null : Number(LDPOS_FORGING_KEY_INDEX)
         });
       } catch (error) {
@@ -2017,7 +2020,9 @@ module.exports = class LDPoSChainModule {
     } else {
       ldposClient = createClient({
         adapter: this.dal,
-        store: this.dal
+        store: this.dal,
+        networkSymbol: this.networkSymbol,
+        verifyNetwork: false
       });
     }
 
@@ -2918,6 +2923,7 @@ module.exports = class LDPoSChainModule {
         `Failed to initialize from genesis because of error: ${error.message}`
       );
     }
+    this.networkSymbol = this.genesis.networkSymbol || DEFAULT_NETWORK_SYMBOL;
 
     if (!Number.isInteger(this.blockSignaturesToProvide) || this.blockSignaturesToProvide < 0) {
       throw new Error(
@@ -2968,8 +2974,6 @@ module.exports = class LDPoSChainModule {
     await this.channel.invoke('app:updateModuleState', {
       [this.alias]: moduleState
     });
-
-    this.networkSymbol = await this.dal.getNetworkSymbol();
 
     this.startPendingTransactionExpiryLoop();
     this.startTransactionPropagationLoop();

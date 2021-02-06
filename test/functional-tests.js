@@ -9,11 +9,10 @@ const { createClient } = require('ldpos-client');
 const { tearDownAllFixtures, destroyConnection } = require('ldpos-knex-dal/test/setup');
 const LDPoSChainModule = require('../index');
 
-let dalLibPath = './test/utils/dal';
+const NETWORK_SYMBOL = 'ldpos';
+
 const useKnexDal = process.env.USE_KNEX_DAL;
-if (useKnexDal) {
-  dalLibPath = 'ldpos-knex-dal/src/index'
-}
+const dalLibPath = useKnexDal ? 'ldpos-knex-dal/src/index' : './test/utils/dal';
 
 describe('Functional tests', async () => {
   let chainModule;
@@ -129,7 +128,8 @@ describe('Functional tests', async () => {
         await chainModule.load(channel, options);
         clientForger = createClient({
           adapter,
-          store
+          store,
+          networkSymbol: NETWORK_SYMBOL
         });
         await clientForger.connect({
           passphrase: options.forgingPassphrase
@@ -140,7 +140,8 @@ describe('Functional tests', async () => {
 
         clientA = createClient({
           adapter,
-          store
+          store,
+          networkSymbol: NETWORK_SYMBOL
         });
         await clientA.connect({
           passphrase: walletAPassphrase
@@ -249,7 +250,8 @@ describe('Functional tests', async () => {
       await wait(2000);
       clientForger = createClient({
         adapter,
-        store
+        store,
+        networkSymbol: NETWORK_SYMBOL
       });
       await clientForger.connect({
         passphrase: options.forgingPassphrase
@@ -260,7 +262,8 @@ describe('Functional tests', async () => {
 
       clientA = createClient({
         adapter,
-        store
+        store,
+        networkSymbol: NETWORK_SYMBOL
       });
       await clientA.connect({
         passphrase: walletAPassphrase
@@ -442,7 +445,8 @@ describe('Functional tests', async () => {
         // Address: ldpos3689799460f1aa80689bfd81bbd20314b616b88e
         multisigClient = createClient({
           adapter,
-          store
+          store,
+          networkSymbol: NETWORK_SYMBOL
         });
         await multisigClient.connect({
           passphrase: 'guitar sight absurd copper right amount habit boat trigger bundle high pudding'
@@ -451,7 +455,8 @@ describe('Functional tests', async () => {
         // Address: ldpos367429ac94d4204823fba7e79076d794ee0144c5
         clientB = createClient({
           adapter,
-          store
+          store,
+          networkSymbol: NETWORK_SYMBOL
         });
         await clientB.connect({
           passphrase: 'trip timber saddle fine shock orbit lamp nominee subject pledge random wedding'
@@ -553,7 +558,8 @@ describe('Functional tests', async () => {
 
         multisigClient = createClient({
           adapter,
-          store
+          store,
+          networkSymbol: NETWORK_SYMBOL
         });
         await multisigClient.connect({
           passphrase: 'guitar sight absurd copper right amount habit boat trigger bundle high pudding'
@@ -561,7 +567,8 @@ describe('Functional tests', async () => {
 
         clientB = createClient({
           adapter,
-          store
+          store,
+          networkSymbol: NETWORK_SYMBOL
         });
         await clientB.connect({
           passphrase: 'trip timber saddle fine shock orbit lamp nominee subject pledge random wedding'
@@ -673,7 +680,8 @@ describe('Functional tests', async () => {
       await chainModule.load(channel, options);
       clientForger = createClient({
         adapter,
-        store
+        store,
+        networkSymbol: NETWORK_SYMBOL
       });
       await clientForger.connect({
         passphrase: options.forgingPassphrase
@@ -684,7 +692,8 @@ describe('Functional tests', async () => {
 
       clientA = createClient({
         adapter,
-        store
+        store,
+        networkSymbol: NETWORK_SYMBOL
       });
       await clientA.connect({
         passphrase: walletAPassphrase
@@ -714,7 +723,8 @@ describe('Functional tests', async () => {
 
         firstRecipientClient = createClient({
           adapter,
-          store
+          store,
+          networkSymbol: NETWORK_SYMBOL
         });
         // Address: ldposc917fe4c2a3a323fd221d4df44bb9ad0a3ecc3c8
         await firstRecipientClient.connect({
@@ -821,7 +831,8 @@ describe('Functional tests', async () => {
       await chainModule.load(channel, options);
       clientForger = createClient({
         adapter,
-        store
+        store,
+        networkSymbol: NETWORK_SYMBOL
       });
       await clientForger.connect({
         passphrase: options.forgingPassphrase
@@ -832,7 +843,8 @@ describe('Functional tests', async () => {
 
       clientA = createClient({
         adapter,
-        store
+        store,
+        networkSymbol: NETWORK_SYMBOL
       });
       await clientA.connect({
         passphrase: walletAPassphrase
@@ -970,7 +982,8 @@ describe('Functional tests', async () => {
       await chainModule.load(channel, options);
       clientForger = createClient({
         adapter,
-        store
+        store,
+        networkSymbol: NETWORK_SYMBOL
       });
       await clientForger.connect({
         passphrase: options.forgingPassphrase
@@ -981,7 +994,8 @@ describe('Functional tests', async () => {
 
       clientA = createClient({
         adapter,
-        store
+        store,
+        networkSymbol: NETWORK_SYMBOL
       });
       await clientA.connect({
         passphrase: walletAPassphrase
@@ -1079,7 +1093,8 @@ describe('Functional tests', async () => {
       await chainModule.load(channel, options);
       clientForger = createClient({
         adapter,
-        store
+        store,
+        networkSymbol: NETWORK_SYMBOL
       });
       await clientForger.connect({
         passphrase: options.forgingPassphrase
@@ -1088,7 +1103,8 @@ describe('Functional tests', async () => {
       // Address: ldpos1f4db4c3ae469a987776493d47a81a70c245ed00
       clientA = createClient({
         adapter,
-        store
+        store,
+        networkSymbol: NETWORK_SYMBOL
       });
       await clientA.connect({
         passphrase: 'birth select quiz process bid raccoon memory village snow cable agent bean'
@@ -1097,7 +1113,8 @@ describe('Functional tests', async () => {
       // Address: ldpos367429ac94d4204823fba7e79076d794ee0144c5
       clientB = createClient({
         adapter,
-        store
+        store,
+        networkSymbol: NETWORK_SYMBOL
       });
       await clientB.connect({
         passphrase: 'trip timber saddle fine shock orbit lamp nominee subject pledge random wedding'
@@ -1295,7 +1312,8 @@ describe('Functional tests', async () => {
       await chainModule.load(channel, options);
       clientForger = createClient({
         adapter,
-        store
+        store,
+        networkSymbol: NETWORK_SYMBOL
       });
       await clientForger.connect({
         passphrase: options.forgingPassphrase
@@ -1304,7 +1322,8 @@ describe('Functional tests', async () => {
       // Address: ldpos1f4db4c3ae469a987776493d47a81a70c245ed00
       clientA = createClient({
         adapter,
-        store
+        store,
+        networkSymbol: NETWORK_SYMBOL
       });
       await clientA.connect({
         passphrase: 'birth select quiz process bid raccoon memory village snow cable agent bean'
@@ -1425,7 +1444,8 @@ describe('Functional tests', async () => {
       await chainModule.load(channel, options);
       clientForger = createClient({
         adapter,
-        store
+        store,
+        networkSymbol: NETWORK_SYMBOL
       });
       await clientForger.connect({
         passphrase: options.forgingPassphrase
@@ -1434,7 +1454,8 @@ describe('Functional tests', async () => {
       // Address: ldpos1f4db4c3ae469a987776493d47a81a70c245ed00
       clientA = createClient({
         adapter,
-        store
+        store,
+        networkSymbol: NETWORK_SYMBOL
       });
       await clientA.connect({
         passphrase: 'birth select quiz process bid raccoon memory village snow cable agent bean'
@@ -1532,7 +1553,8 @@ describe('Functional tests', async () => {
       await chainModule.load(channel, options);
       clientForger = createClient({
         adapter,
-        store
+        store,
+        networkSymbol: NETWORK_SYMBOL
       });
       await clientForger.connect({
         passphrase: options.forgingPassphrase
@@ -1541,7 +1563,8 @@ describe('Functional tests', async () => {
       // Address: ldpos1f4db4c3ae469a987776493d47a81a70c245ed00
       clientA = createClient({
         adapter,
-        store
+        store,
+        networkSymbol: NETWORK_SYMBOL
       });
       await clientA.connect({
         passphrase: 'birth select quiz process bid raccoon memory village snow cable agent bean'
