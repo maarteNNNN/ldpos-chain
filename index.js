@@ -615,7 +615,15 @@ module.exports = class LDPoSChainModule {
             this.delegateCount,
             this.networkSymbol
           );
-          let senderAccountDetails = await this.verifyFullySignedBlock(block, this.lastProcessedBlock);
+
+          let {
+            senderAccountDetails,
+            delegateChangedKeys
+          } = await this.verifyFullySignedBlock(block, this.lastProcessedBlock);
+
+          if (!this.blockMeetsRequirements(block, delegateChangedKeys)) {
+            throw new Error(`Block ${block.id} did not meet processing requirements`);
+          }
           await this.processBlock(block, senderAccountDetails, true);
         } catch (error) {
           this.logger.warn(
@@ -1265,6 +1273,10 @@ module.exports = class LDPoSChainModule {
     this.logger.info(`Finished processing block ${block.id} at height ${block.height}`);
   }
 
+  async blockMeetsRequirements(block, delegateChangedKeys) {
+    return block.transactions.length >= this.minTransactionsPerBlock || delegateChangedKeys;
+  }
+
   async verifyTransactionDoesNotAlreadyExist(transaction) {
     let { id } = transaction;
     let wasTransactionAlreadyProcessed;
@@ -1612,13 +1624,13 @@ module.exports = class LDPoSChainModule {
   }
 
   async verifyFullySignedBlock(block, lastBlock) {
-    let { senderAccountDetails } = await this.verifyForgedBlock(block, lastBlock);
+    let blockInfo = await this.verifyForgedBlock(block, lastBlock);
 
     await Promise.all(
       block.signatures.map(blockSignature => this.verifyBlockSignature(block, blockSignature))
     );
 
-    return senderAccountDetails;
+    return blockInfo;
   }
 
   async verifyForgedBlock(block, lastBlock) {
@@ -2266,7 +2278,7 @@ module.exports = class LDPoSChainModule {
             this.logger.info(`Received a sufficient number of valid delegate signatures for block ${block.id}`);
 
             // Only process the block if it has transactions or if the forging delegate wants to change their forging key.
-            if (block.transactions.length >= this.minTransactionsPerBlock || delegateChangedKeys) {
+            if (this.blockMeetsRequirements(block, delegateChangedKeys)) {
               await this.processBlock(block, senderAccountDetails, false);
               this.lastFullySignedBlock = block;
 
