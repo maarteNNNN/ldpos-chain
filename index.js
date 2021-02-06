@@ -2004,7 +2004,8 @@ module.exports = class LDPoSChainModule {
           walletAddress: options.forgingWalletAddress,
           adapter: this.dal,
           store: this.dal,
-          networkSymbol: this.networkSymbol
+          networkSymbol: this.networkSymbol,
+          verifyNetwork: false
         });
         await ldposClient.connect({
           passphrase: forgingPassphrase,
@@ -2020,7 +2021,8 @@ module.exports = class LDPoSChainModule {
       ldposClient = createClient({
         adapter: this.dal,
         store: this.dal,
-        networkSymbol: this.networkSymbol
+        networkSymbol: this.networkSymbol,
+        verifyNetwork: false
       });
     }
 

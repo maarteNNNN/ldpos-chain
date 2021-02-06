@@ -9,6 +9,8 @@ const { createClient } = require('ldpos-client');
 
 const LDPoSChainModule = require('../index');
 
+const NETWORK_SYMBOL = 'ldpos';
+
 // This test suite can be adapted to check whether or not a custom chain module is compatible with Lisk DEX.
 // All the boilerplate can be modified except the 'it' blocks where the assertions are made.
 // If a module passes all the test case cases in this file, then it is compatible with Lisk DEX.
@@ -90,7 +92,8 @@ describe('DEX API tests', async () => {
       await chainModule.load(channel, moduleOptions);
       clientForger = createClient({
         adapter,
-        store
+        store,
+        networkSymbol: NETWORK_SYMBOL
       });
       await clientForger.connect({
         passphrase: moduleOptions.forgingPassphrase
@@ -226,7 +229,8 @@ describe('DEX API tests', async () => {
 
       clientA = createClient({
         adapter,
-        store
+        store,
+        networkSymbol: NETWORK_SYMBOL
       });
       await clientA.connect({
         passphrase: multisigMemberAPassphrase
@@ -234,7 +238,8 @@ describe('DEX API tests', async () => {
 
       clientB = createClient({
         adapter,
-        store
+        store,
+        networkSymbol: NETWORK_SYMBOL
       });
       await clientB.connect({
         passphrase: multisigMemberBPassphrase
