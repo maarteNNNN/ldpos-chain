@@ -4,7 +4,8 @@
   "description": "LDPoS chain module",
   "main": "index.js",
   "scripts": {
-    "test": "mocha --reporter spec --timeout 40000 --slow 40000"
+    "test": "mocha --reporter spec --timeout 40000 --slow 40000",
+    "test:using-dal-knex": "USE_KNEX_DAL=true mocha --reporter spec --timeout 40000 --slow 40000"
   },
   "keywords": [
     "blockchain",
@@ -15,6 +16,7 @@
   "dependencies": {
     "bip39": "^3.0.3",
     "ldpos-client": "^4.1.0",
+    "ldpos-knex-dal": "git://github.com/Leasehold/ldpos-knex-dal/",
     "lodash.shuffle": "^4.2.0",
     "proper-merkle": "^3.1.1",
     "writable-consumable-stream": "^2.0.0"
