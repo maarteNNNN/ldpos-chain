@@ -30,10 +30,7 @@ describe('Functional tests', async () => {
 
   beforeEach(async () => {
     if (useKnexDal) {
-      try {
-        await tearDownAllFixtures();
-      } catch (e) {
-      }
+      await tearDownAllFixtures();
     }
     chainModule = new LDPoSChainModule({
       config: {
@@ -101,14 +98,13 @@ describe('Functional tests', async () => {
     await chainModule.unload();
   });
 
-  after( async () => {
+  after(async () => {
     if (useKnexDal) {
       await destroyConnection();
     }
-  })
+  });
 
   describe('block forging', async () => {
-
 
     describe('with a single registered delegate', async () => {
 
