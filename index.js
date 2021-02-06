@@ -2617,11 +2617,20 @@ module.exports = class LDPoSChainModule {
     let channel = this.channel;
     channel.subscribe(`network:event:${this.alias}:block`, async (event) => {
       let block = event.data;
+      this.logger.info(`Received block ${block && block.id}`);
 
       let senderAccountDetails;
       let delegateChangedKeys;
       try {
         validateBlockSchema(block, 0, this.maxTransactionsPerBlock, 0, 0, this.networkSymbol);
+
+        if (block.id === this.lastReceivedBlock.id) {
+          this.logger.debug(
+            new Error(`Block ${block.id} has already been received before`)
+          );
+          return;
+        }
+
         let blockInfo = await this.verifyForgedBlock(block, this.lastProcessedBlock);
         senderAccountDetails = blockInfo.senderAccountDetails;
         delegateChangedKeys = blockInfo.delegateChangedKeys;
@@ -2636,14 +2645,6 @@ module.exports = class LDPoSChainModule {
           new Error(
             `Received invalid block ${block && block.id} - ${error.message}`
           )
-        );
-        return;
-      }
-      this.logger.info(`Received block ${block.id}`);
-
-      if (block.id === this.lastReceivedBlock.id) {
-        this.logger.debug(
-          new Error(`Block ${block.id} has already been received before`)
         );
         return;
       }
