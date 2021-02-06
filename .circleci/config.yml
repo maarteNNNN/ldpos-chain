@@ -50,6 +50,7 @@ jobs:
             [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
             export PATH="$HOME/.yarn/bin:$HOME/.config/yarn/global/node_modules/.bin:$PATH"
             nvm use 12.18.2
+            yarn install
             ./scripts/start-postgres.sh
           background: true
       - run:
@@ -74,6 +75,7 @@ jobs:
             [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
             export PATH="$HOME/.yarn/bin:$HOME/.config/yarn/global/node_modules/.bin:$PATH"
             nvm use 12.18.2
+            yarn install
             ./scripts/stop-postgres.sh
 
 workflows:
