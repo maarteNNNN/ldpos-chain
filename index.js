@@ -2114,6 +2114,7 @@ module.exports = class LDPoSChainModule {
           });
 
           if (!this.isActive) {
+            this.resolveUnload();
             break;
           }
 
@@ -3024,8 +3025,11 @@ module.exports = class LDPoSChainModule {
   }
 
   async unload() {
-    this.isActive = false;
     clearInterval(this._pendingTransactionExpiryCheckIntervalId);
+    await new Promise((resolve) => {
+      this.resolveUnload = resolve;
+      this.isActive = false;
+    });
   }
 
   async wait(duration) {

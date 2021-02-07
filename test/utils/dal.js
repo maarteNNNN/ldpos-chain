@@ -1,7 +1,6 @@
 const crypto = require('crypto');
 
 const ID_BYTE_SIZE = 20;
-// TODO 222 CHange interface to BigInt instead of strings for all money (amounts, fees)...
 
 class DAL {
   constructor() {
