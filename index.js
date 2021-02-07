@@ -2209,9 +2209,12 @@ module.exports = class LDPoSChainModule {
 
             let pendingTransactions = this.sortPendingTransactions(validTransactions);
             let blockTransactions = pendingTransactions.slice(0, maxTransactionsPerBlock).map(txn => this.simplifyTransaction(txn, true));
-            let previousForgingPublicKey = this.ldposClient.forgingPublicKey;
-            block = await this.forgeBlock(nextHeight, blockTimestamp, blockTransactions);
-            delegateChangedKeys = this.ldposClient.forgingPublicKey !== previousForgingPublicKey;
+            let [ forgedBlock, forgerAccount ] = await Promise.all([
+              this.forgeBlock(nextHeight, blockTimestamp, blockTransactions),
+              this.dal.getAccount(forgingWalletAddress)
+            ]);
+            block = forgedBlock;
+            delegateChangedKeys = block.forgingPublicKey !== forgerAccount.forgingPublicKey;
 
             this.lastReceivedSignerAddressSet.clear();
             this.lastReceivedBlock = block;
