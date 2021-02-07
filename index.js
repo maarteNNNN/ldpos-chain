@@ -1273,7 +1273,7 @@ module.exports = class LDPoSChainModule {
     this.logger.info(`Finished processing block ${block.id} at height ${block.height}`);
   }
 
-  async blockMeetsRequirements(block, delegateChangedKeys) {
+  blockMeetsRequirements(block, delegateChangedKeys) {
     return block.transactions.length >= this.minTransactionsPerBlock || delegateChangedKeys;
   }
 
