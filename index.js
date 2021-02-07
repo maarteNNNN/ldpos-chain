@@ -2023,6 +2023,12 @@ module.exports = class LDPoSChainModule {
           walletAddress: options.forgingWalletAddress,
           forgingKeyIndex: LDPOS_FORGING_KEY_INDEX == null ? null : Number(LDPOS_FORGING_KEY_INDEX)
         });
+        let wasKeyIndexUpdated = await ldposClient.syncKeyIndex('forging');
+        if (wasKeyIndexUpdated) {
+          this.logger.info(
+            `The delegate forging key index was shifted to ${ldposClient.forgingKeyIndex}`
+          );
+        }
       } catch (error) {
         throw new Error(
           `Failed to initialize forging because of error: ${error.message}`
