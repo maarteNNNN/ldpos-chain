@@ -56,7 +56,8 @@ jobs:
       - run:
           name: Wait for DB
           command: |
-            ./node_modules/ldpos-knex-dal/wait-for-it.sh -h localhost -p 5454
+            set +e
+            node_modules/ldpos-knex-dal/wait-for-it.sh -h localhost -p 5454
       - run:
           name: Run integration tests
           command: |
