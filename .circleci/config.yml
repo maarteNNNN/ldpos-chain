@@ -51,7 +51,7 @@ jobs:
             export PATH="$HOME/.yarn/bin:$HOME/.config/yarn/global/node_modules/.bin:$PATH"
             nvm use 12.18.2
             yarn install
-            ./scripts/start-postgres.sh
+            yarn start:postgres
           background: true
       - run:
           name: Wait for DB
@@ -76,7 +76,7 @@ jobs:
             export PATH="$HOME/.yarn/bin:$HOME/.config/yarn/global/node_modules/.bin:$PATH"
             nvm use 12.18.2
             yarn install
-            ./scripts/stop-postgres.sh
+            yarn stop:postgres
 
 workflows:
   test:
