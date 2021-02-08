@@ -1,6 +1,6 @@
 {
   "name": "ldpos-chain",
-  "version": "1.5.1",
+  "version": "1.5.2",
   "description": "LDPoS chain module",
   "main": "index.js",
   "scripts": {
@@ -22,7 +22,7 @@
   "dependencies": {
     "bip39": "^3.0.3",
     "ldpos-client": "^4.2.0",
-    "ldpos-knex-dal": "^1.0.2",
+    "ldpos-knex-dal": "https://github.com/Leasehold/ldpos-knex-dal",
     "lodash.shuffle": "^4.2.0",
     "proper-merkle": "^3.1.1",
     "writable-consumable-stream": "^2.0.0"

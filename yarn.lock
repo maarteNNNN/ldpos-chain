@@ -988,18 +988,18 @@ knex@^0.21.16:
     tildify "2.0.0"
     v8flags "^3.2.0"
 
-ldpos-client@^4.0.3:
-  version "4.0.3"
-  resolved "https://registry.yarnpkg.com/ldpos-client/-/ldpos-client-4.0.3.tgz#bb7c71521fb2d6b9d8fdf6f984d84b3cd5e6716f"
-  integrity sha512-azjCjM3xXF6V2nOZ0OnlyyD8Tjy4dTsYVD1ypjIoctpsGhzs+PzAwgJZkKkVp3UyLJyYsxzlVqWkdP3dopqujQ==
+ldpos-client@^4.2.0:
+  version "4.2.0"
+  resolved "https://registry.yarnpkg.com/ldpos-client/-/ldpos-client-4.2.0.tgz#898bf77c7734435395773d1bc74b469300e57002"
+  integrity sha512-36JpZiJzDECqHFwCCVOyMpT3E2gZ1GqxHklb2jbM3EqMuB2iEG7gOSmT3L9gZlO5CIBaaAeJP2e9exEESUcAxw==
   dependencies:
     bip39 "^3.0.3"
     proper-merkle "^3.1.1"
     socketcluster-client "^16.0.1"
 
-"ldpos-knex-dal@git://github.com/Leasehold/ldpos-knex-dal/":
-  version "1.0.0"
-  resolved "git://github.com/Leasehold/ldpos-knex-dal/#8899f79b1c21ee2ae911956938404cdde91d9145"
+"ldpos-knex-dal@https://github.com/Leasehold/ldpos-knex-dal":
+  version "1.0.2"
+  resolved "https://github.com/Leasehold/ldpos-knex-dal#aa7024f892113426b61c99ac1b98d9f922104de7"
   dependencies:
     knex "^0.21.16"
     pg "^8.5.1"
