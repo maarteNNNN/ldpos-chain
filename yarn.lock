@@ -999,7 +999,7 @@ ldpos-client@^4.2.0:
 
 "ldpos-knex-dal@https://github.com/Leasehold/ldpos-knex-dal":
   version "1.0.2"
-  resolved "https://github.com/Leasehold/ldpos-knex-dal#aa7024f892113426b61c99ac1b98d9f922104de7"
+  resolved "https://github.com/Leasehold/ldpos-knex-dal#4f4d61797d51b8b9b58b1e1a8551fbfcd0cf6dbc"
   dependencies:
     knex "^0.21.16"
     pg "^8.5.1"
