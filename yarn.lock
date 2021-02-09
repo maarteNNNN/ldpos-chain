@@ -997,9 +997,10 @@ ldpos-client@^4.2.0:
     proper-merkle "^3.1.1"
     socketcluster-client "^16.0.1"
 
-"ldpos-knex-dal@https://github.com/Leasehold/ldpos-knex-dal":
-  version "1.0.2"
-  resolved "https://github.com/Leasehold/ldpos-knex-dal#4f4d61797d51b8b9b58b1e1a8551fbfcd0cf6dbc"
+ldpos-knex-dal@^1.0.4:
+  version "1.0.4"
+  resolved "https://registry.yarnpkg.com/ldpos-knex-dal/-/ldpos-knex-dal-1.0.4.tgz#8316959981b04120641c58b3c835856e9ef60be5"
+  integrity sha512-34tgyqFJWyIEEc2VdkdBbPA5uuaErMAISugZgzx8HomNwLV1+eH5+zdYkfPrZMw+IC4jp/n03FXYBlnNUbBD6A==
   dependencies:
     knex "^0.21.16"
     pg "^8.5.1"

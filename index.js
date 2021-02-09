@@ -34,8 +34,8 @@ const DEFAULT_MODULE_ALIAS = 'ldpos_chain';
 const DEFAULT_GENESIS_PATH = './genesis/mainnet/genesis.json';
 const DEFAULT_NETWORK_SYMBOL = 'ldpos';
 const DEFAULT_CRYPTO_CLIENT_LIB_PATH = 'ldpos-client';
-const DEFAULT_DELEGATE_COUNT = 11;
-const DEFAULT_MIN_DELEGATE_BLOCK_SIGNATURE_RATIO = .6;
+const DEFAULT_FORGER_COUNT = 11;
+const DEFAULT_MIN_FORGER_BLOCK_SIGNATURE_RATIO = .6;
 const DEFAULT_BLOCK_SIGNATURES_TO_PROVIDE = 6;
 const DEFAULT_BLOCK_SIGNATURES_TO_FETCH = 6;
 const DEFAULT_BLOCK_SIGNATURES_INDICATOR = 'bsi';
@@ -612,7 +612,7 @@ module.exports = class LDPoSChainModule {
             0,
             this.maxTransactionsPerBlock,
             requiredBlockSignatureCount,
-            this.delegateCount,
+            this.forgerCount,
             this.networkSymbol
           );
 
@@ -772,7 +772,7 @@ module.exports = class LDPoSChainModule {
   }
 
   async fetchTopActiveDelegates() {
-    this.topActiveDelegates = await this.dal.getDelegatesByVoteWeight(0, this.delegateCount, 'desc');
+    this.topActiveDelegates = await this.dal.getDelegatesByVoteWeight(0, this.forgerCount, 'desc');
     this.topActiveDelegateAddressSet = new Set(this.topActiveDelegates.map(delegate => delegate.address));
   }
 
@@ -1988,7 +1988,7 @@ module.exports = class LDPoSChainModule {
       forgingInterval,
       forgingBlockBroadcastDelay,
       forgingSignatureBroadcastDelay,
-      delegateCount,
+      forgerCount,
       fetchBlockLimit,
       fetchBlockPause,
       fetchBlockEndConfirmations,
@@ -2092,8 +2092,8 @@ module.exports = class LDPoSChainModule {
     (async () => {
       try {
         while (true) {
-          let activeDelegateCount = Math.min(this.topActiveDelegates.length, delegateCount);
-          let blockSignerMajorityCount = Math.floor(activeDelegateCount * this.minDelegateBlockSignatureRatio);
+          let activeDelegateCount = Math.min(this.topActiveDelegates.length, forgerCount);
+          let blockSignerMajorityCount = Math.floor(activeDelegateCount * this.minForgerBlockSignatureRatio);
           let requiredBlockSignatureCountDuringCatchUp = Math.min(blockSignerMajorityCount, this.blockSignaturesToFetch);
 
           // If the node is already on the latest network height, it will just return it.
@@ -2862,8 +2862,8 @@ module.exports = class LDPoSChainModule {
 
     let defaultOptions = {
       forgingInterval: DEFAULT_FORGING_INTERVAL,
-      delegateCount: DEFAULT_DELEGATE_COUNT,
-      minDelegateBlockSignatureRatio: DEFAULT_MIN_DELEGATE_BLOCK_SIGNATURE_RATIO,
+      forgerCount: DEFAULT_FORGER_COUNT,
+      minForgerBlockSignatureRatio: DEFAULT_MIN_FORGER_BLOCK_SIGNATURE_RATIO,
       blockSignaturesToProvide: DEFAULT_BLOCK_SIGNATURES_TO_PROVIDE,
       blockSignaturesToFetch: DEFAULT_BLOCK_SIGNATURES_TO_FETCH,
       blockSignaturesIndicator: DEFAULT_BLOCK_SIGNATURES_INDICATOR,
@@ -2908,8 +2908,8 @@ module.exports = class LDPoSChainModule {
     this.minTransactionFees = minTransactionFees;
 
     this.forgingInterval = this.options.forgingInterval;
-    this.delegateCount = this.options.delegateCount;
-    this.minDelegateBlockSignatureRatio = this.options.minDelegateBlockSignatureRatio;
+    this.forgerCount = this.options.forgerCount;
+    this.minForgerBlockSignatureRatio = this.options.minForgerBlockSignatureRatio;
     this.blockSignaturesToProvide = this.options.blockSignaturesToProvide;
     this.blockSignaturesToFetch = this.options.blockSignaturesToFetch;
     this.blockSignaturesIndicator = this.options.blockSignaturesIndicator;
@@ -2929,9 +2929,9 @@ module.exports = class LDPoSChainModule {
     this.maxPublicAPILimit = this.options.maxPublicAPILimit;
     this.maxPrivateAPILimit = this.options.maxPrivateAPILimit;
 
-    if (this.minDelegateBlockSignatureRatio < 0.5) {
+    if (this.minForgerBlockSignatureRatio < 0.5) {
       throw new Error(
-        `The minDelegateBlockSignatureRatio option cannot be less than 0.5`
+        `The minForgerBlockSignatureRatio option cannot be less than 0.5`
       );
     }
 
@@ -2975,7 +2975,7 @@ module.exports = class LDPoSChainModule {
       moduleState[`${this.blockSignaturesIndicator}${i}`] = 1;
     }
 
-    let majorityBlockSignatureCount = Math.floor(this.delegateCount * this.minDelegateBlockSignatureRatio);
+    let majorityBlockSignatureCount = Math.floor(this.forgerCount * this.minForgerBlockSignatureRatio);
 
     if (this.blockSignaturesToProvide >= majorityBlockSignatureCount) {
       moduleState.providesMostBlockSignatures = true;
@@ -2990,7 +2990,7 @@ module.exports = class LDPoSChainModule {
         )
       );
     }
-    if (this.blockSignaturesToProvide >= this.delegateCount - 1) {
+    if (this.blockSignaturesToProvide >= this.forgerCount - 1) {
       moduleState.providesAllBlockSignatures = true;
     }
 
