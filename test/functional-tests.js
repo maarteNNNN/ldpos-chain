@@ -30,7 +30,11 @@ describe('Functional tests', async () => {
 
   beforeEach(async () => {
     if (useKnexDal) {
-      await tearDownAllFixtures();
+      try {
+        await tearDownAllFixtures();
+      } catch (error) {
+        console.error(error);
+      }
     }
     chainModule = new LDPoSChainModule({
       config: {
