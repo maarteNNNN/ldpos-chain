@@ -14,7 +14,7 @@ const NETWORK_SYMBOL = 'ldpos';
 const useKnexDal = process.env.USE_KNEX_DAL;
 const dalLibPath = useKnexDal ? 'ldpos-knex-dal/src/index' : './test/utils/dal';
 
-describe('Functional tests', async () => {
+describe.only('Functional tests', async () => {
   let chainModule;
   let dal;
   let adapter;
@@ -33,7 +33,7 @@ describe('Functional tests', async () => {
       try {
         await tearDownAllFixtures();
       } catch (error) {
-        console.error(error);
+        console.debug(error.message);
       }
     }
     chainModule = new LDPoSChainModule({
@@ -113,7 +113,7 @@ describe('Functional tests', async () => {
     describe('with a single registered delegate', async () => {
 
       beforeEach(async () => {
-        // Forger address: ldposfacd5ebf967ebd87436bd5932a58168b9a1151e3
+        // Forger address: ldpos313ac2d3d1d081901be0c5ce074d1e81a8a0bf5f
         options = {
           genesisPath: './test/utils/genesis-functional.json',
           forgingPassphrase: 'clerk aware give dog reopen peasant duty cheese tobacco trouble gold angle',
@@ -135,7 +135,7 @@ describe('Functional tests', async () => {
           passphrase: options.forgingPassphrase
         });
 
-        // Address: ldpos1f4db4c3ae469a987776493d47a81a70c245ed00
+        // Address: ldpos5f0bc55450657f7fcb188e90122f7e4cee894199
         walletAPassphrase = 'birth select quiz process bid raccoon memory village snow cable agent bean';
 
         clientA = createClient({
@@ -173,7 +173,7 @@ describe('Functional tests', async () => {
             let block = newBlocks[i];
             assert.equal(block.height, i + 1);
             assert.equal(block.timestamp % 5000, 0);
-            assert.equal(block.forgerAddress, 'ldposfacd5ebf967ebd87436bd5932a58168b9a1151e3');
+            assert.equal(block.forgerAddress, 'ldpos313ac2d3d1d081901be0c5ce074d1e81a8a0bf5f');
             assert.equal(typeof block.forgingPublicKey, 'string');
             assert.equal(typeof block.nextForgingPublicKey, 'string');
             assert.equal(typeof block.nextForgingKeyIndex, 'number');
@@ -193,7 +193,7 @@ describe('Functional tests', async () => {
             // Recipient passphrase: genius shoulder into daring armor proof cycle bench patrol paper grant picture
             let preparedTxn = await clientA.prepareTransaction({
               type: 'transfer',
-              recipientAddress: 'ldposc917fe4c2a3a323fd221d4df44bb9ad0a3ecc3c8',
+              recipientAddress: 'ldpos3a7bb5751c811b76bf13edce4105b5b330a71054',
               amount: `${i + 1}00000000`,
               fee: `${i + 1}0000000`,
               timestamp: 100000,
@@ -257,7 +257,7 @@ describe('Functional tests', async () => {
         passphrase: options.forgingPassphrase
       });
 
-      // Address: ldpos1f4db4c3ae469a987776493d47a81a70c245ed00
+      // Address: ldpos5f0bc55450657f7fcb188e90122f7e4cee894199
       walletAPassphrase = 'birth select quiz process bid raccoon memory village snow cable agent bean';
 
       clientA = createClient({
@@ -279,7 +279,7 @@ describe('Functional tests', async () => {
           // Recipient passphrase: genius shoulder into daring armor proof cycle bench patrol paper grant picture
           let preparedTxn = await clientA.prepareTransaction({
             type: 'transfer',
-            recipientAddress: 'ldposc917fe4c2a3a323fd221d4df44bb9ad0a3ecc3c8',
+            recipientAddress: 'ldpos3a7bb5751c811b76bf13edce4105b5b330a71054',
             amount: `${i + 1}00000000`,
             fee: `${i + 1}0000000`,
             timestamp: 100000,
@@ -329,7 +329,7 @@ describe('Functional tests', async () => {
           }),
           chainModule.actions.getAccount.handler({
             params: {
-              walletAddress: 'ldposc917fe4c2a3a323fd221d4df44bb9ad0a3ecc3c8'
+              walletAddress: 'ldpos3a7bb5751c811b76bf13edce4105b5b330a71054'
             }
           })
         ]);
@@ -365,7 +365,7 @@ describe('Functional tests', async () => {
           // Recipient passphrase: genius shoulder into daring armor proof cycle bench patrol paper grant picture
           let preparedTxn = await clientA.prepareTransaction({
             type: 'transfer',
-            recipientAddress: 'ldposc917fe4c2a3a323fd221d4df44bb9ad0a3ecc3c8',
+            recipientAddress: 'ldpos3a7bb5751c811b76bf13edce4105b5b330a71054',
             amount: `${i + 1}00000000`,
             fee: `${i + 1}0000000`,
             timestamp: 100000,
@@ -424,7 +424,7 @@ describe('Functional tests', async () => {
           }),
           chainModule.actions.getAccount.handler({
             params: {
-              walletAddress: 'ldposc917fe4c2a3a323fd221d4df44bb9ad0a3ecc3c8'
+              walletAddress: 'ldpos3a7bb5751c811b76bf13edce4105b5b330a71054'
             }
           })
         ]);
@@ -442,7 +442,7 @@ describe('Functional tests', async () => {
     describe('when processing blocks which contain valid multisig transfer transactions', async () => {
 
       beforeEach(async () => {
-        // Address: ldpos3689799460f1aa80689bfd81bbd20314b616b88e
+        // Address: ldpos6da4367efe495a14a8cc38064c61879cea884e60
         multisigClient = createClient({
           adapter,
           store,
@@ -452,7 +452,7 @@ describe('Functional tests', async () => {
           passphrase: 'guitar sight absurd copper right amount habit boat trigger bundle high pudding'
         });
 
-        // Address: ldpos367429ac94d4204823fba7e79076d794ee0144c5
+        // Address: ldposaed82ed3f324e738306301ca4d6b955580d4bc24
         clientB = createClient({
           adapter,
           store,
@@ -468,7 +468,7 @@ describe('Functional tests', async () => {
           // Recipient passphrase: genius shoulder into daring armor proof cycle bench patrol paper grant picture
           let preparedTxn = multisigClient.prepareMultisigTransaction({
             type: 'transfer',
-            recipientAddress: 'ldposc917fe4c2a3a323fd221d4df44bb9ad0a3ecc3c8',
+            recipientAddress: 'ldpos3a7bb5751c811b76bf13edce4105b5b330a71054',
             amount: `${i + 1}00000000`,
             fee: `${i + 1}0000000`,
             timestamp: 100000,
@@ -525,7 +525,7 @@ describe('Functional tests', async () => {
           }),
           chainModule.actions.getAccount.handler({
             params: {
-              walletAddress: 'ldposc917fe4c2a3a323fd221d4df44bb9ad0a3ecc3c8'
+              walletAddress: 'ldpos3a7bb5751c811b76bf13edce4105b5b330a71054'
             }
           })
         ]);
@@ -580,7 +580,7 @@ describe('Functional tests', async () => {
           // Recipient passphrase: genius shoulder into daring armor proof cycle bench patrol paper grant picture
           let preparedTxn = multisigClient.prepareMultisigTransaction({
             type: 'transfer',
-            recipientAddress: 'ldposc917fe4c2a3a323fd221d4df44bb9ad0a3ecc3c8',
+            recipientAddress: 'ldpos3a7bb5751c811b76bf13edce4105b5b330a71054',
             amount: `${i + 1}00000000`,
             fee: `${i + 1}0000000`,
             timestamp: 100000,
@@ -646,7 +646,7 @@ describe('Functional tests', async () => {
           }),
           chainModule.actions.getAccount.handler({
             params: {
-              walletAddress: 'ldposc917fe4c2a3a323fd221d4df44bb9ad0a3ecc3c8'
+              walletAddress: 'ldpos3a7bb5751c811b76bf13edce4105b5b330a71054'
             }
           })
         ]);
@@ -687,7 +687,7 @@ describe('Functional tests', async () => {
         passphrase: options.forgingPassphrase
       });
 
-      // Address: ldpos1f4db4c3ae469a987776493d47a81a70c245ed00
+      // Address: ldpos5f0bc55450657f7fcb188e90122f7e4cee894199
       walletAPassphrase = 'birth select quiz process bid raccoon memory village snow cable agent bean';
 
       clientA = createClient({
@@ -707,7 +707,7 @@ describe('Functional tests', async () => {
       beforeEach(async () => {
         let preparedTxn = await clientA.prepareTransaction({
           type: 'transfer',
-          recipientAddress: 'ldposc917fe4c2a3a323fd221d4df44bb9ad0a3ecc3c8',
+          recipientAddress: 'ldpos3a7bb5751c811b76bf13edce4105b5b330a71054',
           amount: '10000000000',
           fee: '10000000',
           timestamp: 100000,
@@ -726,7 +726,7 @@ describe('Functional tests', async () => {
           store,
           networkSymbol: NETWORK_SYMBOL
         });
-        // Address: ldposc917fe4c2a3a323fd221d4df44bb9ad0a3ecc3c8
+        // Address: ldpos3a7bb5751c811b76bf13edce4105b5b330a71054
         await firstRecipientClient.connect({
           passphrase: 'genius shoulder into daring armor proof cycle bench patrol paper grant picture'
         });
@@ -734,7 +734,7 @@ describe('Functional tests', async () => {
         // Recipient passphrase: sniff there advice door hand eyebrow story eyebrow brief window mushroom legend
         let firstRecipientPreparedTxn = await firstRecipientClient.prepareTransaction({
           type: 'transfer',
-          recipientAddress: 'ldposc586d60664f1c8658a1bcee2d7192c0fc3dc2c60',
+          recipientAddress: 'ldposfa181bd957848641ece236b5b94eff4ec0af8ebd',
           amount: '500000000',
           fee: '10000000',
           timestamp: 100000,
@@ -763,7 +763,7 @@ describe('Functional tests', async () => {
           }),
           chainModule.actions.getAccount.handler({
             params: {
-              walletAddress: 'ldposc586d60664f1c8658a1bcee2d7192c0fc3dc2c60'
+              walletAddress: 'ldposfa181bd957848641ece236b5b94eff4ec0af8ebd'
             }
           })
         ]);
@@ -786,7 +786,7 @@ describe('Functional tests', async () => {
         // Recipient passphrase: genius shoulder into daring armor proof cycle bench patrol paper grant picture
         let preparedTxn = await clientA.prepareTransaction({
           type: 'transfer',
-          recipientAddress: 'ldposc917fe4c2a3a323fd221d4df44bb9ad0a3ecc3c8',
+          recipientAddress: 'ldpos3a7bb5751c811b76bf13edce4105b5b330a71054',
           amount: '100000000000',
           fee: '10000000',
           timestamp: 100000,
@@ -838,7 +838,7 @@ describe('Functional tests', async () => {
         passphrase: options.forgingPassphrase
       });
 
-      // Address: ldpos1f4db4c3ae469a987776493d47a81a70c245ed00
+      // Address: ldpos5f0bc55450657f7fcb188e90122f7e4cee894199
       walletAPassphrase = 'birth select quiz process bid raccoon memory village snow cable agent bean';
 
       clientA = createClient({
@@ -856,7 +856,7 @@ describe('Functional tests', async () => {
       beforeEach(async () => {
         let preparedTxn = await clientA.prepareTransaction({
           type: 'vote',
-          delegateAddress: 'ldpos1f4db4c3ae469a987776493d47a81a70c245ed00',
+          delegateAddress: 'ldpos5f0bc55450657f7fcb188e90122f7e4cee894199',
           fee: '20000000',
           timestamp: 100000,
           message: ''
@@ -874,7 +874,7 @@ describe('Functional tests', async () => {
         let activeDelegatesAfterList = await chainModule.actions.getForgingDelegates.handler();
         assert.equal(Array.isArray(activeDelegatesAfterList), true);
         assert.equal(activeDelegatesAfterList.length, 2);
-        assert.equal(activeDelegatesAfterList[1].address, 'ldpos1f4db4c3ae469a987776493d47a81a70c245ed00');
+        assert.equal(activeDelegatesAfterList[1].address, 'ldpos5f0bc55450657f7fcb188e90122f7e4cee894199');
         assert.equal(activeDelegatesAfterList[1].voteWeight, '99980000000');
       });
 
@@ -887,7 +887,7 @@ describe('Functional tests', async () => {
 
         let preparedTxn = await clientA.prepareTransaction({
           type: 'vote',
-          delegateAddress: 'ldposfacd5ebf967ebd87436bd5932a58168b9a1151e3',
+          delegateAddress: 'ldpos313ac2d3d1d081901be0c5ce074d1e81a8a0bf5f',
           fee: '20000000',
           timestamp: 100000,
           message: ''
@@ -922,7 +922,7 @@ describe('Functional tests', async () => {
 
         let preparedTxn = await clientA.prepareTransaction({
           type: 'vote',
-          delegateAddress: 'ldpos1f4db4c3ae469a987776493d47a81a70c245ed00',
+          delegateAddress: 'ldpos5f0bc55450657f7fcb188e90122f7e4cee894199',
           fee: '20000000',
           timestamp: 100000,
           message: ''
@@ -935,7 +935,7 @@ describe('Functional tests', async () => {
 
         let secondPreparedTxn = await clientA.prepareTransaction({
           type: 'vote',
-          delegateAddress: 'ldpos367429ac94d4204823fba7e79076d794ee0144c5',
+          delegateAddress: 'ldposaed82ed3f324e738306301ca4d6b955580d4bc24',
           fee: '20000000',
           timestamp: 100000,
           message: ''
@@ -989,7 +989,7 @@ describe('Functional tests', async () => {
         passphrase: options.forgingPassphrase
       });
 
-      // Address: ldpos1f4db4c3ae469a987776493d47a81a70c245ed00
+      // Address: ldpos5f0bc55450657f7fcb188e90122f7e4cee894199
       walletAPassphrase = 'birth select quiz process bid raccoon memory village snow cable agent bean';
 
       clientA = createClient({
@@ -1010,7 +1010,7 @@ describe('Functional tests', async () => {
 
         let preparedTxn = await clientA.prepareTransaction({
           type: 'unvote',
-          delegateAddress: 'ldposfacd5ebf967ebd87436bd5932a58168b9a1151e3',
+          delegateAddress: 'ldpos313ac2d3d1d081901be0c5ce074d1e81a8a0bf5f',
           fee: '20000000',
           timestamp: 100000,
           message: ''
@@ -1049,7 +1049,7 @@ describe('Functional tests', async () => {
 
         let preparedTxn = await clientA.prepareTransaction({
           type: 'unvote',
-          delegateAddress: 'ldpos367429ac94d4204823fba7e79076d794ee0144c5',
+          delegateAddress: 'ldposaed82ed3f324e738306301ca4d6b955580d4bc24',
           fee: '20000000',
           timestamp: 100000,
           message: ''
@@ -1100,7 +1100,7 @@ describe('Functional tests', async () => {
         passphrase: options.forgingPassphrase
       });
 
-      // Address: ldpos1f4db4c3ae469a987776493d47a81a70c245ed00
+      // Address: ldpos5f0bc55450657f7fcb188e90122f7e4cee894199
       clientA = createClient({
         adapter,
         store,
@@ -1110,7 +1110,7 @@ describe('Functional tests', async () => {
         passphrase: 'birth select quiz process bid raccoon memory village snow cable agent bean'
       });
 
-      // Address: ldpos367429ac94d4204823fba7e79076d794ee0144c5
+      // Address: ldposaed82ed3f324e738306301ca4d6b955580d4bc24
       clientB = createClient({
         adapter,
         store,
@@ -1130,8 +1130,8 @@ describe('Functional tests', async () => {
           type: 'registerMultisigWallet',
           requiredSignatureCount: 2,
           memberAddresses: [
-            'ldposfacd5ebf967ebd87436bd5932a58168b9a1151e3',
-            'ldpos367429ac94d4204823fba7e79076d794ee0144c5'
+            'ldpos313ac2d3d1d081901be0c5ce074d1e81a8a0bf5f',
+            'ldposaed82ed3f324e738306301ca4d6b955580d4bc24'
           ],
           fee: '50000000',
           timestamp: 100000,
@@ -1149,7 +1149,7 @@ describe('Functional tests', async () => {
         // Recipient passphrase: genius shoulder into daring armor proof cycle bench patrol paper grant picture
         let preparedTransferTxn = await clientA.prepareTransaction({
           type: 'transfer',
-          recipientAddress: 'ldposc917fe4c2a3a323fd221d4df44bb9ad0a3ecc3c8',
+          recipientAddress: 'ldpos3a7bb5751c811b76bf13edce4105b5b330a71054',
           amount: '12300000000',
           fee: '10000000',
           timestamp: 100000,
@@ -1191,8 +1191,8 @@ describe('Functional tests', async () => {
           type: 'registerMultisigWallet',
           requiredSignatureCount: 2,
           memberAddresses: [
-            'ldposfacd5ebf967ebd87436bd5932a58168b9a1151e3',
-            'ldpos367429ac94d4204823fba7e79076d794ee0144c5'
+            'ldpos313ac2d3d1d081901be0c5ce074d1e81a8a0bf5f',
+            'ldposaed82ed3f324e738306301ca4d6b955580d4bc24'
           ],
           fee: '50000000',
           timestamp: 100000,
@@ -1217,7 +1217,7 @@ describe('Functional tests', async () => {
           type: 'registerMultisigWallet',
           requiredSignatureCount: 1,
           memberAddresses: [
-            'ldposfacd5ebf967ebd87436bd5932a58168b9a1151e3'
+            'ldpos313ac2d3d1d081901be0c5ce074d1e81a8a0bf5f'
           ],
           fee: '50000000',
           timestamp: 100000,
@@ -1262,8 +1262,8 @@ describe('Functional tests', async () => {
           type: 'registerMultisigWallet',
           requiredSignatureCount: 3,
           memberAddresses: [
-            'ldposfacd5ebf967ebd87436bd5932a58168b9a1151e3',
-            'ldpos367429ac94d4204823fba7e79076d794ee0144c5'
+            'ldpos313ac2d3d1d081901be0c5ce074d1e81a8a0bf5f',
+            'ldposaed82ed3f324e738306301ca4d6b955580d4bc24'
           ],
           fee: '50000000',
           timestamp: 100000,
@@ -1319,7 +1319,7 @@ describe('Functional tests', async () => {
         passphrase: options.forgingPassphrase
       });
 
-      // Address: ldpos1f4db4c3ae469a987776493d47a81a70c245ed00
+      // Address: ldpos5f0bc55450657f7fcb188e90122f7e4cee894199
       clientA = createClient({
         adapter,
         store,
@@ -1352,12 +1352,12 @@ describe('Functional tests', async () => {
         await wait(8000);
 
         // Should allow control of an account to be transferred to a different user.
-        clientForger.walletAddress = 'ldpos1f4db4c3ae469a987776493d47a81a70c245ed00';
+        clientForger.walletAddress = 'ldpos5f0bc55450657f7fcb188e90122f7e4cee894199';
 
         // Recipient passphrase: genius shoulder into daring armor proof cycle bench patrol paper grant picture
         let preparedTxnB = await clientForger.prepareTransaction({
           type: 'transfer',
-          recipientAddress: 'ldposc917fe4c2a3a323fd221d4df44bb9ad0a3ecc3c8',
+          recipientAddress: 'ldpos3a7bb5751c811b76bf13edce4105b5b330a71054',
           amount: '2000000000',
           fee: '10000000',
           timestamp: 100000,
@@ -1451,7 +1451,7 @@ describe('Functional tests', async () => {
         passphrase: options.forgingPassphrase
       });
 
-      // Address: ldpos1f4db4c3ae469a987776493d47a81a70c245ed00
+      // Address: ldpos5f0bc55450657f7fcb188e90122f7e4cee894199
       clientA = createClient({
         adapter,
         store,
@@ -1560,7 +1560,7 @@ describe('Functional tests', async () => {
         passphrase: options.forgingPassphrase
       });
 
-      // Address: ldpos1f4db4c3ae469a987776493d47a81a70c245ed00
+      // Address: ldpos5f0bc55450657f7fcb188e90122f7e4cee894199
       clientA = createClient({
         adapter,
         store,

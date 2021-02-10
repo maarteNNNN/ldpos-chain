@@ -1,7 +1,7 @@
 // Utility script to generate account details to put in genesis.json
 
 const bip39 = require('bip39');
-const ProperMerkle = require('proper-merkle');
+const LiteMerkle = require('lite-merkle');
 const mnemonic = process.argv[2];
 
 if (!mnemonic) {
@@ -13,8 +13,8 @@ const SEED_ENCODING = 'hex';
 const NODE_ENCODING = 'hex';
 const ADDRESS_ENCODING = 'hex';
 
-let merkle = new ProperMerkle({
-  leafCount: 32,
+let merkle = new LiteMerkle({
+  leafCount: 64,
   seedEncoding: SEED_ENCODING,
   nodeEncoding: NODE_ENCODING
 });

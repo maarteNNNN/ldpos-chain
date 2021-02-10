@@ -1,5 +1,5 @@
 const ADDRESS_BASE_LENGTH = 40;
-const SIGNATURE_LENGTH = 32984;
+const MAX_SIGNATURE_LENGTH = 22784;
 const SIGNATURE_HASH_LENGTH = 44;
 const PUBLIC_KEY_LENGTH = 64;
 const ID_LENGTH = 40;
@@ -138,8 +138,8 @@ function validateSignature(propertyName, packet) {
   if (typeof signature !== 'string') {
     throw new Error(`Signature in ${propertyName} must be a string`);
   }
-  if (signature.length !== SIGNATURE_LENGTH) {
-    throw new Error(`Signature in ${propertyName} must have a length of ${SIGNATURE_LENGTH} characters`);
+  if (signature.length > MAX_SIGNATURE_LENGTH) {
+    throw new Error(`Signature in ${propertyName} must have a length of no more than ${MAX_SIGNATURE_LENGTH} characters`);
   }
 }
 
@@ -239,7 +239,7 @@ module.exports = {
   validateTimestamp,
   ADDRESS_BASE_LENGTH,
   ID_LENGTH,
-  SIGNATURE_LENGTH,
+  MAX_SIGNATURE_LENGTH,
   SIGNATURE_HASH_LENGTH,
   PUBLIC_KEY_LENGTH
 };

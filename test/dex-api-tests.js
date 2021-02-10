@@ -184,9 +184,9 @@ describe('DEX API tests', async () => {
       memberAccounts = [
         // Passphrase: birth select quiz process bid raccoon memory village snow cable agent bean
         {
-          address: 'ldpos1f4db4c3ae469a987776493d47a81a70c245ed00',
+          address: 'ldpos5f0bc55450657f7fcb188e90122f7e4cee894199',
           type: 'sig',
-          forgingPublicKey: '54ec095ccd226f0684bc0409ee488900a583e8cd82fd3a539972ae49f97dee69',
+          forgingPublicKey: 'e6c87420fb00ac4cd1327dabcfcfea7c2a63d3cf93580c18de2282385d3d72b3',
           nextForgingKeyIndex: 0,
           multisigPublicKey: 'a2d6e3024059ca92409911e0ad8308011f39c9278662f27ba7e32e1d777326dd',
           nextMultisigKeyIndex: 0,
@@ -196,7 +196,7 @@ describe('DEX API tests', async () => {
         },
         // Passphrase: genius shoulder into daring armor proof cycle bench patrol paper grant picture
         {
-          address: 'ldposc917fe4c2a3a323fd221d4df44bb9ad0a3ecc3c8',
+          address: 'ldpos3a7bb5751c811b76bf13edce4105b5b330a71054',
           type: 'sig',
           forgingPublicKey: 'SzXp6/L1ZztVN/LKxkkYQHR9BKoUuf1hjFf0a8vkZIE=',
           nextForgingKeyIndex: 0,
@@ -254,7 +254,7 @@ describe('DEX API tests', async () => {
           transactions: [
             {
               type: 'transfer',
-              recipientAddress: 'ldposc917fe4c2a3a323fd221d4df44bb9ad0a3ecc3c8',
+              recipientAddress: 'ldpos3a7bb5751c811b76bf13edce4105b5b330a71054',
               amount: '1100000000',
               fee: '100000000',
               timestamp: 10000,
@@ -262,7 +262,7 @@ describe('DEX API tests', async () => {
             },
             {
               type: 'transfer',
-              recipientAddress: 'ldpos1f4db4c3ae469a987776493d47a81a70c245ed00',
+              recipientAddress: 'ldpos5f0bc55450657f7fcb188e90122f7e4cee894199',
               amount: '1200000000',
               fee: '100000000',
               timestamp: 20000,
@@ -277,7 +277,7 @@ describe('DEX API tests', async () => {
           transactions: [
             {
               type: 'transfer',
-              recipientAddress: 'ldpos1f4db4c3ae469a987776493d47a81a70c245ed00',
+              recipientAddress: 'ldpos5f0bc55450657f7fcb188e90122f7e4cee894199',
               amount: '1300000000',
               fee: '100000000',
               timestamp: 30000,
@@ -292,7 +292,7 @@ describe('DEX API tests', async () => {
           transactions: [
             {
               type: 'transfer',
-              recipientAddress: 'ldpos1f4db4c3ae469a987776493d47a81a70c245ed00',
+              recipientAddress: 'ldpos5f0bc55450657f7fcb188e90122f7e4cee894199',
               amount: '1300000000',
               fee: '100000000',
               timestamp: 80000,
@@ -408,7 +408,7 @@ describe('DEX API tests', async () => {
         try {
           await chainModule.actions.getMinMultisigRequiredSignatures.handler({
             params: {
-              walletAddress: 'ldpos1f4db4c3ae469a987776493d47a81a70c245ed00'
+              walletAddress: 'ldpos5f0bc55450657f7fcb188e90122f7e4cee894199'
             }
           });
         } catch (error) {
@@ -519,7 +519,7 @@ describe('DEX API tests', async () => {
     describe('getInboundTransactionsFromBlock action', async () => {
 
       it('should return an array of transactions sent to the specified walletAddress', async () => {
-        let recipientAddress = 'ldpos1f4db4c3ae469a987776493d47a81a70c245ed00';
+        let recipientAddress = 'ldpos5f0bc55450657f7fcb188e90122f7e4cee894199';
         let transactions = await chainModule.actions.getInboundTransactionsFromBlock.handler({
           params: {
             walletAddress: recipientAddress,
@@ -543,7 +543,7 @@ describe('DEX API tests', async () => {
       });
 
       it('should return an empty array if no transactions match the specified blockId', async () => {
-        let recipientAddress = 'ldpos1f4db4c3ae469a987776493d47a81a70c245ed00';
+        let recipientAddress = 'ldpos5f0bc55450657f7fcb188e90122f7e4cee894199';
         let transactions = await chainModule.actions.getInboundTransactionsFromBlock.handler({
           params: {
             walletAddress: recipientAddress,
@@ -555,7 +555,7 @@ describe('DEX API tests', async () => {
       });
 
       it('should return an empty array if no transactions match the specified walletAddress', async () => {
-        let recipientAddress = 'ldpos1f4db4c3ae469a987776493d47a81a70c245ed00';
+        let recipientAddress = 'ldpos5f0bc55450657f7fcb188e90122f7e4cee894199';
         let transactions = await chainModule.actions.getInboundTransactionsFromBlock.handler({
           params: {
             walletAddress: 'ldpos6312b77c6ca4233141835eb37f8f33a45f18d50f',
@@ -772,7 +772,7 @@ describe('DEX API tests', async () => {
         // The chain module can handle the transaction and signature objects however it wants.
         let preparedTxn = await clientForger.prepareTransaction({
           type: 'transfer',
-          recipientAddress: 'ldpos1f4db4c3ae469a987776493d47a81a70c245ed00',
+          recipientAddress: 'ldpos5f0bc55450657f7fcb188e90122f7e4cee894199',
           amount: '3300000000',
           fee: '100000000',
           timestamp: 100000,

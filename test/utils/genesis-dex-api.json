@@ -2,15 +2,15 @@
   "networkSymbol": "ldpos",
   "accounts": [
     {
-      "address": "ldposfacd5ebf967ebd87436bd5932a58168b9a1151e3",
-      "forgingPublicKey": "351b1c997046484dc443e2f728a4479d8523a3b7f088c577f628177e639ef2b1",
+      "address": "ldpos313ac2d3d1d081901be0c5ce074d1e81a8a0bf5f",
+      "forgingPublicKey": "65afbf3e6e0f1b99bd595852ab59e9d54cd6ebffad3fb3608d6f084534938757",
       "nextForgingKeyIndex": 0,
-      "multisigPublicKey": "3ee9d5e74aa178ed7c6af4feb77430973c279a751be162cd3f669144b4a72fa2",
+      "multisigPublicKey": "9cd1cb3923eaf015762a6a2c44f224004060f60e4b12c27f61489685742e1c11",
       "nextMultisigKeyIndex": 0,
-      "sigPublicKey": "facd5ebf967ebd87436bd5932a58168b9a1151e3ccfbb9bda9a8ab6cb546675e",
+      "sigPublicKey": "313ac2d3d1d081901be0c5ce074d1e81a8a0bf5fe29515ac2d349cfa2f5b3b10",
       "nextSigKeyIndex": 0,
       "balance": "10000000000000000",
-      "votes": ["ldposfacd5ebf967ebd87436bd5932a58168b9a1151e3"]
+      "votes": ["ldpos313ac2d3d1d081901be0c5ce074d1e81a8a0bf5f"]
     }
   ]
 }
