@@ -1368,7 +1368,7 @@ module.exports = class LDPoSChainModule {
         transaction.sigPublicKey !== senderAccount.nextSigPublicKey
       ) {
         throw new Error(
-          `Transaction sigPublicKey did not match the sigPublicKey or nextSigPublicKey of the account ${
+          `Transaction sigPublicKey did not match the sigPublicKey or nextSigPublicKey of the sender account ${
             senderAccount.address
           }`
         );
@@ -1381,7 +1381,7 @@ module.exports = class LDPoSChainModule {
       let addressHex = senderAccount.address.slice(this.networkSymbol.length);
       if (txnSigPublicKeyHex !== addressHex) {
         throw new Error(
-          `Transaction sigPublicKey did not correspond to the address of the account ${
+          `Transaction sigPublicKey did not correspond to the address of the sender account ${
             senderAccount.address
           }`
         );
@@ -1389,6 +1389,18 @@ module.exports = class LDPoSChainModule {
     }
 
     if (fullCheck) {
+      if (
+        senderAccount.nextSigKeyIndex != null &&
+        transaction.nextSigKeyIndex <= senderAccount.nextSigKeyIndex
+      ) {
+        throw new Error(
+          `Transaction nextSigKeyIndex was too low for the sender account ${
+            senderAccount.address
+          }; it needs to be higher than ${
+            senderAccount.nextSigKeyIndex
+          }`
+        );
+      }
       // Check that the transaction signature corresponds to the public key.
       if (!this.ldposClient.verifyTransaction(transaction)) {
         throw new Error('Transaction senderSignature was invalid');
@@ -1416,7 +1428,8 @@ module.exports = class LDPoSChainModule {
       for (let signaturePacket of transaction.signatures) {
         let {
           signerAddress,
-          multisigPublicKey
+          multisigPublicKey,
+          nextMultisigKeyIndex
         } = signaturePacket;
 
         if (!multisigMemberAccounts[signerAddress]) {
@@ -1441,8 +1454,17 @@ module.exports = class LDPoSChainModule {
           multisigPublicKey !== memberAccount.nextMultisigPublicKey
         ) {
           throw new Error(
-            `Transaction multisigPublicKey did not match the multisigPublicKey or nextMultisigPublicKey of member ${
+            `Multisig transaction signature multisigPublicKey did not match the multisigPublicKey or nextMultisigPublicKey of the member account ${
               memberAccount.address
+            }`
+          );
+        }
+        if (nextMultisigKeyIndex <= memberAccount.nextMultisigKeyIndex) {
+          throw new Error(
+            `Multisig transaction signature nextMultisigKeyIndex from the member account ${
+              memberAccount.address
+            } was too low; it needs to be higher than ${
+              memberAccount.nextMultisigKeyIndex
             }`
           );
         }
@@ -1823,7 +1845,9 @@ module.exports = class LDPoSChainModule {
             senderAccount.balance -= txnTotal;
           } catch (error) {
             throw new Error(
-              `Failed to validate transactions during block verification because of error: ${
+              `Failed to validate transaction ${
+                senderTxn.id
+              } during block verification because of error: ${
                 error.message
               }`
             );

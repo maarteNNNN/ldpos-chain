@@ -1337,7 +1337,7 @@ describe('Functional tests', async () => {
           type: 'registerSigDetails',
           newSigPublicKey: clientForger.sigPublicKey,
           newNextSigPublicKey: clientForger.nextSigPublicKey,
-          newNextSigKeyIndex: clientForger.sigKeyIndex + 1,
+          newNextSigKeyIndex: clientForger.sigKeyIndex,
           fee: '10000000',
           timestamp: 100000,
           message: ''
@@ -1469,7 +1469,7 @@ describe('Functional tests', async () => {
           type: 'registerMultisigDetails',
           newMultisigPublicKey: clientForger.multisigPublicKey,
           newNextMultisigPublicKey: clientForger.nextMultisigPublicKey,
-          newNextMultisigKeyIndex: clientForger.multisigKeyIndex + 1,
+          newNextMultisigKeyIndex: clientForger.multisigKeyIndex,
           fee: '10000000',
           timestamp: 100000,
           message: ''
@@ -1493,7 +1493,7 @@ describe('Functional tests', async () => {
         assert.equal(caughtError, null);
         assert.equal(account.multisigPublicKey, clientForger.multisigPublicKey);
         assert.equal(account.nextMultisigPublicKey, clientForger.nextMultisigPublicKey);
-        assert.equal(account.nextMultisigKeyIndex, clientForger.multisigKeyIndex + 1);
+        assert.equal(account.nextMultisigKeyIndex, clientForger.multisigKeyIndex);
       });
 
     });
@@ -1578,7 +1578,7 @@ describe('Functional tests', async () => {
           type: 'registerForgingDetails',
           newForgingPublicKey: clientForger.forgingPublicKey,
           newNextForgingPublicKey: clientForger.nextForgingPublicKey,
-          newNextForgingKeyIndex: clientForger.forgingKeyIndex + 1,
+          newNextForgingKeyIndex: clientForger.forgingKeyIndex,
           fee: '10000000',
           timestamp: 100000,
           message: ''
@@ -1602,7 +1602,7 @@ describe('Functional tests', async () => {
         assert.equal(caughtError, null);
         assert.equal(account.forgingPublicKey, clientForger.forgingPublicKey);
         assert.equal(account.nextForgingPublicKey, clientForger.nextForgingPublicKey);
-        assert.equal(account.nextForgingKeyIndex, clientForger.forgingKeyIndex + 1);
+        assert.equal(account.nextForgingKeyIndex, clientForger.forgingKeyIndex);
       });
 
     });
