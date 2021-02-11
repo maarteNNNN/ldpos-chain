@@ -470,7 +470,7 @@ describe('Functional tests', async () => {
             type: 'transfer',
             recipientAddress: 'ldpos3a7bb5751c811b76bf13edce4105b5b330a71054',
             amount: `${i + 1}00000000`,
-            fee: `${i + 1}0000000`,
+            fee: `${i + 1}1000000`,
             timestamp: 100000,
             message: ''
           });
@@ -532,7 +532,7 @@ describe('Functional tests', async () => {
 
         let initialAmount = 300;
         let expectedSentAmount = 15;
-        let expectedFees = 1.5;
+        let expectedFees = 1.55;
         let unitSize = 100000000;
         assert.equal(senderAccount.balance, String((initialAmount - expectedSentAmount - expectedFees) * unitSize));
         assert.equal(recipientAccount.balance, String(expectedSentAmount * unitSize));
@@ -582,7 +582,7 @@ describe('Functional tests', async () => {
             type: 'transfer',
             recipientAddress: 'ldpos3a7bb5751c811b76bf13edce4105b5b330a71054',
             amount: `${i + 1}00000000`,
-            fee: `${i + 1}0000000`,
+            fee: `${i + 1}1000000`,
             timestamp: 100000,
             message: ''
           });
@@ -653,7 +653,7 @@ describe('Functional tests', async () => {
 
         let initialAmount = 300;
         let expectedSentAmount = 15;
-        let expectedFees = 1.5;
+        let expectedFees = 1.55;
         let unitSize = 100000000;
         assert.equal(senderAccount.balance, String((initialAmount - expectedSentAmount - expectedFees) * unitSize));
         assert.equal(recipientAccount.balance, String(expectedSentAmount * unitSize));
@@ -1133,7 +1133,7 @@ describe('Functional tests', async () => {
             'ldpos313ac2d3d1d081901be0c5ce074d1e81a8a0bf5f',
             'ldposaed82ed3f324e738306301ca4d6b955580d4bc24'
           ],
-          fee: '50000000',
+          fee: '250000000',
           timestamp: 100000,
           message: ''
         });
@@ -1151,7 +1151,7 @@ describe('Functional tests', async () => {
           type: 'transfer',
           recipientAddress: 'ldpos3a7bb5751c811b76bf13edce4105b5b330a71054',
           amount: '12300000000',
-          fee: '10000000',
+          fee: '11000000',
           timestamp: 100000,
           message: ''
         });
@@ -1175,7 +1175,7 @@ describe('Functional tests', async () => {
           }
         });
         assert.equal(account.type, 'multisig');
-        assert.equal(account.balance, '99950000000');
+        assert.equal(account.balance, '99750000000');
         assert.notEqual(caughtError, null);
       });
 
@@ -1194,7 +1194,7 @@ describe('Functional tests', async () => {
             'ldpos313ac2d3d1d081901be0c5ce074d1e81a8a0bf5f',
             'ldposaed82ed3f324e738306301ca4d6b955580d4bc24'
           ],
-          fee: '50000000',
+          fee: '250000000',
           timestamp: 100000,
           message: ''
         });
@@ -1219,7 +1219,7 @@ describe('Functional tests', async () => {
           memberAddresses: [
             'ldpos313ac2d3d1d081901be0c5ce074d1e81a8a0bf5f'
           ],
-          fee: '50000000',
+          fee: '251000000',
           timestamp: 100000,
           message: ''
         });
@@ -1248,7 +1248,7 @@ describe('Functional tests', async () => {
       it('should support re-registering an existing multisig wallet with a different set of member addresses', async () => {
         assert.equal(accountBefore.requiredSignatureCount, 2);
         assert.equal(accountAfter.requiredSignatureCount, 1);
-        assert.equal(accountAfter.balance, '99900000000');
+        assert.equal(accountAfter.balance, '99499000000');
       });
 
     });

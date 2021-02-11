@@ -1319,9 +1319,9 @@ module.exports = class LDPoSChainModule {
           fee
         } was below the minimum fee of ${
           minFee
-        } for transactions of type ${
+        } for this ${
           type
-        }`
+        } transaction`
       );
     }
   }
@@ -1338,9 +1338,9 @@ module.exports = class LDPoSChainModule {
           fee
         } was below the minimum fee of ${
           minFee
-        } for multisig transactions of type ${
+        } for this ${
           type
-        } with ${
+        } multisig transaction with ${
           multisigMemberCount
         } wallet members`
       );
