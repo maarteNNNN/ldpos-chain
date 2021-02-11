@@ -34,10 +34,10 @@ const DEFAULT_MODULE_ALIAS = 'ldpos_chain';
 const DEFAULT_GENESIS_PATH = './genesis/mainnet/genesis.json';
 const DEFAULT_NETWORK_SYMBOL = 'ldpos';
 const DEFAULT_CRYPTO_CLIENT_LIB_PATH = 'ldpos-client';
-const DEFAULT_FORGER_COUNT = 11;
+const DEFAULT_FORGER_COUNT = 21;
 const DEFAULT_MIN_FORGER_BLOCK_SIGNATURE_RATIO = .6;
-const DEFAULT_BLOCK_SIGNATURES_TO_PROVIDE = 6;
-const DEFAULT_BLOCK_SIGNATURES_TO_FETCH = 6;
+const DEFAULT_BLOCK_SIGNATURES_TO_PROVIDE = 12;
+const DEFAULT_BLOCK_SIGNATURES_TO_FETCH = 12;
 const DEFAULT_BLOCK_SIGNATURES_INDICATOR = 'bsi';
 const DEFAULT_FORGING_INTERVAL = 30000;
 const DEFAULT_FETCH_BLOCK_LIMIT = 10;
@@ -2984,7 +2984,7 @@ module.exports = class LDPoSChainModule {
         new Error(
           `The blockSignaturesToProvide option was ${
             this.blockSignaturesToProvide
-          } which is less than the delegate majority of ${
+          } which is less than the required delegate majority of ${
             majorityBlockSignatureCount
           } - Node will operate in lite mode`
         )
