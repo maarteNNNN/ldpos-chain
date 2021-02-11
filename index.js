@@ -51,7 +51,7 @@ const DEFAULT_TIME_POLL_INTERVAL = 200;
 const DEFAULT_MIN_TRANSACTIONS_PER_BLOCK = 1;
 const DEFAULT_MAX_TRANSACTIONS_PER_BLOCK = 300;
 const DEFAULT_MIN_MULTISIG_MEMBERS = 1;
-const DEFAULT_MAX_MULTISIG_MEMBERS = 20;
+const DEFAULT_MAX_MULTISIG_MEMBERS = 100;
 const DEFAULT_PENDING_TRANSACTION_EXPIRY = 604800000; // 1 week
 const DEFAULT_PENDING_TRANSACTION_EXPIRY_CHECK_INTERVAL = 3600000; // 1 hour
 const DEFAULT_MAX_SPENDABLE_DIGITS = 25;
@@ -79,6 +79,9 @@ const DEFAULT_MIN_TRANSACTION_FEES = {
   registerForgingDetails: '10000000',
   registerMultisigWallet: '50000000'
 };
+
+const DEFAULT_MIN_MULTISIG_REGISTRATION_FEE_PER_MEMBER = '100000000';
+const DEFAULT_MIN_MULTISIG_TRANSFER_FEE_PER_MEMBER = '500000';
 
 const NO_PEER_LIMIT = -1;
 const ACCOUNT_TYPE_MULTISIG = 'multisig';
@@ -1296,20 +1299,50 @@ module.exports = class LDPoSChainModule {
     }
   }
 
-  verifyTransactionOffersMinFee(transaction) {
+  getTransactionFeeInfo(transaction) {
     let { type, fee } = transaction;
     let txnFee = BigInt(fee);
     let minFee = this.minTransactionFees[type] || 0n;
+    if (type === 'registerMultisigWallet') {
+      let { memberAddresses } = transaction;
+      minFee += BigInt(memberAddresses.length) * this.minMultisigRegistrationFeePerMember;
+    }
+    return { type, fee: txnFee, minFee };
+  }
 
-    if (txnFee < minFee) {
+  verifySigTransactionOffersMinFee(transaction) {
+    let { type, fee, minFee } = this.getTransactionFeeInfo(transaction);
+
+    if (fee < minFee) {
       throw new Error(
         `Transaction fee ${
-          txnFee
+          fee
         } was below the minimum fee of ${
           minFee
         } for transactions of type ${
           type
         }`
+      );
+    }
+  }
+
+  verifyMultisigTransactionOffersMinFee(transaction, multisigMemberAccounts) {
+    let { type, fee, minFee } = this.getTransactionFeeInfo(transaction);
+
+    let multisigMemberCount = Object.keys(multisigMemberAccounts || {}).length;
+    minFee += BigInt(multisigMemberCount) * this.minMultisigTransferFeePerMember;
+
+    if (fee < minFee) {
+      throw new Error(
+        `Transaction fee ${
+          fee
+        } was below the minimum fee of ${
+          minFee
+        } for multisig transactions of type ${
+          type
+        } with ${
+          multisigMemberCount
+        } wallet members`
       );
     }
   }
@@ -1574,7 +1607,7 @@ module.exports = class LDPoSChainModule {
     this.verifyTransactionIsNotInFuture(transaction);
 
     if (fullCheck) {
-      this.verifyTransactionOffersMinFee(transaction);
+      this.verifySigTransactionOffersMinFee(transaction);
       await this.verifyTransactionDoesNotAlreadyExist(transaction);
     }
 
@@ -1601,7 +1634,7 @@ module.exports = class LDPoSChainModule {
     this.verifyTransactionIsNotInFuture(transaction);
 
     if (fullCheck) {
-      this.verifyTransactionOffersMinFee(transaction);
+      this.verifyMultisigTransactionOffersMinFee(transaction, multisigMemberAccounts);
       await this.verifyTransactionDoesNotAlreadyExist(transaction);
     }
 
@@ -2879,6 +2912,8 @@ module.exports = class LDPoSChainModule {
       maxTransactionsPerBlock: DEFAULT_MAX_TRANSACTIONS_PER_BLOCK,
       minMultisigMembers: DEFAULT_MIN_MULTISIG_MEMBERS,
       maxMultisigMembers: DEFAULT_MAX_MULTISIG_MEMBERS,
+      minMultisigRegistrationFeePerMember: DEFAULT_MIN_MULTISIG_REGISTRATION_FEE_PER_MEMBER,
+      minMultisigTransferFeePerMember: DEFAULT_MIN_MULTISIG_TRANSFER_FEE_PER_MEMBER,
       pendingTransactionExpiry: DEFAULT_PENDING_TRANSACTION_EXPIRY,
       pendingTransactionExpiryCheckInterval: DEFAULT_PENDING_TRANSACTION_EXPIRY_CHECK_INTERVAL,
       maxSpendableDigits: DEFAULT_MAX_SPENDABLE_DIGITS,
@@ -2906,6 +2941,8 @@ module.exports = class LDPoSChainModule {
     }
     this.options.minTransactionFees = minTransactionFees;
     this.minTransactionFees = minTransactionFees;
+    this.minMultisigRegistrationFeePerMember = BigInt(this.options.minMultisigRegistrationFeePerMember);
+    this.minMultisigTransferFeePerMember = BigInt(this.options.minMultisigTransferFeePerMember);
 
     this.forgingInterval = this.options.forgingInterval;
     this.forgerCount = this.options.forgerCount;
