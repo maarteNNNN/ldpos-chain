@@ -23,7 +23,7 @@
     "bip39": "^3.0.3",
     "ldpos-client": "^4.2.0",
     "ldpos-knex-dal": "^1.0.4",
-    "lite-merkle": "^1.0.0",
+    "lite-merkle": "^1.0.1",
     "lodash.shuffle": "^4.2.0",
     "writable-consumable-stream": "^2.0.0"
   },
