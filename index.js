@@ -105,7 +105,9 @@ module.exports = class LDPoSChainModule {
       );
     }
     const DAL = require(this.dalConfig.libPath);
-    this.dal = new DAL();
+    this.dal = new DAL({
+      logger: this.logger
+    });
 
     this.pendingTransactionStreams = {};
     this.pendingTransactionMap = new Map();
@@ -2165,13 +2167,18 @@ module.exports = class LDPoSChainModule {
           this.nodeHeight = this.networkHeight;
           let nextHeight = this.networkHeight + 1;
 
+          if (!this.isActive) {
+            this.resolveUnload && this.resolveUnload();
+            break;
+          }
+
           await this.waitUntilNextBlockTimeSlot({
             forgingInterval,
             timePollInterval
           });
 
           if (!this.isActive) {
-            this.resolveUnload();
+            this.resolveUnload && this.resolveUnload();
             break;
           }
 
@@ -3090,10 +3097,13 @@ module.exports = class LDPoSChainModule {
 
   async unload() {
     clearInterval(this._pendingTransactionExpiryCheckIntervalId);
-    await new Promise((resolve) => {
-      this.resolveUnload = resolve;
+    if (this.isActive) {
       this.isActive = false;
-    });
+      await new Promise((resolve) => {
+        this.resolveUnload = resolve;
+      });
+      await this.dal.destroy();
+    }
   }
 
   async wait(duration) {

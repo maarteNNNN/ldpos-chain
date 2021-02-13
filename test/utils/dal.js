@@ -64,6 +64,16 @@ class DAL {
     );
   }
 
+  async destroy() {
+    this.accounts = {};
+    this.delegates = {};
+    this.ballots = {};
+    this.blocks = [];
+    this.transactions = {};
+    this.multisigMembers = {};
+    this.store = {};
+  }
+
   async saveItem(key, value) {
     this.store[key] = value;
   }

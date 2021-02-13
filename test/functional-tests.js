@@ -6,13 +6,13 @@ const MockLDPoSChainModule = require('./utils/chain');
 const { sha256 } = require('./utils/hash');
 const wait = require('./utils/wait');
 const { createClient } = require('ldpos-client');
-const { tearDownAllFixtures, destroyConnection } = require('ldpos-knex-dal/test/setup');
+const { LDPoSKnexDAL } = require('ldpos-knex-dal');
 const LDPoSChainModule = require('../index');
 
 const NETWORK_SYMBOL = 'ldpos';
 
 const useKnexDal = process.env.USE_KNEX_DAL;
-const dalLibPath = useKnexDal ? 'ldpos-knex-dal/src/index' : './test/utils/dal';
+const dalLibPath = useKnexDal ? 'ldpos-knex-dal' : './test/utils/dal';
 
 describe('Functional tests', async () => {
   let chainModule;
@@ -29,18 +29,12 @@ describe('Functional tests', async () => {
   let clientB;
 
   beforeEach(async () => {
-    if (useKnexDal) {
-      try {
-        await tearDownAllFixtures();
-      } catch (error) {
-        console.debug(error.message);
-      }
-    }
     chainModule = new LDPoSChainModule({
       config: {
         components: {
           dal: {
-            libPath: dalLibPath
+            libPath: dalLibPath,
+            clearAllDataOnInit: true
           }
         }
       },
@@ -100,12 +94,6 @@ describe('Functional tests', async () => {
 
   afterEach(async () => {
     await chainModule.unload();
-  });
-
-  after(async () => {
-    if (useKnexDal) {
-      await destroyConnection();
-    }
   });
 
   describe('block forging', async () => {
