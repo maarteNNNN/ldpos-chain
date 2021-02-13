@@ -200,6 +200,9 @@ function validateTransactionAmount(propertyName, packet, maxSpendableDigits) {
   if (amount.length > maxSpendableDigits) {
     throw new Error(`Transaction amount in ${propertyName} exceeded the maximum spendable digits`);
   }
+  if (BigInt(amount).toString() !== amount) {
+    throw new Error(`Transaction amount in ${propertyName} was not serializable`);
+  }
 }
 
 function validateTransactionFee(propertyName, packet, maxSpendableDigits) {
@@ -209,6 +212,9 @@ function validateTransactionFee(propertyName, packet, maxSpendableDigits) {
   }
   if (fee.length > maxSpendableDigits) {
     throw new Error(`Transaction fee in ${propertyName} exceeded the maximum spendable digits`);
+  }
+  if (BigInt(fee).toString() !== fee) {
+    throw new Error(`Transaction fee in ${propertyName} was not serializable`);
   }
 }
 

@@ -1750,7 +1750,7 @@ module.exports = class LDPoSChainModule {
       );
     }
     if (!this.ldposClient.verifyBlock(block)) {
-      throw new Error('Block was invalid');
+      throw new Error('Block ID or signature was invalid');
     }
     let senderAccountDetails = await this.verifyBlockTransactions(block);
     return {
@@ -2104,6 +2104,15 @@ module.exports = class LDPoSChainModule {
     }
 
     this.ldposClient = ldposClient;
+
+    try {
+      await this.fetchTopActiveDelegates();
+    } catch (error) {
+      throw new Error(
+        `Failed to load top active delegates because of error: ${error.message}`
+      );
+    }
+
     this.nodeHeight = await this.dal.getMaxBlockHeight();
     try {
       this.lastProcessedBlock = await this.dal.getSignedBlockAtHeight(this.nodeHeight);
@@ -2116,7 +2125,8 @@ module.exports = class LDPoSChainModule {
     }
     if (this.lastProcessedBlock) {
       let existingSignatureCount = this.lastProcessedBlock.signatures.length;
-      if (this.blockSignaturesToProvide > existingSignatureCount) {
+      let hasAllForgerSignatures = existingSignatureCount >= this.topActiveDelegates.length - 1;
+      if (!hasAllForgerSignatures && this.blockSignaturesToProvide > existingSignatureCount) {
         throw new Error(
           `The blockSignaturesToProvide option was greater than ${
             existingSignatureCount
@@ -2139,14 +2149,6 @@ module.exports = class LDPoSChainModule {
     }
     this.lastReceivedBlock = this.lastProcessedBlock;
     this.lastFullySignedBlock = this.lastProcessedBlock;
-
-    try {
-      await this.fetchTopActiveDelegates();
-    } catch (error) {
-      throw new Error(
-        `Failed to load top active delegates because of error: ${error.message}`
-      );
-    }
 
     (async () => {
       try {

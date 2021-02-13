@@ -11,6 +11,9 @@ const LDPoSChainModule = require('../index');
 
 const NETWORK_SYMBOL = 'ldpos';
 
+const useKnexDal = process.env.USE_KNEX_DAL;
+const dalLibPath = useKnexDal ? 'ldpos-knex-dal' : './test/utils/dal';
+
 // This test suite can be adapted to check whether or not a custom chain module is compatible with Lisk DEX.
 // All the boilerplate can be modified except the 'it' blocks where the assertions are made.
 // If a module passes all the test case cases in this file, then it is compatible with Lisk DEX.
@@ -32,7 +35,8 @@ describe('DEX API tests', async () => {
       config: {
         components: {
           dal: {
-            libPath: './test/utils/dal'
+            libPath: dalLibPath,
+            clearAllDataOnInit: true
           }
         }
       },

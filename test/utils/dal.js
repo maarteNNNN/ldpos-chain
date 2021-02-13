@@ -266,10 +266,6 @@ class DAL {
     return [...memberAddresses];
   }
 
-  async getLastBlock() {
-    return {...this.blocks[this.blocks.length - 1]};
-  }
-
   async getBlocksFromHeight(height, limit) {
     let blocks = await this.getSignedBlocksFromHeight(height, limit)
     return blocks.map(block => this.simplifyBlock(block));
