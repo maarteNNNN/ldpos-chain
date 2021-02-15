@@ -2384,7 +2384,14 @@ module.exports = class LDPoSChainModule {
   }
 
   async postTransaction(transaction) {
-    await this.processReceivedTransaction(transaction, PROPAGATION_MODE_IMMEDIATE);
+    try {
+      await this.processReceivedTransaction(transaction, PROPAGATION_MODE_IMMEDIATE);
+    } catch (error) {
+      let err = new Error(error.message);
+      err.name = 'InvalidTransactionError';
+      err.type = 'InvalidActionError';
+      throw err;
+    }
   }
 
   async broadcastTransaction(transaction) {
