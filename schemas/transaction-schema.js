@@ -21,13 +21,15 @@ function validateTransactionSchema(transaction, maxSpendableDigits, networkSymbo
   let { type } = transaction;
 
   if (
-    type !== 'transfer' &&
-    type !== 'vote' &&
-    type !== 'unvote' &&
-    type !== 'registerSigDetails' &&
-    type !== 'registerMultisigDetails' &&
-    type !== 'registerForgingDetails' &&
-    type !== 'registerMultisigWallet'
+    [
+      'transfer',
+      'vote',
+      'unvote',
+      'registerSigDetails',
+      'registerMultisigDetails',
+      'registerForgingDetails',
+      'registerMultisigWallet',
+    ].includes(type)
   ) {
     throw new Error(
       'Transaction type must be a string which refers to one of the supported transaction types'
