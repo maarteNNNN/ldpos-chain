@@ -40,28 +40,22 @@ function validateTransactionSchema(transaction, maxSpendableDigits, networkSymbo
   validateTransactionMessage('message', transaction, maxTransactionMessageLength);
 
   let extraValidProperties;
-  if (type === 'transfer') {
-    extraValidProperties = validateTransferTransactionSchema(transaction, maxSpendableDigits, networkSymbol);
-  } else if (type === 'vote') {
-    extraValidProperties = validateVoteTransactionSchema(transaction, networkSymbol);
-  } else if (type === 'unvote') {
-    extraValidProperties = validateUnvoteTransactionSchema(transaction, networkSymbol);
-  } else if (type === 'registerSigDetails') {
-    extraValidProperties = validateRegisterSigDetailsTransactionSchema(transaction);
-  } else if (type === 'registerMultisigDetails') {
-    extraValidProperties = validateRegisterMultisigDetailsTransactionSchema(transaction);
-  } else if (type === 'registerForgingDetails') {
-    extraValidProperties = validateRegisterForgingDetailsTransactionSchema(transaction);
-  } else if (type === 'registerMultisigWallet') {
-    extraValidProperties = validateRegisterMultisigWalletTransactionSchema(
+  const sw = {
+    transfer: () => (extraValidProperties = validateTransferTransactionSchema(transaction, maxSpendableDigits, networkSymbol)),
+    vote: () => (extraValidProperties = validateVoteTransactionSchema(transaction, networkSymbol)),
+    unvote: () => (extraValidProperties = validateUnvoteTransactionSchema(transaction, networkSymbol)),
+    registerSigDetails: () => (extraValidProperties = validateRegisterSigDetailsTransactionSchema(transaction)),
+    registerMultisigDetails: () => (extraValidProperties = validateRegisterMultisigDetailsTransactionSchema(transaction)),
+    registerForgingDetails: () => (extraValidProperties = validateRegisterForgingDetailsTransactionSchema(transaction)),
+    registerMultisigWallet: () => (extraValidProperties = validateRegisterMultisigWalletTransactionSchema(
       transaction,
       minMultisigMembers,
       maxMultisigMembers,
       networkSymbol
-    );
-  } else {
-    extraValidProperties = [];
+    )),
+    default: () => (extraValidProperties = [])
   }
+  (sw[type] || sw.default)()
 
   let validPropertyList = [
     'id',
