@@ -21,7 +21,7 @@ function validateTransactionSchema(transaction, maxSpendableDigits, networkSymbo
   let { type } = transaction;
 
   if (
-    [
+    ![
       'transfer',
       'vote',
       'unvote',
